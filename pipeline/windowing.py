@@ -18,16 +18,22 @@ def build_flow_windows(flow_df: pd.DataFrame, config: dict[str, Any]) -> pd.Data
     df = flow_df.copy()
     df["window_start"] = df["timestamp"].dt.floor(f"{window_seconds}s")
     df["stage"] = df["label"].map(label_to_stage)
+    if "has_ip_data" not in df.columns:
+        df["has_ip_data"] = 1.0  # caller didn't route through flow_features.clean_and_normalize
 
     rows = []
     for (src_ip, window_start), group in df.groupby(["src_ip", "window_start"]):
         total_pkts = group["total_pkts"].sum()
+        has_ip_data = float(group["has_ip_data"].iloc[0])
         rows.append({
             "src_ip": src_ip,
             "window_start": window_start,
             "flow_count": len(group),
             "unique_dst_ports": group["dst_port"].nunique(),
-            "unique_dst_ips": group["dst_ip"].nunique(),
+            # dst_ip is a constant sentinel ("UNKNOWN") when has_ip_data is 0 — nunique() would
+            # trivially read 1, which looks like a real "only one destination" signal but isn't
+            "unique_dst_ips": group["dst_ip"].nunique() if has_ip_data else 0.0,
+            "has_ip_data": has_ip_data,
             "total_bytes": group["total_bytes"].sum(),
             "total_packets": total_pkts,
             "mean_duration": group["duration_s"].mean(),
