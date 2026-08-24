@@ -210,6 +210,55 @@ def _bruteforce_packets(start_s: int, end_s: int) -> list:
     return packets
 
 
+def _lateral_movement_packets(start_s: int, end_s: int) -> list:
+    packets = []
+    t = start_s
+    while t < end_s:
+        dst_ip = str(RNG.choice(INTERNAL_HOSTS))
+        port = int(RNG.choice([445, 3389, 139, 22]))
+        pkt = IP(src=ATTACKER_IP, dst=dst_ip, ttl=64) / TCP(
+            sport=int(RNG.integers(40000, 65000)), dport=port, flags="PA",
+            window=int(RNG.integers(4000, 65000)),
+        )
+        pkt /= b"x" * int(RNG.integers(100, 2000))
+        pkt.time = (BASE_TIME + pd.Timedelta(seconds=t)).timestamp()
+        packets.append(pkt)
+        t += int(RNG.uniform(2, 6))
+    return packets
+
+
+def _c2_packets(start_s: int, end_s: int) -> list:
+    """Regular beacon interval, matching _c2_phase's flow-level pattern."""
+    packets = []
+    t = start_s
+    beacon_interval = 5
+    while t < end_s:
+        pkt = IP(src=ATTACKER_IP, dst=C2_IP, ttl=64) / TCP(
+            sport=int(RNG.integers(40000, 65000)), dport=443, flags="PA",
+            window=int(RNG.integers(4000, 8000)),
+        )
+        pkt /= b"x" * int(RNG.integers(100, 300))
+        pkt.time = (BASE_TIME + pd.Timedelta(seconds=t)).timestamp()
+        packets.append(pkt)
+        t += beacon_interval
+    return packets
+
+
+def _exfiltration_packets(start_s: int, end_s: int) -> list:
+    packets = []
+    t = start_s
+    while t < end_s:
+        pkt = IP(src=ATTACKER_IP, dst=EXFIL_IP, ttl=64) / TCP(
+            sport=int(RNG.integers(40000, 65000)), dport=443, flags="PA",
+            window=int(RNG.integers(4000, 65000)),
+        )
+        pkt /= b"x" * int(RNG.integers(1000, 1400))
+        pkt.time = (BASE_TIME + pd.Timedelta(seconds=t)).timestamp()
+        packets.append(pkt)
+        t += int(RNG.uniform(1, 3))
+    return packets
+
+
 def main(config_path: str = "configs/default.yaml") -> None:
     config = load_config(config_path)
     flow_dir = resolve_path(config, "raw_flow_dir")
@@ -239,10 +288,23 @@ def main(config_path: str = "configs/default.yaml") -> None:
         ]
         for start, end, fn in phases:
             rows.extend(fn(start, end))
-        packets.extend(_benign_packets(offset + 0, offset + 300))
-        packets.extend(_recon_packets(offset + 300, offset + 375))
-        packets.extend(_bruteforce_packets(offset + 375, offset + 450))
-        packets.extend(_benign_packets(offset + 825, offset + 900))
+
+        # PCAP coverage alternates by WHOLE CYCLE, not by attack phase. Every cycle contains the
+        # same phase progression (benign -> recon -> bruteforce -> lateral -> C2 -> exfil ->
+        # benign), so an every-other-cycle capture gap — simulating a sensor that periodically
+        # drops, e.g. a rotating/rebooting capture appliance — is independent of the attack label.
+        # Earlier this only ever captured the first three phases of every cycle, which made
+        # `has_packet_features` a near-perfect proxy for "early vs late attack" — the same leak
+        # class a competing SIH team found and fixed on CTU-13's PCAP. See
+        # tests/test_windowing.py::test_has_packet_features_not_a_near_perfect_label_proxy_on_synthetic_sample.
+        if cycle % 2 == 0:
+            packets.extend(_benign_packets(offset + 0, offset + 300))
+            packets.extend(_recon_packets(offset + 300, offset + 375))
+            packets.extend(_bruteforce_packets(offset + 375, offset + 450))
+            packets.extend(_lateral_movement_packets(offset + 450, offset + 600))
+            packets.extend(_c2_packets(offset + 600, offset + 750))
+            packets.extend(_exfiltration_packets(offset + 750, offset + 825))
+            packets.extend(_benign_packets(offset + 825, offset + 900))
 
     flow_df = pd.DataFrame(rows).sort_values("Timestamp")
     csv_path = flow_dir / "synthetic_sample.csv"

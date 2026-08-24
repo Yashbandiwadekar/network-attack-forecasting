@@ -61,15 +61,22 @@ def merge_packet_features(
     flow_windows: pd.DataFrame, packet_windows: pd.DataFrame | None, config: dict[str, Any]
 ) -> pd.DataFrame:
     """Left-join packet-level window features onto flow-level windows. Windows with no PCAP
-    coverage get zero-filled packet features (flow-only mode)."""
-    packet_cols = config["features"]["packet_level"]
+    coverage get zero-filled packet features (flow-only mode) plus an explicit
+    `has_packet_features` flag — the model can then distinguish "no scan activity observed"
+    from "no packet data was ever available for this window", instead of the two looking
+    identical after zero-filling.
+    """
+    real_packet_cols = [c for c in config["features"]["packet_level"] if c != "has_packet_features"]
     merged = flow_windows.copy()
     if packet_windows is None or packet_windows.empty:
-        for col in packet_cols:
+        for col in real_packet_cols:
             merged[col] = 0.0
+        merged["has_packet_features"] = 0.0
         return merged
-    merged = merged.merge(packet_windows, on=["src_ip", "window_start"], how="left")
-    merged[packet_cols] = merged[packet_cols].fillna(0.0)
+    merged = merged.merge(packet_windows, on=["src_ip", "window_start"], how="left", indicator=True)
+    merged["has_packet_features"] = (merged["_merge"] == "both").astype(float)
+    merged = merged.drop(columns=["_merge"])
+    merged[real_packet_cols] = merged[real_packet_cols].fillna(0.0)
     return merged
 
 
@@ -100,17 +107,23 @@ def build_sequences(
     windows_df: pd.DataFrame, feature_cols: list[str], config: dict[str, Any]
 ) -> dict[str, np.ndarray]:
     """Slide a window of length `sequence_length` per src_ip and emit training examples:
-      X:                 (N, L, F)  past L state vectors
-      next_state:        (N, F)     ground-truth S_t+1 for the world model's regression head
-      future_stages:     (N, K)     stage index at each of the next K steps (-1 = excluded/impact)
-      infiltration:       (N, K)    binary "is this future step an attack" time series
-      window_end_time:   (N,)       timestamp of the last input window, used for chronological split
-      src_ip:            (N,)
+      X:                   (N, L, F)  past L state vectors
+      next_state:          (N, F)     ground-truth S_t+1 for the world model's regression head
+      future_stages:       (N, K)     stage index at each of the next K steps (-1 = excluded/impact)
+      infiltration:        (N, K)     binary "is this future step an attack" time series
+      current_stage:       (N,)       stage index of the LAST INPUT window itself (-1 = excluded/impact)
+      current_infiltration: (N,)      binary "is the last input window itself an attack" — together
+                                       with current_stage, this is what a persistence baseline
+                                       needs (models/baseline_lr.py::PersistenceBaseline): "predict
+                                       that whatever is true right now stays true next step"
+      window_end_time:     (N,)       timestamp of the last input window, used for chronological split
+      src_ip:              (N,)
     """
     seq_len = config["windowing"]["sequence_length"]
     horizon = config["windowing"]["forecast_horizon"]
 
-    X, next_state, future_stages, infiltration, window_end_time, src_ips = [], [], [], [], [], []
+    X, next_state, future_stages, infiltration = [], [], [], []
+    current_stage, current_infiltration, window_end_time, src_ips = [], [], [], []
 
     for src_ip, group in windows_df.groupby("src_ip"):
         group = group.sort_values("window_start").reset_index(drop=True)
@@ -126,6 +139,9 @@ def build_sequences(
             fut = stages[i + seq_len: i + seq_len + horizon]
             future_stages.append(np.array([_stage_idx_or_masked(s) for s in fut]))
             infiltration.append(np.array([0.0 if s == BENIGN else 1.0 for s in fut], dtype=np.float32))
+            last_input_stage = stages[i + seq_len - 1]
+            current_stage.append(_stage_idx_or_masked(last_input_stage))
+            current_infiltration.append(0.0 if last_input_stage == BENIGN else 1.0)
             window_end_time.append(times[i + seq_len - 1])
             src_ips.append(src_ip)
 
@@ -134,6 +150,8 @@ def build_sequences(
         "next_state": np.stack(next_state) if next_state else np.zeros((0, len(feature_cols)), dtype=np.float32),
         "future_stages": np.stack(future_stages) if future_stages else np.zeros((0, horizon), dtype=np.int64),
         "infiltration": np.stack(infiltration) if infiltration else np.zeros((0, horizon), dtype=np.float32),
+        "current_stage": np.array(current_stage, dtype=np.int64),
+        "current_infiltration": np.array(current_infiltration, dtype=np.float32),
         "window_end_time": np.array(window_end_time),
         "src_ip": np.array(src_ips),
     }

@@ -1,10 +1,13 @@
 """Explainability required by the problem statement: "Black-box outputs without interpretability
-are not acceptable." Two complementary views, both wired into the forecast output:
+are not acceptable." Three complementary views, all wired into the forecast output:
 
   - attention (from models/world_model.py / models/forecast.py): which PAST TIME WINDOWS the
     model relied on most for a given prediction — temporal explanation, free from the architecture.
-  - SHAP (this module): which FEATURES in the current snapshot (which flags, ports, flow stats)
-    are driving the infiltration probability up or down — feature-level explanation.
+  - gradient x input (this module): which FEATURES in the current snapshot are driving the
+    infiltration probability, from a single backward pass — instant, an approximation.
+  - SHAP (this module): the same "which features" question, sampling-based rather than a local
+    linear approximation — slower but doesn't share gradient x input's blind spots (e.g. saturated
+    sigmoid regions where the true gradient is near zero but the feature still matters).
 """
 from __future__ import annotations
 
@@ -22,6 +25,40 @@ def summarize_attention(attention_row: np.ndarray, sequence_length: int) -> list
     labels = [f"t-{sequence_length - 1 - i}" for i in range(sequence_length)]
     pairs = list(zip(labels, attention_row.tolist()))
     return sorted(pairs, key=lambda p: -p[1])
+
+
+def gradient_input_attribution(model: WorldModel, scaled_sequence: np.ndarray, feature_names: list[str]) -> dict:
+    """Gradient x input attribution for the infiltration-probability head, w.r.t. the most recent
+    window's features only (same "what about the current snapshot" framing as ShapExplainer, held
+    to the same last-window scope for a fair side-by-side). One forward + one backward pass —
+    orders of magnitude cheaper than SHAP's sampling, at the cost of being a local linear
+    approximation rather than a sampled attribution.
+
+    scaled_sequence: (L, F) already feature-scaled (same scaler used for training/rollout).
+    """
+    device = next(model.parameters()).device
+    was_training = model.training
+    model.eval()
+    try:
+        x = torch.tensor(scaled_sequence, dtype=torch.float32, device=device).unsqueeze(0)
+        x.requires_grad_(True)
+        _, _, infiltration_logit = model(x)
+        infiltration_prob = torch.sigmoid(infiltration_logit)
+        model.zero_grad(set_to_none=True)
+        infiltration_prob.backward()
+    finally:
+        model.train(was_training)
+
+    last_window_grad = x.grad.squeeze(0)[-1, :]
+    last_window_value = x.detach().squeeze(0)[-1, :]
+    attribution = (last_window_grad * last_window_value).cpu().numpy()
+
+    order = np.argsort(-np.abs(attribution))
+    return {
+        "feature_names": feature_names,
+        "attribution": attribution,
+        "top_features": [(feature_names[i], float(attribution[i])) for i in order[:5]],
+    }
 
 
 class ShapExplainer:

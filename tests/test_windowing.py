@@ -78,6 +78,63 @@ def test_merge_packet_features_zero_fills_when_no_pcap():
     merged = merge_packet_features(flow_windows, None, TEST_CONFIG)
     assert merged["port_scan_score"].iloc[0] == 0.0
     assert merged["retransmit_ratio"].iloc[0] == 0.0
+    assert merged["has_packet_features"].iloc[0] == 0.0
+
+
+def test_merge_packet_features_flags_covered_windows():
+    # two windows for the same src_ip; only the first has PCAP coverage
+    flow_windows = pd.DataFrame([
+        {"src_ip": "a", "window_start": pd.Timestamp("2026-01-01 00:00:00"), "flow_count": 1},
+        {"src_ip": "a", "window_start": pd.Timestamp("2026-01-01 00:00:10"), "flow_count": 1},
+    ])
+    packet_windows = pd.DataFrame([
+        {"src_ip": "a", "window_start": pd.Timestamp("2026-01-01 00:00:00"),
+         "port_scan_score": 0.7, "retransmit_ratio": 0.1},
+    ])
+    merged = merge_packet_features(flow_windows, packet_windows, TEST_CONFIG)
+    assert merged["has_packet_features"].tolist() == [1.0, 0.0]
+    assert merged.loc[0, "port_scan_score"] == 0.7
+    assert merged.loc[1, "port_scan_score"] == 0.0  # zero-filled, not NaN, for the uncovered window
+
+
+def test_has_packet_features_not_a_near_perfect_label_proxy_on_synthetic_sample():
+    """Regression guard for the exact leak class a competing project's PCAP found and fixed on
+    their own dataset: PCAP coverage that only spans some attack phases makes
+    `has_packet_features` a proxy for "early vs late attack" rather than genuine information.
+    Runs the real synthetic-sample pipeline end-to-end and checks the correlation stays low.
+    """
+    import pytest
+
+    from common.config import load_config, resolve_path
+    from pipeline.flow_features import load_flow_dir
+    from pipeline.packet_features import compute_packet_window_features, load_pcap
+
+    config = load_config("configs/default.yaml")
+    flow_dir = resolve_path(config, "raw_flow_dir")
+    pcap_dir = resolve_path(config, "raw_pcap_dir")
+    if not flow_dir.exists() or not any(flow_dir.glob("*.csv")):
+        pytest.skip("synthetic sample not generated yet — run `python -m scripts.make_synthetic_sample`")
+
+    flow_df = load_flow_dir(flow_dir)
+    flow_windows = build_flow_windows(flow_df, config)
+    packet_windows = None
+    if pcap_dir.exists() and any(pcap_dir.glob("*.pcap")):
+        frames = [compute_packet_window_features(load_pcap(p), config["windowing"]["window_seconds"])
+                  for p in sorted(pcap_dir.glob("*.pcap"))]
+        packet_windows = pd.concat(frames, ignore_index=True)
+    windows = merge_packet_features(flow_windows, packet_windows, config)
+    windows = apply_reconnaissance_heuristic(windows, config)
+
+    is_attack = (windows["stage"] != BENIGN).astype(float)
+    has_pf = windows["has_packet_features"]
+    if has_pf.nunique() < 2 or is_attack.nunique() < 2:
+        return  # nothing to correlate against — not the failure mode this test guards
+    correlation = abs(np.corrcoef(has_pf, is_attack)[0, 1])
+    assert correlation < 0.6, (
+        f"has_packet_features correlates with the attack label at {correlation:.2f} — PCAP "
+        "coverage is acting as a label proxy instead of carrying independent information; "
+        "extend PCAP generation to cover the missing phases"
+    )
 
 
 def test_build_sequences_shapes_and_alignment():
@@ -95,3 +152,21 @@ def test_build_sequences_shapes_and_alignment():
     np.testing.assert_array_equal(seqs["next_state"][0], [2.0])
     # i=0: future windows are indices 2,3 -> stage at index 3 is command_and_control (attack)
     assert seqs["infiltration"][0].tolist() == [0.0, 1.0]
+    # i=0's last INPUT window is index 1 (benign); i=1's last input window is index 2 (also benign)
+    # — current_stage/current_infiltration describe the input window itself, not the future
+    assert seqs["current_infiltration"].tolist() == [0.0, 0.0]
+    assert seqs["current_stage"].tolist() == [0, 0]  # 0 == benign's index in STAGE_CLASSIFICATION_LABELS
+
+
+def test_build_sequences_current_infiltration_true_when_last_input_window_is_an_attack():
+    # 5 windows, index 1 (the src_ip's second window) is itself an attack
+    feature_cols = ["flow_count"]
+    windows = pd.DataFrame([
+        {"src_ip": "a", "window_start": pd.Timestamp("2026-01-01") + pd.Timedelta(seconds=10 * i),
+         "flow_count": float(i), "stage": "initial_access" if i == 1 else BENIGN}
+        for i in range(5)
+    ])
+    seqs = build_sequences(windows, feature_cols, TEST_CONFIG)
+    # i=0's last input window is index 1 -> the attack window itself
+    assert seqs["current_infiltration"][0] == 1.0
+    assert seqs["current_stage"][0] == 2  # initial_access's index in STAGE_CLASSIFICATION_LABELS
