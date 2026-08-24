@@ -12,7 +12,10 @@ windowing:
   window_seconds: 10                    # time-window size for state aggregation
   sequence_length: 12                   # L past windows fed to the model (2 min of context at 10s windows)
   forecast_horizon: 6                   # K steps rolled out ahead (1 min lookahead at 10s windows)
-  group_by: src_ip                      # network state is per-source-IP; extend to per-subnet later if needed
+  group_by: src_ip                      # windowing always groups by src_ip; when a data source has no
+                                         # real IPs, flow_features.py substitutes one pseudo-host per
+                                         # calendar day, which makes this network-wide instead of per-host
+                                         # for that data — see _fill_missing_ip_columns and has_ip_data
   recon_port_scan_threshold: 0.5        # benign window with port_scan_score above this, followed by
                                          # an attack within forecast_horizon windows, is relabeled reconnaissance
 
@@ -23,6 +26,10 @@ features:
     - flow_count
     - unique_dst_ports
     - unique_dst_ips
+    - has_ip_data                    # 1.0 if this window's flows had a real source IP, 0.0 if
+                                      # src_ip/dst_ip were unavailable and windowing fell back to a
+                                      # per-day network-wide pseudo-host (see flow_features.py);
+                                      # explains why unique_dst_ips reads 0 rather than "unknown"
     - total_bytes
     - total_packets
     - mean_duration

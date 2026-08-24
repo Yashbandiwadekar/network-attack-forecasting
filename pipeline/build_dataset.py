@@ -26,14 +26,37 @@ def _load_packet_windows(pcap_dir: Path, window_seconds: int):
 
 
 def _chronological_split(sequences: dict, split_config: dict) -> dict[str, dict]:
-    order = np.argsort(sequences["window_end_time"])
-    n = len(order)
-    train_end = int(n * split_config["train_frac"])
-    val_end = train_end + int(n * split_config["val_frac"])
+    """Chronological within EACH src_ip group, not globally across all of them pooled together.
 
-    splits = {"train": order[:train_end], "val": order[train_end:val_end], "test": order[val_end:]}
+    Real CIC-IDS-2018 is ~10 largely independent day-long scenarios, each dedicated to one attack
+    family (Bruteforce on the 14th, DDoS on the 20th-21st, Infiltration on the 28th-1st, Bot on the
+    2nd, ...). A single global chronological cutoff across the whole concatenated multi-day
+    timeline puts almost all of the earliest days in train and almost all of the latest days in
+    test — the model would train on next to no lateral_movement/command_and_control examples and
+    the val split used for threshold_at_fpr would barely see them either, silently making every
+    downstream metric for those stages meaningless. Splitting within each src_ip group (which,
+    per flow_features.py's per-day pseudo-host fallback, is effectively "within each day" for
+    sources lacking real IPs) keeps every day's — and so every attack type's — examples
+    represented proportionally in all three splits, while still never training on a given
+    source's future (val/test sequences are always chronologically after that same source's train
+    sequences).
+    """
+    n = len(sequences["src_ip"])
+    split_of = np.empty(n, dtype=object)
+
+    for src_ip in np.unique(sequences["src_ip"]):
+        group_idx = np.where(sequences["src_ip"] == src_ip)[0]
+        group_idx = group_idx[np.argsort(sequences["window_end_time"][group_idx])]
+        n_group = len(group_idx)
+        train_end = int(n_group * split_config["train_frac"])
+        val_end = train_end + int(n_group * split_config["val_frac"])
+        split_of[group_idx[:train_end]] = "train"
+        split_of[group_idx[train_end:val_end]] = "val"
+        split_of[group_idx[val_end:]] = "test"
+
     out = {}
-    for name, idx in splits.items():
+    for name in ("train", "val", "test"):
+        idx = np.where(split_of == name)[0]
         out[name] = {k: v[idx] for k, v in sequences.items()}
     return out
 

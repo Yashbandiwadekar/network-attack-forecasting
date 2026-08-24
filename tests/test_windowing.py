@@ -48,6 +48,27 @@ def test_build_flow_windows_majority_label_wins():
     assert windows.iloc[0]["stage"] == "initial_access"
 
 
+def test_build_flow_windows_defaults_has_ip_data_when_column_absent():
+    # callers that don't route through flow_features.clean_and_normalize (e.g. this test file's
+    # own _flow() fixture) get has_ip_data=1.0 by default, preserving old behaviour
+    rows = [_flow(0, dst_ip="10.0.0.60"), _flow(1, dst_ip="10.0.0.70")]
+    windows = build_flow_windows(pd.DataFrame(rows), TEST_CONFIG)
+    assert windows.iloc[0]["has_ip_data"] == 1.0
+    assert windows.iloc[0]["unique_dst_ips"] == 2  # real dst_ip diversity, computed normally
+
+
+def test_build_flow_windows_zero_fills_unique_dst_ips_without_real_ip_data():
+    # dst_ip is a constant sentinel ("UNKNOWN") when has_ip_data=0 — nunique() would trivially
+    # read 1, which looks like a real "only one destination" signal but isn't
+    rows = [
+        _flow(0, dst_ip="UNKNOWN", has_ip_data=0.0),
+        _flow(1, dst_ip="UNKNOWN", has_ip_data=0.0),
+    ]
+    windows = build_flow_windows(pd.DataFrame(rows), TEST_CONFIG)
+    assert windows.iloc[0]["has_ip_data"] == 0.0
+    assert windows.iloc[0]["unique_dst_ips"] == 0.0
+
+
 def test_reconnaissance_heuristic_relabels_precursor_window():
     # window 0: benign with high port-scan score, window 1: an actual attack -> window 0 becomes recon
     windows = pd.DataFrame([

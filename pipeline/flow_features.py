@@ -49,12 +49,16 @@ COLUMN_RENAME = {
     "Label": "label",
 }
 
-REQUIRED_COLUMNS = [
-    "src_ip", "dst_ip", "src_port", "dst_port", "protocol", "timestamp",
+STRICTLY_REQUIRED_COLUMNS = [
+    "dst_port", "protocol", "timestamp",
     "duration_us", "fwd_pkts", "bwd_pkts", "fwd_bytes", "bwd_bytes",
     "syn_cnt", "ack_cnt", "fin_cnt", "rst_cnt", "psh_cnt", "urg_cnt",
     "iat_mean", "iat_std", "iat_max", "label",
 ]
+# Several real CIC-IDS-2018 "ML-ready" CSV releases strip these three entirely (only e.g. the
+# Tuesday-20-02-2018 DDoS day keeps the full 5-tuple) — optional, not required. See
+# clean_and_normalize's _fill_missing_ip_columns for how their absence is handled.
+OPTIONAL_IP_COLUMNS = ["src_ip", "dst_ip", "src_port"]
 
 TCP = 6
 UDP = 17
@@ -65,10 +69,45 @@ def load_flow_csv(path: str | Path) -> pd.DataFrame:
     df = pd.read_csv(path, low_memory=False)
     df.columns = [c.strip() for c in df.columns]
     df = df.rename(columns=COLUMN_RENAME)
-    missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
+    missing = [c for c in STRICTLY_REQUIRED_COLUMNS if c not in df.columns]
     if missing:
         raise ValueError(f"{path}: missing required columns after rename: {missing}")
-    return df[REQUIRED_COLUMNS].copy()
+    present_optional = [c for c in OPTIONAL_IP_COLUMNS if c in df.columns]
+    return df[STRICTLY_REQUIRED_COLUMNS + present_optional].copy()
+
+
+def _fill_missing_ip_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Without a real source IP, windowing.py can't group flows per host. Rather than crash (or
+    silently mis-group), synthesize one pseudo-host per capture file per calendar day
+    ("NETWORK-<date>") — this makes windowing naturally aggregate that day's WHOLE network into
+    one time series instead of a per-host one. `has_ip_data` records which rows have a genuine
+    source IP, so windowing.py doesn't report a fabricated `unique_dst_ips` (the sentinel dst_ip
+    value below would trivially make every window read "1 unique destination", which looks like a
+    real signal but means "no IP data available")."""
+    if "src_ip" in df.columns:
+        df["has_ip_data"] = 1.0
+    else:
+        day = df["timestamp"].dt.date.astype(str)
+        df["src_ip"] = "NETWORK-" + day
+        df["has_ip_data"] = 0.0
+    if "dst_ip" not in df.columns:
+        df["dst_ip"] = "UNKNOWN"
+    if "src_port" not in df.columns:
+        df["src_port"] = 0
+    return df
+
+
+def _parse_timestamp(series: pd.Series) -> pd.Series:
+    """Two explicit formats tried in sequence, NOT pandas' format="mixed" + dayfirst=True
+    inference — verified that combination silently corrupts unambiguous ISO dates too (it parses
+    "2026-01-02" as 2026-02-01, not 2026-01-02). Real CIC-IDS-2018 uses day-first slash-separated
+    timestamps (confirmed by dates like 14/02/2018, which can only be day-first — there's no 14th
+    month); the synthetic sample uses ISO-style dashes. Each gets its own explicit, unambiguous
+    format; only values matching neither become NaT.
+    """
+    day_first_slash = pd.to_datetime(series, format="%d/%m/%Y %H:%M:%S", errors="coerce")
+    iso_dash = pd.to_datetime(series, format="ISO8601", errors="coerce")  # tolerates optional .microseconds
+    return day_first_slash.fillna(iso_dash)
 
 
 def clean_and_normalize(df: pd.DataFrame) -> pd.DataFrame:
@@ -76,19 +115,23 @@ def clean_and_normalize(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     numeric_cols = [
-        "src_port", "dst_port", "protocol", "duration_us", "fwd_pkts", "bwd_pkts",
+        "dst_port", "protocol", "duration_us", "fwd_pkts", "bwd_pkts",
         "fwd_bytes", "bwd_bytes", "syn_cnt", "ack_cnt", "fin_cnt", "rst_cnt",
         "psh_cnt", "urg_cnt", "iat_mean", "iat_std", "iat_max",
     ]
+    if "src_port" in df.columns:
+        numeric_cols = ["src_port"] + numeric_cols
     for col in numeric_cols:
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce", format="mixed")
-    df = df.dropna(subset=["timestamp", "src_ip", "protocol"])
+    df["timestamp"] = _parse_timestamp(df["timestamp"])
+    df = df.dropna(subset=["timestamp", "protocol"])
     df = df.dropna(subset=numeric_cols)
 
     # replace inf (CICFlowMeter occasionally emits inf for rate features) before any aggregation
     df = df.replace([np.inf, -np.inf], np.nan).dropna(subset=numeric_cols)
+
+    df = _fill_missing_ip_columns(df)
 
     df["label"] = df["label"].astype(str).str.strip()
     df["total_pkts"] = df["fwd_pkts"] + df["bwd_pkts"]
