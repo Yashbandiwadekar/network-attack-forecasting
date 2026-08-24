@@ -79,32 +79,48 @@ predicted MITRE stage, and the attention pattern that produced it — a full tra
 single score. This autoregressive rollout, not the training objective, is what makes the system a
 world model rather than a one-shot classifier.
 
-## 4. Explainability — two complementary views
+## 4. Explainability — three views, plus two unsupervised signals
 
-- **Attention** (`models/explain.py::summarize_attention`): which past time windows the model
-  relied on for a given prediction — free from the architecture, no extra training.
-- **SHAP** (`models/explain.py::ShapExplainer`): `KernelExplainer` over the *current* window's
-  feature vector against the infiltration-probability output, holding the preceding `L-1` windows
-  of real history fixed. This isolates which specific flags, ports, or flow statistics are driving
-  the score for *this* snapshot, rather than conflating it with the trajectory that led here.
+- **Attention** (`summarize_attention`): which past windows drove a prediction — free, no extra training.
+- **Gradient x input** (`gradient_input_attribution`): instant, one backward pass, local approximation.
+- **SHAP** (`ShapExplainer`): `KernelExplainer` on the current window against the preceding `L-1`
+  windows held fixed — slower, sampled rather than a local approximation, no saturated-gradient blind spot.
 
-Both are wired directly into the forecast output and surfaced in the demo — never a bare
-probability with no explanation attached.
+All three explain the *same* prediction and are surfaced together in the demo — never a bare
+probability. Two further, label-free signals: **predicted state delta** (`ForecastResult.state_deltas`,
+raw-unit "what's about to change") and **novelty** (`one_step_reconstruction_error`: how far the
+model's prediction for the most recently *observed* window was from what actually happened — a
+genuine ground-truth anomaly signal, unlike `transition_magnitude`'s size-of-imagined-jump, which
+has no ground truth to check against yet). `rollout_with_uncertainty` (MC-dropout over `n_samples`
+stochastic rollouts) gives a 10th/50th/90th percentile band around the forecast, shown in the demo.
 
-## 5. Baseline and evaluation
+## 5. Baselines and evaluation
 
-`models/baseline_lr.py`: logistic regression predicting the same immediate-next-step targets from
-only the *current* window's feature vector — no sequence, no temporal context. This is
-deliberately the "traditional classifier treats each flow in isolation" approach the problem
-statement contrasts world models against. `eval/benchmark.py` compares F1/precision/recall/FPR
-(infiltration) and macro F1/precision/recall (MITRE stage) between the two on an identical held-out
-test set; results are written to `docs/04-evaluation.md`.
+Three baselines in `models/baseline_lr.py`, each isolating a different question:
+
+- **LR, last window**: current window only — the "classify each flow in isolation" approach the
+  problem statement contrasts world models against.
+- **LR, stacked window**: the *same* `L`-window history the world model sees, flattened for a
+  non-sequential classifier — isolates "does sequential structure help, or would the same columns
+  fed flat do just as well," a stronger claim than the last-window comparison alone.
+- **Persistence**: no learning — current state persists unchanged. If the world model can't beat
+  this, it isn't learning real dynamics.
+
+`eval/benchmark.py` compares all four at two operating points: default 0.5, and a fixed 5%
+false-positive-rate budget (threshold picked on **val**, applied to test) — how a defender actually
+tunes such a system. `docs/04-evaluation.md` includes a computed honesty check: if the stacked
+baseline ties or beats the world model, the report says so rather than only showing favourable numbers.
 
 ## 6. Known limitations
 
-- MITRE stage labels for CIC-IDS-2018 are a documented heuristic mapping (`docs/03-mitre-mapping.md`),
-  not ground truth the dataset provides directly.
-- `reconnaissance` has no direct CIC-IDS-2018 label; it's derived from benign windows with a high
-  port-scan score immediately preceding an attack from the same source IP.
-- Currently validated end-to-end on a synthetic traffic sample; real CIC-IDS-2018 training is the
-  next step (`docs/02-dataset-and-features.md`).
+- MITRE stage labels are a documented heuristic mapping (`docs/03-mitre-mapping.md`), not ground
+  truth CIC-IDS-2018 provides directly; `reconnaissance` is derived (high port-scan score preceding
+  an attack from the same IP), not assigned from a label.
+- Validated end-to-end on a synthetic sample; real CIC-IDS-2018 training is the next step
+  (`docs/02-dataset-and-features.md`).
+- Two stronger architectures were deliberately not attempted, for timeline reasons, and are noted
+  here rather than silently skipped: an RSSM (Dreamer-style GRU + prior/posterior latent dynamics
+  with genuine "imagination" rollouts) is more faithful to the World Models literature than this
+  Transformer; a GNN (nodes = hosts, edges = flows per window) is the other natural extension. Both
+  add meaningfully more implementation risk than fit alongside dual feature levels, K-step rollout,
+  MITRE mapping, three baselines, and the demo.

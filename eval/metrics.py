@@ -4,7 +4,21 @@ asks the world model to beat the logistic-regression baseline on.
 from __future__ import annotations
 
 import numpy as np
-from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score
+from sklearn.metrics import confusion_matrix, f1_score, precision_score, recall_score, roc_curve
+
+
+def threshold_at_fpr(y_true: np.ndarray, y_prob: np.ndarray, target_fpr: float = 0.05) -> float:
+    """The score threshold that achieves the highest recall without exceeding `target_fpr`, fit
+    on whatever split is passed in — callers MUST fit this on val, never on test, or the reported
+    test metrics are no longer honest. This is the "defender picks a fixed false-alarm budget"
+    operating point, not the default-0.5 threshold `binary_metrics` uses on its own.
+    """
+    fpr, tpr, thresholds = roc_curve(y_true, y_prob)
+    eligible = fpr <= target_fpr
+    if not eligible.any():
+        return 1.0  # no threshold meets the budget — predict nothing positive
+    best_idx = np.where(eligible)[0][np.argmax(tpr[eligible])]
+    return float(thresholds[best_idx])
 
 
 def binary_metrics(y_true: np.ndarray, y_prob: np.ndarray, threshold: float = 0.5) -> dict[str, float]:

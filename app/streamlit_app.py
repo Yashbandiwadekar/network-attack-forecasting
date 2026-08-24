@@ -22,8 +22,11 @@ import streamlit as st
 
 from common.config import feature_columns, load_config, resolve_path
 from models.dataset import FeatureScaler, load_split
-from models.explain import ShapExplainer, summarize_attention
-from models.forecast import ForecastEngine, latest_sequence, load_world_model
+from models.explain import ShapExplainer, gradient_input_attribution, summarize_attention
+from models.forecast import (
+    ForecastEngine, latest_sequence, load_world_model,
+    one_step_reconstruction_error, previous_sequence_and_actual,
+)
 from pipeline.flow_features import clean_and_normalize, load_flow_csv
 from pipeline.packet_features import compute_packet_window_features, load_pcap
 from pipeline.windowing import apply_reconnaissance_heuristic, build_flow_windows, merge_packet_features
@@ -122,7 +125,9 @@ def main() -> None:
     raw_sequence = latest_sequence(windows, feature_cols, src_ip, seq_len)
 
     engine = ForecastEngine(model, scaler, config)
-    result = engine.rollout(raw_sequence)
+    result = engine.rollout(raw_sequence)  # deterministic — drives the point predictions/explanations below
+    with st.spinner("Estimating forecast uncertainty (MC-dropout)..."):
+        uncertainty = engine.rollout_with_uncertainty(raw_sequence, n_samples=20)
 
     st.subheader(f"K-step infiltration forecast for {src_ip}")
     horizon = config["windowing"]["forecast_horizon"]
@@ -130,32 +135,69 @@ def main() -> None:
     timeline_df = pd.DataFrame({
         "step": [f"t+{(i + 1) * window_s}s" for i in range(horizon)],
         "infiltration_probability": result.infiltration_probs,
+        "p10 (MC-dropout)": uncertainty.infiltration_p10,
+        "p90 (MC-dropout)": uncertainty.infiltration_p90,
         "predicted_stage": result.stage_predictions,
     }).set_index("step")
 
     col1, col2 = st.columns([2, 1])
     with col1:
-        st.line_chart(timeline_df["infiltration_probability"])
+        st.line_chart(timeline_df[["infiltration_probability", "p10 (MC-dropout)", "p90 (MC-dropout)"]])
+        st.caption(
+            "Solid line: deterministic forecast (dropout off, reproducible — matches eval/benchmark.py). "
+            "p10/p90: 10th-90th percentile band from 20 stochastic MC-dropout rollouts, showing how much "
+            "the forecast wobbles under the model's own uncertainty."
+        )
     with col2:
-        st.dataframe(timeline_df, use_container_width=True)
+        st.dataframe(timeline_df[["infiltration_probability", "predicted_stage"]], use_container_width=True)
 
     peak_step = int(np.argmax(result.infiltration_probs))
-    st.metric(
-        "Peak infiltration probability",
-        f"{result.infiltration_probs[peak_step]:.1%}",
-        help=f"At {timeline_df.index[peak_step]}, predicted stage: {result.stage_predictions[peak_step]}",
-    )
+    metric_col1, metric_col2 = st.columns(2)
+    with metric_col1:
+        st.metric(
+            "Peak infiltration probability",
+            f"{result.infiltration_probs[peak_step]:.1%}",
+            help=f"At {timeline_df.index[peak_step]}, predicted stage: {result.stage_predictions[peak_step]}",
+        )
+    with metric_col2:
+        st.metric(
+            "Predicted transition magnitude (step 1)",
+            f"{result.transition_magnitude[0]:.2f}",
+            help="Scaled-feature L2 norm of the model's predicted next-step state change — how much "
+                 "the model believes conditions are about to shift. NOT a ground-truth accuracy measure; "
+                 "see the novelty check below for that.",
+        )
+
+    prev_and_actual = previous_sequence_and_actual(windows, feature_cols, src_ip, seq_len)
+    if prev_and_actual is not None:
+        prior_seq, actual_state = prev_and_actual
+        novelty = one_step_reconstruction_error(model, scaler, prior_seq, actual_state)
+        st.metric(
+            "Novelty of most recently observed window",
+            f"{novelty:.2f}",
+            help="Ground-truth reconstruction error: how far the model's own prediction for the most "
+                 "recent window (made from the history before it) was from what actually happened. "
+                 "An unsupervised anomaly signal, independent of the infiltration/stage labels — a high "
+                 "value means this traffic didn't match learned dynamics at all, whether or not it's "
+                 "flagged as an attack.",
+        )
 
     st.subheader("Explainability")
-    exp_col1, exp_col2 = st.columns(2)
+    exp_col1, exp_col2, exp_col3 = st.columns(3)
 
     with exp_col1:
-        st.markdown("**Attention — which past windows drove the first forecast step**")
+        st.markdown("**Attention** — which past windows drove the first forecast step")
         attn_pairs = summarize_attention(result.attentions[0], seq_len)
         st.bar_chart(pd.DataFrame(attn_pairs, columns=["window", "attention_weight"]).set_index("window"))
 
     with exp_col2:
-        st.markdown("**SHAP — which features drove the first forecast step's infiltration score**")
+        st.markdown("**Gradient x input** — instant feature attribution")
+        grad_result = gradient_input_attribution(model, scaler.transform(raw_sequence), feature_cols)
+        grad_df = pd.DataFrame(grad_result["top_features"], columns=["feature", "attribution"]).set_index("feature")
+        st.bar_chart(grad_df)
+
+    with exp_col3:
+        st.markdown("**SHAP** — sampling-based feature attribution")
         if background is not None:
             with st.spinner("Computing SHAP attribution..."):
                 shap_explainer = ShapExplainer(model, background)
@@ -165,6 +207,14 @@ def main() -> None:
             st.bar_chart(shap_df)
         else:
             st.info("No training data available to build a SHAP background distribution.")
+
+    st.markdown("**What's about to change** — predicted feature deltas for the first forecast step")
+    delta_order = np.argsort(-np.abs(result.state_deltas[0]))[:8]
+    delta_df = pd.DataFrame({
+        "feature": [feature_cols[i] for i in delta_order],
+        "predicted_delta": result.state_deltas[0][delta_order],
+    }).set_index("feature")
+    st.dataframe(delta_df, use_container_width=True)
 
     st.subheader(f"Flagged flows — most recent window for {src_ip}")
     latest_window_start = windows[windows["src_ip"] == src_ip]["window_start"].max()

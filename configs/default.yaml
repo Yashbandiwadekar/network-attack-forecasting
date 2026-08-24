@@ -47,6 +47,8 @@ features:
     - std_payload_size
     - port_scan_score
     - retransmit_ratio
+    - has_packet_features           # 1.0 if a PCAP covered this window, 0.0 if packet features are zero-filled —
+                                     # lets the model distinguish "no scan activity" from "no packet data at all"
 
 split:
   train_frac: 0.7

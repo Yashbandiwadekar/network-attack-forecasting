@@ -73,6 +73,8 @@ def main(config_path: str = "configs/default.yaml") -> None:
             next_state=split["next_state"],
             future_stages=split["future_stages"],
             infiltration=split["infiltration"],
+            current_stage=split["current_stage"],
+            current_infiltration=split["current_infiltration"],
             window_end_time=split["window_end_time"].astype("datetime64[ns]").astype(np.int64),
             src_ip=split["src_ip"],
         )

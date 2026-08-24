@@ -27,26 +27,30 @@ python -m pipeline.build_dataset
 # 4. Train the world model (GPU used automatically if available)
 python -m models.train
 
-# 5. Benchmark against the logistic-regression baseline
+# 5. Benchmark against the three baselines (last-window LR, stacked-window LR, persistence)
 python -m eval.benchmark
 
-# 6. Launch the demo
+# 6. Optional: check the trained model stays calm on unusual-but-legitimate traffic
+python -m scripts.check_robustness
+
+# 7. Launch the demo
 streamlit run app/streamlit_app.py
 ```
 
 To point the pipeline at real CIC-IDS-2018 data instead of the synthetic sample, see
 `docs/02-dataset-and-features.md` — drop CICFlowMeter CSVs in `data/raw/flows/` (and PCAPs in
-`data/raw/pcap/`, optional) and re-run steps 3–6.
+`data/raw/pcap/`, optional) and re-run steps 3–7.
 
 ## Project layout
 
 | Path | Purpose |
 |---|---|
 | `pipeline/` | Flow + packet feature extraction, MITRE stage mapping, time-windowing, sequence building |
-| `models/` | The Transformer world model, the logistic-regression baseline, training, K-step forecast rollout, explainability |
-| `eval/` | Metrics and the world-model-vs-baseline benchmark |
+| `models/` | The Transformer world model, three baselines, training, K-step forecast rollout + uncertainty, explainability |
+| `eval/` | Metrics (including fixed-FPR-budget thresholds) and the world-model-vs-baselines benchmark |
 | `app/streamlit_app.py` | Offline demo UI |
 | `scripts/make_synthetic_sample.py` | Generates a synthetic traffic sample for dev/demo before the real dataset is downloaded |
+| `scripts/check_robustness.py` | Manual regression check: does the trained model stay calm on unusual-but-legitimate traffic |
 | `configs/default.yaml` | Single source of truth for windowing, features, and model hyperparameters |
 | `docs/` | Submission documents — project overview, architecture, dataset notes, MITRE mapping, evaluation results |
 
@@ -61,7 +65,8 @@ pytest tests/
 - [x] Feature extraction pipeline (flow-level + packet-level) — `pipeline/`
 - [x] Trained world model with reproducible training config — `models/world_model.py`, `models/train.py`, `configs/default.yaml`
 - [x] K-step infiltration prediction engine with MITRE stage mapping — `models/forecast.py`
-- [x] Explainability (attention + SHAP) — `models/explain.py`
+- [x] Explainability (attention + gradient×input + SHAP) — `models/explain.py`
 - [x] Offline demo interface — `app/streamlit_app.py`
-- [x] Benchmark vs logistic-regression baseline — `eval/benchmark.py`, results in `docs/04-evaluation.md`
+- [x] Benchmark vs three baselines (last-window LR, stacked-window LR, persistence), at default and fixed-FPR-budget thresholds — `eval/benchmark.py`, results in `docs/04-evaluation.md`
+- [x] Robustness check against out-of-distribution-but-benign traffic — `scripts/check_robustness.py`
 - [ ] Trained on full CIC-IDS-2018 (currently validated end-to-end on a synthetic sample; see `docs/02-dataset-and-features.md` for the real-data download step)
