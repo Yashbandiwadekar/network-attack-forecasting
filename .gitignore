@@ -1,0 +1,12 @@
+data/raw/
+data/processed/
+checkpoints/
+*.pt
+*.pth
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+.ipynb_checkpoints/

@@ -1,0 +1,78 @@
+# Single source of truth for paths, windowing, and model hyperparameters.
+# Every script (pipeline, training, forecasting, eval, demo) reads this file.
+
+paths:
+  raw_flow_dir: data/raw/flows          # CICFlowMeter CSVs
+  raw_pcap_dir: data/raw/pcap           # raw PCAP files (optional, packet-level features)
+  processed_dir: data/processed         # windowed sequence tensors + splits
+  checkpoint_dir: checkpoints
+  eval_report: docs/04-evaluation.md
+
+windowing:
+  window_seconds: 10                    # time-window size for state aggregation
+  sequence_length: 12                   # L past windows fed to the model (2 min of context at 10s windows)
+  forecast_horizon: 6                   # K steps rolled out ahead (1 min lookahead at 10s windows)
+  group_by: src_ip                      # network state is per-source-IP; extend to per-subnet later if needed
+  recon_port_scan_threshold: 0.5        # benign window with port_scan_score above this, followed by
+                                         # an attack within forecast_horizon windows, is relabeled reconnaissance
+
+# Ordered feature vector — this exact order is what flow_features.py / packet_features.py /
+# windowing.py must emit and what world_model.py consumes. Keep in sync with docs/02-dataset-and-features.md.
+features:
+  flow_level:
+    - flow_count
+    - unique_dst_ports
+    - unique_dst_ips
+    - total_bytes
+    - total_packets
+    - mean_duration
+    - syn_ratio
+    - ack_ratio
+    - fin_ratio
+    - rst_ratio
+    - psh_ratio
+    - urg_ratio
+    - mean_iat
+    - var_iat
+    - max_iat
+    - bidir_ratio
+    - tcp_ratio
+    - udp_ratio
+  packet_level:
+    - mean_ttl
+    - var_ttl
+    - mean_window_size
+    - frag_ratio
+    - mean_payload_size
+    - std_payload_size
+    - port_scan_score
+    - retransmit_ratio
+
+split:
+  train_frac: 0.7
+  val_frac: 0.15
+  test_frac: 0.15
+  chronological: true                   # never shuffle across time — this is a forecasting task
+
+model:
+  d_model: 64
+  n_heads: 4
+  n_layers: 3
+  d_ff: 128
+  dropout: 0.1
+  batch_size: 64
+  lr: 0.0003
+  epochs: 30
+  device: cuda                          # falls back to cpu automatically if unavailable
+
+mitre_stages:
+  - benign
+  - reconnaissance
+  - initial_access
+  - lateral_movement
+  - command_and_control
+  - exfiltration
+
+baseline:
+  model: logistic_regression
+  max_iter: 1000
