@@ -1,6 +1,5 @@
-"""Time-window aggregation: per-flow rows -> per (src_ip, window) network-state vectors ->
-sliding sequences ready for the world model.
-"""
+"""Time-window aggregation, sequence building, and feature merging."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -8,171 +7,694 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from pipeline.mitre_mapping import BENIGN, IMPACT, RECONNAISSANCE, label_to_stage, stage_to_index
+from pipeline.mitre_mapping import (
+    BENIGN,
+    IMPACT,
+    RECONNAISSANCE,
+    label_to_stage,
+    stage_to_index,
+)
 
 
-def build_flow_windows(flow_df: pd.DataFrame, config: dict[str, Any]) -> pd.DataFrame:
-    """Aggregate cleaned per-flow rows (from flow_features.clean_and_normalize) into per
-    (src_ip, window_start) state vectors, using the flow_level feature list from config.
+def build_flow_windows(
+    flow_df: pd.DataFrame,
+    config: dict[str, Any],
+) -> pd.DataFrame:
+    """Aggregate flow rows into per-(src_ip, window_start) states.
 
-    Vectorized via groupby().agg() rather than a Python loop over groups — real CIC-IDS-2018
-    collapses ~16M flows into ~1.5M (src_ip, window) groups, and iterating those one at a time in
-    Python took over 20 minutes; this does the equivalent work in well under a minute by pushing
-    the aggregation into pandas' C implementation. The one exception is `stage` (needs the mode of
-    non-benign labels per window), which still uses a per-group apply, but only over the attack
-    subset of rows — typically 1-2% of the data — not all of them.
+    Uses pandas vectorized aggregation instead of a Python loop over every
+    individual window. This is substantially faster for large datasets such
+    as CTU-13.
     """
+
     window_seconds = config["windowing"]["window_seconds"]
+
     df = flow_df.copy()
-    df["window_start"] = df["timestamp"].dt.floor(f"{window_seconds}s")
-    df["stage"] = df["label"].map(label_to_stage)
+
+    # Ensure required columns exist.
     if "has_ip_data" not in df.columns:
-        df["has_ip_data"] = 1.0  # caller didn't route through flow_features.clean_and_normalize
-    df["iat_var"] = df["iat_std"] ** 2
+        df["has_ip_data"] = 1.0
 
-    group_keys = ["src_ip", "window_start"]
-    grouped = df.groupby(group_keys, sort=False)
+    # Create time windows.
+    df["window_start"] = df["timestamp"].dt.floor(
+        f"{window_seconds}s"
+    )
 
-    agg = pd.DataFrame({
-        "flow_count": grouped.size(),
-        "unique_dst_ports": grouped["dst_port"].nunique(),
-        "unique_dst_ips": grouped["dst_ip"].nunique(),
-        "has_ip_data": grouped["has_ip_data"].first(),
-        "total_bytes": grouped["total_bytes"].sum(),
-        "total_packets": grouped["total_pkts"].sum(),
-        "mean_duration": grouped["duration_s"].mean(),
-        "mean_iat": grouped["iat_mean"].mean(),
-        "var_iat": grouped["iat_var"].mean(),
-        "max_iat": grouped["iat_max"].max(),
-        "bidir_ratio": grouped["bidir_ratio"].mean(),
-        "tcp_ratio": grouped["is_tcp"].mean(),
-        "udp_ratio": grouped["is_udp"].mean(),
-    })
+    # Map raw labels to MITRE-style stages.
+    df["stage"] = df["label"].map(label_to_stage)
 
-    # dst_ip is a constant sentinel ("UNKNOWN") when has_ip_data is 0 — nunique() would trivially
-    # read 1, which looks like a real "only one destination" signal but isn't
-    agg.loc[agg["has_ip_data"] == 0.0, "unique_dst_ips"] = 0.0
+    # Numeric safety.
+    numeric_cols = [
+        "total_pkts",
+        "total_bytes",
+        "duration_s",
+        "syn_cnt",
+        "ack_cnt",
+        "fin_cnt",
+        "rst_cnt",
+        "psh_cnt",
+        "urg_cnt",
+        "iat_mean",
+        "iat_std",
+        "iat_max",
+        "bidir_ratio",
+        "is_tcp",
+        "is_udp",
+    ]
 
-    safe_total = agg["total_packets"].where(agg["total_packets"] > 0)  # NaN where 0, guards /0
-    for ratio_col, count_col in [
-        ("syn_ratio", "syn_cnt"), ("ack_ratio", "ack_cnt"), ("fin_ratio", "fin_cnt"),
-        ("rst_ratio", "rst_cnt"), ("psh_ratio", "psh_cnt"), ("urg_ratio", "urg_cnt"),
-    ]:
-        agg[ratio_col] = (grouped[count_col].sum() / safe_total).fillna(0.0)
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(
+                df[col],
+                errors="coerce",
+            ).fillna(0.0)
 
-    # majority non-benign label wins the window, so one attack flow among many benign flows still
-    # marks the window as an attack window (rare events must not get diluted away)
-    attack_rows = df[df["stage"] != BENIGN]
-    if len(attack_rows) > 0:
-        attack_stage = attack_rows.groupby(group_keys, sort=False)["stage"].agg(lambda s: s.mode().iloc[0])
-        agg["stage"] = attack_stage.reindex(agg.index)
+    # ------------------------------------------------------------------
+    # Pre-compute values needed by aggregation.
+    # ------------------------------------------------------------------
+
+    df["_one"] = 1.0
+
+    # Destination IP uniqueness should be zero when IP data is unavailable.
+    df["_dst_ip_value"] = df["dst_ip"].where(
+        df["has_ip_data"].astype(bool),
+        pd.NA,
+    )
+
+    # IAT variance contribution.
+    df["_iat_var"] = df["iat_std"] ** 2
+
+    # ------------------------------------------------------------------
+    # Vectorized group aggregation.
+    # ------------------------------------------------------------------
+
+    if "scenario_id" in df.columns:
+        group_cols = [
+            "scenario_id",
+            "src_ip",
+            "window_start",
+        ]
     else:
-        agg["stage"] = None
-    agg["stage"] = agg["stage"].fillna(BENIGN)
+        group_cols = [
+            "src_ip",
+            "window_start",
+        ]
 
-    return agg.reset_index().sort_values(["src_ip", "window_start"]).reset_index(drop=True)
+    grouped = df.groupby(
+        group_cols,
+        sort=False,
+        observed=True,
+        dropna=False,
+    )
+
+    windows = grouped.agg(
+        flow_count=("_one", "sum"),
+        unique_dst_ports=("dst_port", "nunique"),
+        unique_dst_ips=("_dst_ip_value", "nunique"),
+        has_ip_data=("has_ip_data", "first"),
+        total_bytes=("total_bytes", "sum"),
+        total_packets=("total_pkts", "sum"),
+        mean_duration=("duration_s", "mean"),
+        syn_count=("syn_cnt", "sum"),
+        ack_count=("ack_cnt", "sum"),
+        fin_count=("fin_cnt", "sum"),
+        rst_count=("rst_cnt", "sum"),
+        psh_count=("psh_cnt", "sum"),
+        urg_count=("urg_cnt", "sum"),
+        mean_iat=("iat_mean", "mean"),
+        var_iat=("_iat_var", "mean"),
+        max_iat=("iat_max", "max"),
+        bidir_ratio=("bidir_ratio", "mean"),
+        tcp_ratio=("is_tcp", "mean"),
+        udp_ratio=("is_udp", "mean"),
+    ).reset_index()
+
+    # ------------------------------------------------------------------
+    # Convert packet counts to ratios.
+    # ------------------------------------------------------------------
+
+    total_packets = windows["total_packets"]
+
+    for name, source in [
+        ("syn_ratio", "syn_count"),
+        ("ack_ratio", "ack_count"),
+        ("fin_ratio", "fin_count"),
+        ("rst_ratio", "rst_count"),
+        ("psh_ratio", "psh_count"),
+        ("urg_ratio", "urg_count"),
+    ]:
+        windows[name] = np.divide(
+            windows[source],
+            total_packets,
+            out=np.zeros(len(windows), dtype=np.float64),
+            where=total_packets.to_numpy() != 0,
+        )
+
+    # Remove temporary count columns.
+    windows = windows.drop(
+        columns=[
+            "syn_count",
+            "ack_count",
+            "fin_count",
+            "rst_count",
+            "psh_count",
+            "urg_count",
+        ]
+    )
+
+    # ------------------------------------------------------------------
+    # Match original behavior:
+    # unique_dst_ips = 0 when no real IP data is available.
+    # ------------------------------------------------------------------
+
+    windows["unique_dst_ips"] = np.where(
+        windows["has_ip_data"].astype(bool),
+        windows["unique_dst_ips"],
+        0.0,
+    )
+
+    # ------------------------------------------------------------------
+    # Determine window stage.
+    #
+    # Any non-benign stage wins over benign.
+    # For multiple attack stages, use the most frequent attack stage.
+    # ------------------------------------------------------------------
+
+    non_benign = df[df["stage"] != BENIGN]
+
+    if not non_benign.empty:
+        stage_counts = (
+            non_benign
+            .groupby(
+                group_cols + ["stage"],
+                sort=False,
+                observed=True,
+                dropna=False,
+            )
+            .size()
+            .rename("stage_count")
+            .reset_index()
+        )
+
+        # Pick the most frequent non-benign stage per window.
+        stage_counts = stage_counts.sort_values(
+            group_cols + ["stage_count"],
+            ascending=[True] * len(group_cols) + [False],
+        )
+
+        attack_stage = (
+            stage_counts
+            .drop_duplicates(
+                subset=group_cols,
+                keep="first",
+            )
+            [group_cols + ["stage"]]
+            .rename(columns={"stage": "attack_stage"})
+        )
+
+        windows = windows.merge(
+            attack_stage,
+            on=group_cols,
+            how="left",
+        )
+
+        windows["stage"] = windows["attack_stage"].fillna(BENIGN)
+        windows = windows.drop(columns=["attack_stage"])
+
+    else:
+        windows["stage"] = BENIGN
+
+    # ------------------------------------------------------------------
+    # Column ordering.
+    # ------------------------------------------------------------------
+
+    columns = [
+        "src_ip",
+        "window_start",
+        "flow_count",
+        "unique_dst_ports",
+        "unique_dst_ips",
+        "has_ip_data",
+        "total_bytes",
+        "total_packets",
+        "mean_duration",
+        "syn_ratio",
+        "ack_ratio",
+        "fin_ratio",
+        "rst_ratio",
+        "psh_ratio",
+        "urg_ratio",
+        "mean_iat",
+        "var_iat",
+        "max_iat",
+        "bidir_ratio",
+        "tcp_ratio",
+        "udp_ratio",
+        "stage",
+    ]
+
+    if "scenario_id" in windows.columns:
+        columns.insert(0, "scenario_id")
+
+    windows = windows[columns]
+
+    return (
+        windows
+        .sort_values(
+            group_cols,
+            kind="mergesort",
+        )
+        .reset_index(drop=True)
+    )
+
+
+def _majority_stage(stages: pd.Series) -> str:
+    """Return the most common non-benign stage, otherwise benign."""
+    non_benign = stages[stages != BENIGN]
+
+    if len(non_benign) > 0:
+        return non_benign.mode().iloc[0]
+
+    return BENIGN
 
 
 def merge_packet_features(
-    flow_windows: pd.DataFrame, packet_windows: pd.DataFrame | None, config: dict[str, Any]
+    flow_windows: pd.DataFrame,
+    packet_windows: pd.DataFrame | None,
+    config: dict[str, Any],
 ) -> pd.DataFrame:
-    """Left-join packet-level window features onto flow-level windows. Windows with no PCAP
-    coverage get zero-filled packet features (flow-only mode) plus an explicit
-    `has_packet_features` flag — the model can then distinguish "no scan activity observed"
-    from "no packet data was ever available for this window", instead of the two looking
-    identical after zero-filling.
-    """
-    real_packet_cols = [c for c in config["features"]["packet_level"] if c != "has_packet_features"]
+    """Merge packet-level features onto flow windows."""
+
+    real_packet_cols = [
+        c
+        for c in config["features"]["packet_level"]
+        if c != "has_packet_features"
+    ]
+
     merged = flow_windows.copy()
+
     if packet_windows is None or packet_windows.empty:
         for col in real_packet_cols:
             merged[col] = 0.0
+
         merged["has_packet_features"] = 0.0
+
         return merged
-    merged = merged.merge(packet_windows, on=["src_ip", "window_start"], how="left", indicator=True)
-    merged["has_packet_features"] = (merged["_merge"] == "both").astype(float)
+
+    merged = merged.merge(
+        packet_windows,
+        on=["src_ip", "window_start"],
+        how="left",
+        indicator=True,
+    )
+
+    merged["has_packet_features"] = (
+        merged["_merge"] == "both"
+    ).astype(float)
+
     merged = merged.drop(columns=["_merge"])
-    merged[real_packet_cols] = merged[real_packet_cols].fillna(0.0)
+
+    merged[real_packet_cols] = (
+        merged[real_packet_cols]
+        .fillna(0.0)
+    )
+
+    return merged
+
+def merge_graph_features(
+    flow_windows: pd.DataFrame,
+    graph_windows: pd.DataFrame | None,
+    config: dict[str, Any],
+) -> pd.DataFrame:
+    """Merge graph-level window features onto the flow-window DataFrame.
+
+    Parallel to :func:`merge_packet_features`.  When *graph_windows* is
+    ``None`` or empty (e.g. no real IP data was available across the whole
+    capture), every graph feature column is zero-filled — consistent with the
+    treatment of unavailable packet telemetry.
+
+    The model learns to ignore these columns via the ``has_ip_data`` sentinel
+    that is already part of the flow-level feature vector.
+
+    Parameters
+    ----------
+    flow_windows :
+        Output of :func:`build_flow_windows`.
+    graph_windows :
+        Output of :func:`pipeline.graph_features.build_graph_window_features`,
+        or ``None``.
+    config :
+        Full project config.  ``config["features"].get("graph_level", [])``
+        defines which columns to merge.
+    """
+    graph_cols = list(config["features"].get("graph_level", []))
+
+    merged = flow_windows.copy()
+
+    if not graph_cols:
+        # No graph features configured — nothing to do.
+        return merged
+
+    if graph_windows is None or graph_windows.empty:
+        for col in graph_cols:
+            merged[col] = 0.0
+        return merged
+
+    # Determine join keys (preserve scenario_id when present)
+    join_keys = ["src_ip", "window_start"]
+    if (
+        "scenario_id" in flow_windows.columns
+        and "scenario_id" in graph_windows.columns
+    ):
+        join_keys = ["scenario_id"] + join_keys
+
+    # Only keep keys + graph feature columns from graph_windows to avoid
+    # column-name collisions on a subsequent merge.
+    graph_subset = graph_windows[
+        join_keys + [c for c in graph_cols if c in graph_windows.columns]
+    ]
+
+    merged = merged.merge(graph_subset, on=join_keys, how="left")
+
+    for col in graph_cols:
+        if col in merged.columns:
+            merged[col] = merged[col].fillna(0.0)
+        else:
+            merged[col] = 0.0
+
     return merged
 
 
-def apply_reconnaissance_heuristic(windows_df: pd.DataFrame, config: dict[str, Any]) -> pd.DataFrame:
-    """Relabel a benign window as reconnaissance if its port_scan_score is high AND an attack
-    from the same source IP follows within forecast_horizon windows. No CIC-IDS-2018 label maps
-    to reconnaissance directly (see pipeline/mitre_mapping.py); this derives it from the
-    temporal-proximity-to-attack pattern instead of fabricating labels out of nowhere.
-    """
+def apply_reconnaissance_heuristic(
+    windows_df: pd.DataFrame,
+    config: dict[str, Any],
+) -> pd.DataFrame:
+    """Relabel qualifying benign windows as reconnaissance."""
+
     threshold = config["windowing"]["recon_port_scan_threshold"]
     horizon = config["windowing"]["forecast_horizon"]
+
     df = windows_df.copy()
 
-    for src_ip, group in df.groupby("src_ip"):
+    if "scenario_id" in df.columns:
+        recon_group_cols = ["scenario_id", "src_ip"]
+    else:
+        recon_group_cols = ["src_ip"]
+
+    for group_key, group in df.groupby(
+        recon_group_cols,
+        sort=False,
+        observed=True,
+    ):
         idx = group.index.to_numpy()
+
         stages = group["stage"].to_numpy()
         scores = group["port_scan_score"].to_numpy()
+
         for i in range(len(idx)):
-            if stages[i] != BENIGN or scores[i] < threshold:
+            if stages[i] != BENIGN:
                 continue
-            future = stages[i + 1: i + 1 + horizon]
-            if np.any((future != BENIGN) & (future != IMPACT)):
+
+            if scores[i] < threshold:
+                continue
+
+            future = stages[
+                i + 1 : i + 1 + horizon
+            ]
+
+            if np.any(
+                (future != BENIGN)
+                & (future != IMPACT)
+            ):
                 df.loc[idx[i], "stage"] = RECONNAISSANCE
+
     return df
 
 
 def build_sequences(
-    windows_df: pd.DataFrame, feature_cols: list[str], config: dict[str, Any]
+    windows_df: pd.DataFrame,
+    feature_cols: list[str],
+    config: dict[str, Any],
 ) -> dict[str, np.ndarray]:
-    """Slide a window of length `sequence_length` per src_ip and emit training examples:
-      X:                   (N, L, F)  past L state vectors
-      next_state:          (N, F)     ground-truth S_t+1 for the world model's regression head
-      future_stages:       (N, K)     stage index at each of the next K steps (-1 = excluded/impact)
-      infiltration:        (N, K)     binary "is this future step an attack" time series
-      current_stage:       (N,)       stage index of the LAST INPUT window itself (-1 = excluded/impact)
-      current_infiltration: (N,)      binary "is the last input window itself an attack" — together
-                                       with current_stage, this is what a persistence baseline
-                                       needs (models/baseline_lr.py::PersistenceBaseline): "predict
-                                       that whatever is true right now stays true next step"
-      window_end_time:     (N,)       timestamp of the last input window, used for chronological split
-      src_ip:              (N,)
-    """
+    """Build fixed-length temporal sequences with bounded memory."""
+
     seq_len = config["windowing"]["sequence_length"]
     horizon = config["windowing"]["forecast_horizon"]
 
-    X, next_state, future_stages, infiltration = [], [], [], []
-    current_stage, current_infiltration, window_end_time, src_ips = [], [], [], []
+    X_parts = []
+    next_state_parts = []
+    future_stage_parts = []
+    infiltration_parts = []
+    current_stage_parts = []
+    current_infiltration_parts = []
+    window_end_time_parts = []
+    src_ip_parts = []
+    scenario_id_parts = []
 
-    for src_ip, group in windows_df.groupby("src_ip"):
-        group = group.sort_values("window_start").reset_index(drop=True)
-        feats = group[feature_cols].to_numpy(dtype=np.float32)
+    if "scenario_id" in windows_df.columns:
+        group_cols = ["scenario_id", "src_ip"]
+    else:
+        group_cols = ["src_ip"]
+
+    for group_key, group in windows_df.groupby(
+        group_cols,
+        sort=False,
+        observed=True,
+    ):
+        group = (
+            group
+            .sort_values("window_start")
+            .reset_index(drop=True)
+        )
+
+        n = len(group)
+        sample_count = n - seq_len - horizon + 1
+
+        if sample_count <= 0:
+            continue
+
+        feats = group[feature_cols].to_numpy(
+            dtype=np.float32,
+            copy=True,
+        )
+
         stages = group["stage"].to_numpy()
         times = group["window_start"].to_numpy()
 
-        n = len(group)
-        last_start = n - seq_len - horizon
-        for i in range(max(0, last_start + 1)):
-            X.append(feats[i: i + seq_len])
-            next_state.append(feats[i + seq_len])
-            fut = stages[i + seq_len: i + seq_len + horizon]
-            future_stages.append(np.array([_stage_idx_or_masked(s) for s in fut]))
-            infiltration.append(np.array([0.0 if s == BENIGN else 1.0 for s in fut], dtype=np.float32))
-            last_input_stage = stages[i + seq_len - 1]
-            current_stage.append(_stage_idx_or_masked(last_input_stage))
-            current_infiltration.append(0.0 if last_input_stage == BENIGN else 1.0)
-            window_end_time.append(times[i + seq_len - 1])
-            src_ips.append(src_ip)
+        X_group = np.lib.stride_tricks.sliding_window_view(
+            feats,
+            seq_len,
+            axis=0,
+        )
 
-    return {
-        "X": np.stack(X) if X else np.zeros((0, seq_len, len(feature_cols)), dtype=np.float32),
-        "next_state": np.stack(next_state) if next_state else np.zeros((0, len(feature_cols)), dtype=np.float32),
-        "future_stages": np.stack(future_stages) if future_stages else np.zeros((0, horizon), dtype=np.int64),
-        "infiltration": np.stack(infiltration) if infiltration else np.zeros((0, horizon), dtype=np.float32),
-        "current_stage": np.array(current_stage, dtype=np.int64),
-        "current_infiltration": np.array(current_infiltration, dtype=np.float32),
-        "window_end_time": np.array(window_end_time),
-        "src_ip": np.array(src_ips),
+        X_group = np.transpose(
+            X_group,
+            (0, 2, 1),
+        )
+
+        X_group = X_group[
+            :sample_count
+        ].copy()
+
+        next_state_group = feats[
+            seq_len:seq_len + sample_count
+        ].copy()
+
+        future_stage_group = np.empty(
+            (sample_count, horizon),
+            dtype=np.int64,
+        )
+
+        infiltration_group = np.empty(
+            (sample_count, horizon),
+            dtype=np.float32,
+        )
+
+        for j in range(horizon):
+            future = stages[
+                seq_len + j:
+                seq_len + j + sample_count
+            ]
+
+            future_stage_group[:, j] = np.array(
+                [
+                    _stage_idx_or_masked(s)
+                    for s in future
+                ],
+                dtype=np.int64,
+            )
+
+            infiltration_group[:, j] = np.array(
+                [
+                    0.0 if s == BENIGN else 1.0
+                    for s in future
+                ],
+                dtype=np.float32,
+            )
+
+        current_stage_group = np.array(
+            [
+                _stage_idx_or_masked(s)
+                for s in stages[
+                    seq_len - 1:
+                    seq_len - 1 + sample_count
+                ]
+            ],
+            dtype=np.int64,
+        )
+
+        current_infiltration_group = np.array(
+            [
+                0.0 if s == BENIGN else 1.0
+                for s in stages[
+                    seq_len - 1:
+                    seq_len - 1 + sample_count
+                ]
+            ],
+            dtype=np.float32,
+        )
+
+        window_end_time_group = times[
+            seq_len - 1:
+            seq_len - 1 + sample_count
+        ]
+
+        src_ip_value = group["src_ip"].iloc[0]
+
+        X_parts.append(X_group)
+        next_state_parts.append(next_state_group)
+        future_stage_parts.append(future_stage_group)
+        infiltration_parts.append(infiltration_group)
+        current_stage_parts.append(current_stage_group)
+        current_infiltration_parts.append(
+            current_infiltration_group
+        )
+        window_end_time_parts.append(
+            window_end_time_group
+        )
+
+        src_ip_parts.append(
+            np.repeat(
+                src_ip_value,
+                sample_count,
+            )
+        )
+
+        if "scenario_id" in windows_df.columns:
+            scenario_id_value = group[
+                "scenario_id"
+            ].iloc[0]
+
+            scenario_id_parts.append(
+                np.repeat(
+                    scenario_id_value,
+                    sample_count,
+                )
+            )
+
+    if not X_parts:
+        result = {
+            "X": np.zeros(
+                (
+                    0,
+                    seq_len,
+                    len(feature_cols),
+                ),
+                dtype=np.float32,
+            ),
+            "next_state": np.zeros(
+                (
+                    0,
+                    len(feature_cols),
+                ),
+                dtype=np.float32,
+            ),
+            "future_stages": np.zeros(
+                (0, horizon),
+                dtype=np.int64,
+            ),
+            "infiltration": np.zeros(
+                (0, horizon),
+                dtype=np.float32,
+            ),
+            "current_stage": np.zeros(
+                0,
+                dtype=np.int64,
+            ),
+            "current_infiltration": np.zeros(
+                0,
+                dtype=np.float32,
+            ),
+            "window_end_time": np.array([]),
+            "src_ip": np.array([]),
+        }
+
+        if "scenario_id" in windows_df.columns:
+            result["scenario_id"] = np.array([])
+
+        return result
+
+    result = {
+        "X": np.concatenate(
+            X_parts,
+            axis=0,
+        ),
+        "next_state": np.concatenate(
+            next_state_parts,
+            axis=0,
+        ),
+        "future_stages": np.concatenate(
+            future_stage_parts,
+            axis=0,
+        ),
+        "infiltration": np.concatenate(
+            infiltration_parts,
+            axis=0,
+        ),
+        "current_stage": np.concatenate(
+            current_stage_parts,
+            axis=0,
+        ),
+        "current_infiltration": np.concatenate(
+            current_infiltration_parts,
+            axis=0,
+        ),
+        "window_end_time": np.concatenate(
+            window_end_time_parts,
+            axis=0,
+        ),
+        "src_ip": np.concatenate(
+            src_ip_parts,
+            axis=0,
+        ),
     }
+
+    if "scenario_id" in windows_df.columns:
+        result["scenario_id"] = np.concatenate(
+            scenario_id_parts,
+            axis=0,
+        )
+
+    # --------------------------------------------------------------
+    # IMPORTANT:
+    # Sequences are created group-by-group (scenario_id, src_ip).
+    # Therefore concatenation order is NOT chronological.
+    # Sort every sequence-related array using the same timestamp
+    # order before the dataset is split into train/val/test.
+    # --------------------------------------------------------------
+
+    order = np.argsort(
+        result["window_end_time"],
+        kind="stable",
+    )
+
+    for key in result:
+        result[key] = result[key][order]
+
+    return result
 
 
 def _stage_idx_or_masked(stage: str) -> int:
     idx = stage_to_index(stage)
+
     return -1 if idx is None else idx

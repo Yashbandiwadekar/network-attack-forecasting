@@ -34,6 +34,21 @@ class ForecastResult:
 
 
 @dataclass
+class BatchForecastResult:
+    """Same K-step rollout as ForecastResult, computed for many hosts at once via batched tensor
+    ops instead of a Python loop calling ForecastEngine.rollout per host. Built for the alert
+    dashboard, which needs a peak infiltration score for every monitored host (thousands on real
+    data) fast enough to feel live — one batched forward pass per K step regardless of host count,
+    instead of host_count x K individual ones. No attention/SHAP here (those stay per-host,
+    computed lazily only for whichever host an analyst drills into) — just the score used to
+    decide which hosts are even worth drilling into.
+    """
+    host_ids: list[str]
+    infiltration_probs: np.ndarray   # (N, K)
+    stage_predictions: list[list[str]]  # (N, K)
+
+
+@dataclass
 class UncertaintyForecastResult:
     """MC-dropout estimate of forecast uncertainty: `n_samples` stochastic rollouts with dropout
     left active, summarized as a 10th/50th/90th percentile band per step. `ForecastEngine.rollout`
@@ -111,6 +126,38 @@ class ForecastEngine:
             state_deltas=np.stack(state_deltas),
         )
 
+    def rollout_batch(self, host_ids: list[str], raw_sequences: np.ndarray, batch_size: int = 2048) -> BatchForecastResult:
+        """raw_sequences: (N, L, F) unscaled, one row per host. Chunked into `batch_size`-sized
+        pieces so an arbitrarily large host count doesn't try to allocate one giant tensor at once;
+        each chunk is still a single batched forward pass per K step, not one per host."""
+        horizon = self.config["windowing"]["forecast_horizon"]
+        n = raw_sequences.shape[0]
+        all_probs, all_stage_preds = [], []
+
+        with torch.no_grad():
+            for start in range(0, n, batch_size):
+                chunk = raw_sequences[start:start + batch_size]
+                seq = self.scaler.transform(chunk).astype(np.float32)
+                seq_t = torch.tensor(seq, device=self.device)  # (b, L, F)
+
+                probs_steps, stage_steps = [], []
+                for _ in range(horizon):
+                    next_state, stage_logits, infiltration_logit = self.model(seq_t)
+                    probs_steps.append(torch.sigmoid(infiltration_logit).cpu().numpy())
+                    stage_steps.append(torch.softmax(stage_logits, dim=-1).argmax(dim=-1).cpu().numpy())
+                    seq_t = torch.cat([seq_t[:, 1:, :], next_state.unsqueeze(1)], dim=1)
+
+                all_probs.append(np.stack(probs_steps, axis=1))  # (b, K)
+                all_stage_preds.append(np.stack(stage_steps, axis=1))  # (b, K)
+
+        infiltration_probs = np.concatenate(all_probs, axis=0) if all_probs else np.zeros((0, horizon))
+        stage_idx = np.concatenate(all_stage_preds, axis=0) if all_stage_preds else np.zeros((0, horizon), dtype=int)
+        stage_predictions = [[self.stage_labels[i] for i in row] for row in stage_idx]
+
+        return BatchForecastResult(
+            host_ids=host_ids, infiltration_probs=infiltration_probs, stage_predictions=stage_predictions,
+        )
+
     def rollout_with_uncertainty(self, raw_sequence: np.ndarray, n_samples: int = 20) -> UncertaintyForecastResult:
         """MC-dropout: re-run `rollout` `n_samples` times with dropout forced on, and summarize
         the spread. Restores whatever train/eval mode the model was in before returning."""
@@ -167,6 +214,28 @@ def latest_sequence(windows_df, feature_cols: list[str], src_ip: str, sequence_l
     if len(group) < sequence_length:
         return None
     return group[feature_cols].to_numpy(dtype=np.float32)[-sequence_length:]
+
+
+def latest_sequences_batch(
+    windows_df, feature_cols: list[str], sequence_length: int
+) -> tuple[list[str], np.ndarray]:
+    """The batched counterpart to latest_sequence: every eligible host's most recent
+    `sequence_length` windows, stacked into one (N, L, F) array. One groupby pass over
+    `windows_df` rather than one filter per host — needed for the alert dashboard to stay fast
+    when scoring thousands of hosts (real CIC-IDS-2018 has ~9,150 of them).
+    """
+    host_ids: list[str] = []
+    sequences: list[np.ndarray] = []
+    for host, group in windows_df.groupby("src_ip", sort=False):
+        if len(group) < sequence_length:
+            continue
+        group = group.sort_values("window_start")
+        sequences.append(group[feature_cols].to_numpy(dtype=np.float32)[-sequence_length:])
+        host_ids.append(host)
+
+    if not sequences:
+        return [], np.zeros((0, sequence_length, len(feature_cols)), dtype=np.float32)
+    return host_ids, np.stack(sequences)
 
 
 def previous_sequence_and_actual(

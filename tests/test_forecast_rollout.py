@@ -2,7 +2,9 @@ import numpy as np
 import torch
 
 from models.dataset import FeatureScaler
-from models.forecast import ForecastEngine, one_step_reconstruction_error, previous_sequence_and_actual
+from models.forecast import (
+    ForecastEngine, latest_sequences_batch, one_step_reconstruction_error, previous_sequence_and_actual,
+)
 from models.world_model import WorldModel
 
 CONFIG = {
@@ -118,3 +120,65 @@ def test_previous_sequence_and_actual_needs_one_more_window_than_latest_sequence
     assert prior.shape == (seq_len, 1)
     np.testing.assert_array_equal(prior[:, 0], [1.0, 2.0, 3.0])
     assert actual[0] == 4.0
+
+
+def test_latest_sequences_batch_matches_per_host_latest_sequence():
+    import pandas as pd
+
+    from models.forecast import latest_sequence
+
+    feature_cols = ["f0", "f1"]
+    seq_len = 4
+    rows = []
+    for host, n_windows in [("a", 6), ("b", 4), ("c", 2)]:  # c has too little history
+        for i in range(n_windows):
+            rows.append({
+                "src_ip": host, "window_start": pd.Timestamp("2026-01-01") + pd.Timedelta(seconds=10 * i),
+                "f0": float(i), "f1": float(i) * 2,
+            })
+    windows = pd.DataFrame(rows)
+
+    host_ids, sequences = latest_sequences_batch(windows, feature_cols, seq_len)
+
+    assert set(host_ids) == {"a", "b"}  # "c" excluded — fewer than seq_len windows
+    assert sequences.shape == (2, seq_len, 2)
+    for i, host in enumerate(host_ids):
+        expected = latest_sequence(windows, feature_cols, host, seq_len)
+        np.testing.assert_array_equal(sequences[i], expected)
+
+
+def test_rollout_batch_matches_individual_rollout():
+    n_features = 7
+    engine = _engine(n_features)
+    seq_a = np.random.randn(5, n_features).astype(np.float32)
+    seq_b = np.random.randn(5, n_features).astype(np.float32)
+
+    batch_result = engine.rollout_batch(["a", "b"], np.stack([seq_a, seq_b]))
+    single_a = engine.rollout(seq_a)
+    single_b = engine.rollout(seq_b)
+
+    assert batch_result.host_ids == ["a", "b"]
+    assert batch_result.infiltration_probs.shape == (2, 4)
+    np.testing.assert_allclose(batch_result.infiltration_probs[0], single_a.infiltration_probs, atol=1e-5)
+    np.testing.assert_allclose(batch_result.infiltration_probs[1], single_b.infiltration_probs, atol=1e-5)
+    assert batch_result.stage_predictions[0] == single_a.stage_predictions
+    assert batch_result.stage_predictions[1] == single_b.stage_predictions
+
+
+def test_rollout_batch_chunking_gives_same_result_as_one_batch():
+    n_features = 7
+    engine = _engine(n_features)
+    sequences = np.random.randn(5, 5, n_features).astype(np.float32)  # 5 hosts
+    host_ids = [f"host{i}" for i in range(5)]
+
+    one_chunk = engine.rollout_batch(host_ids, sequences, batch_size=2048)
+    many_chunks = engine.rollout_batch(host_ids, sequences, batch_size=2)
+
+    np.testing.assert_allclose(one_chunk.infiltration_probs, many_chunks.infiltration_probs, atol=1e-5)
+
+
+def test_rollout_batch_empty_input():
+    engine = _engine(7)
+    result = engine.rollout_batch([], np.zeros((0, 5, 7), dtype=np.float32))
+    assert result.host_ids == []
+    assert result.infiltration_probs.shape == (0, 4)
