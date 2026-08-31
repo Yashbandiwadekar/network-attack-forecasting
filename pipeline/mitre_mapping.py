@@ -1,19 +1,26 @@
-"""Maps CIC-IDS-2018 attack labels to MITRE ATT&CK stages.
+"""Maps CIC-IDS-2018 and CTU-13 labels to MITRE-style attack stages.
 
-CIC-IDS-2018 labels don't correspond 1:1 to the five stages the problem statement asks for
-(Reconnaissance, Initial Access, Lateral Movement, Command & Control, Exfiltration). This module
-makes the mapping explicit rather than silently forcing a bad fit — see docs/03-mitre-mapping.md
-for the reasoning behind each row.
+The internal pipeline uses five attack stages:
+- reconnaissance
+- initial_access
+- lateral_movement
+- command_and_control
+- exfiltration
 
-Two labels don't map onto any of the five stages at all:
-  - DoS/DDoS labels are MITRE "Impact", not one of the five requested stages. They're kept in a
-    separate `impact` bucket: still used for the binary infiltration-probability target, but
-    excluded from the 5-way stage classification head.
-  - `reconnaissance` has no direct CIC-IDS-2018 label. It is NOT assigned here; windowing.py
-    derives it heuristically (benign windows with a high port-scan score that immediately precede
-    an attack window from the same source IP).
+Benign traffic is also kept as a classification class.
+
+CTU-13 does not provide labels that map perfectly to all five stages.
+Therefore, the mapping is deliberately conservative.
+
+Unknown labels are mapped to IMPACT instead of silently becoming benign.
 """
+
 from __future__ import annotations
+
+
+# ---------------------------------------------------------------------------
+# Internal stage names
+# ---------------------------------------------------------------------------
 
 BENIGN = "benign"
 RECONNAISSANCE = "reconnaissance"
@@ -21,11 +28,16 @@ INITIAL_ACCESS = "initial_access"
 LATERAL_MOVEMENT = "lateral_movement"
 COMMAND_AND_CONTROL = "command_and_control"
 EXFILTRATION = "exfiltration"
-IMPACT = "impact"  # not one of the PS's five stages; kept only for the binary target, see module docstring
 
-# The five stages the classification head is trained on, plus benign. `impact` is deliberately
-# excluded — windows labelled impact are dropped from the stage-classification loss (see
-# models/world_model.py) but still contribute to the infiltration-probability loss.
+# CTU-13 / CIC labels that do not belong to the requested five-stage
+# classification head.
+IMPACT = "impact"
+
+
+# ---------------------------------------------------------------------------
+# Classification labels used by the model
+# ---------------------------------------------------------------------------
+
 STAGE_CLASSIFICATION_LABELS = [
     BENIGN,
     RECONNAISSANCE,
@@ -35,19 +47,31 @@ STAGE_CLASSIFICATION_LABELS = [
     EXFILTRATION,
 ]
 
-# Raw CIC-IDS-2018 `Label` column values -> stage. Covers the label spellings used across the
-# 2018-02-14 .. 2018-03-02 CSVs (spelling/spacing is inconsistent in the original dataset).
+
+# ---------------------------------------------------------------------------
+# CIC-IDS-2018 label mapping
+# ---------------------------------------------------------------------------
+
 CIC_LABEL_TO_STAGE: dict[str, str] = {
+    # Benign
     "BENIGN": BENIGN,
     "Benign": BENIGN,
+
+    # Initial Access
     "FTP-BruteForce": INITIAL_ACCESS,
     "SSH-Bruteforce": INITIAL_ACCESS,
     "Brute Force -Web": INITIAL_ACCESS,
     "Brute Force -XSS": INITIAL_ACCESS,
     "SQL Injection": INITIAL_ACCESS,
-    "Infilteration": LATERAL_MOVEMENT,   # sic — this is the dataset's actual spelling
+
+    # Lateral Movement
+    "Infilteration": LATERAL_MOVEMENT,
     "Infiltration": LATERAL_MOVEMENT,
+
+    # Command and Control
     "Bot": COMMAND_AND_CONTROL,
+
+    # Impact
     "DoS attacks-GoldenEye": IMPACT,
     "DoS attacks-Slowloris": IMPACT,
     "DoS attacks-SlowHTTPTest": IMPACT,
@@ -55,22 +79,121 @@ CIC_LABEL_TO_STAGE: dict[str, str] = {
     "DDOS attack-HOIC": IMPACT,
     "DDOS attack-LOIC-UDP": IMPACT,
     "DDoS attacks-LOIC-HTTP": IMPACT,
-    # Synthetic-only label used by scripts/make_synthetic_sample.py to exercise the exfiltration
-    # class end-to-end, since no CIC-IDS-2018 label maps to it. Not present in real data.
+
+    # Synthetic-only label used by the project.
     "SYNTH-Exfiltration": EXFILTRATION,
 }
 
 
+# ---------------------------------------------------------------------------
+# CTU-13 label mapping
+# ---------------------------------------------------------------------------
+
+def ctu13_label_to_stage(raw_label: str) -> str:
+    """Map a CTU-13 flow label to an internal MITRE-style stage."""
+
+    if raw_label is None:
+        return IMPACT
+
+    label = str(raw_label).strip().lower()
+
+    # -----------------------------------------------------------------------
+    # Normal / background traffic
+    # -----------------------------------------------------------------------
+
+    if label.startswith("flow=background"):
+        return BENIGN
+
+    if label.startswith("flow=to-background"):
+        return BENIGN
+
+    if label.startswith("flow=from-normal"):
+        return BENIGN
+
+    # -----------------------------------------------------------------------
+    # Botnet traffic
+    # -----------------------------------------------------------------------
+
+    if "from-botnet" in label:
+
+        # Botnet communication/control activity.
+        if any(
+            keyword in label
+            for keyword in [
+                "irc",
+                "dns",
+                "http",
+                "https",
+                "cc",
+                "custom-encryption",
+                "encrypted",
+                "attempt",
+                "established",
+            ]
+        ):
+            return COMMAND_AND_CONTROL
+
+        # Malware/binary download activity.
+        if "binary-download" in label:
+            return INITIAL_ACCESS
+
+        # Other botnet traffic is conservatively treated as C2.
+        return COMMAND_AND_CONTROL
+
+    # -----------------------------------------------------------------------
+    # Unknown CTU-13 labels
+    # -----------------------------------------------------------------------
+
+    # Never silently classify unknown traffic as benign.
+    return IMPACT
+
+
+# ---------------------------------------------------------------------------
+# Unified label mapping
+# ---------------------------------------------------------------------------
+
 def label_to_stage(raw_label: str) -> str:
-    """Map a raw dataset label to a MITRE stage. Unknown labels fall back to `impact` rather than
-    silently becoming benign, so pipeline bugs surface as visible unmapped-label warnings instead
-    of corrupting the benign class."""
-    return CIC_LABEL_TO_STAGE.get(raw_label.strip(), IMPACT)
+    """Map either CIC-IDS-2018 or CTU-13 labels to an internal stage."""
+
+    if raw_label is None:
+        return IMPACT
+
+    label = str(raw_label).strip()
+
+    # First try CIC-IDS-2018.
+    if label in CIC_LABEL_TO_STAGE:
+        return CIC_LABEL_TO_STAGE[label]
+
+    # Handle CIC labels with different capitalization.
+    normalized = label.lower()
+
+    for cic_label, stage in CIC_LABEL_TO_STAGE.items():
+        if normalized == cic_label.lower():
+            return stage
+
+    # CTU-13 labels start with "flow=".
+    if normalized.startswith("flow="):
+        return ctu13_label_to_stage(label)
+
+    # Unknown labels are excluded from the five-stage classification.
+    return IMPACT
 
 
-def stage_to_index(stage: str, stage_labels: list[str] = STAGE_CLASSIFICATION_LABELS) -> int | None:
-    """Index into the classification head's output for a stage, or None if it's excluded
-    (i.e. `impact`) from the 5-way classification objective."""
+# ---------------------------------------------------------------------------
+# Stage -> model output index
+# ---------------------------------------------------------------------------
+
+def stage_to_index(
+    stage: str,
+    stage_labels: list[str] = STAGE_CLASSIFICATION_LABELS,
+) -> int | None:
+    """Return the model output index for a stage.
+
+    Returns None for stages such as IMPACT that are excluded from the
+    five-stage classification objective.
+    """
+
     if stage not in stage_labels:
         return None
+
     return stage_labels.index(stage)

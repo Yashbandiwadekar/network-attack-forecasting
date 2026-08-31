@@ -1,6 +1,6 @@
 # Evaluation: World Model vs Baselines
 
-Test set: 191818 sequences. All four models predict the immediate next window (t+1) from
+Test set: 223754 sequences. All four models predict the immediate next window (t+1) from
 identical targets; the world model additionally supports K-step autoregressive rollout (see
 models/forecast.py), which none of the baselines have an equivalent of — demonstrated in the
 Streamlit app rather than benchmarked here, since there's nothing to compare it against fairly.
@@ -9,10 +9,10 @@ Streamlit app rather than benchmarked here, since there's nothing to compare it 
 
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
-| World Model (Transformer) | 0.884 | 0.999 | 0.792 | 0.000 |
-| Baseline (LR, last window) | 0.804 | 0.981 | 0.682 | 0.000 |
-| Baseline (LR, stacked window) | 0.863 | 0.995 | 0.762 | 0.000 |
-| Persistence (no learning) | 0.998 | 0.998 | 0.999 | 0.000 |
+| World Model (Transformer) | 0.797 | 0.809 | 0.786 | 0.008 |
+| Baseline (LR, last window) | 0.010 | 0.048 | 0.005 | 0.005 |
+| Baseline (LR, stacked window) | 0.017 | 0.039 | 0.011 | 0.012 |
+| Persistence (no learning) | 0.990 | 0.990 | 0.989 | 0.000 |
 
 ## Infiltration probability — fixed 5% false-positive-rate budget
 
@@ -21,19 +21,19 @@ operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
 
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
-| World Model (Transformer) | 0.770 | 0.626 | 1.000 | 0.004 |
-| Baseline (LR, last window) | 0.382 | 0.236 | 0.999 | 0.022 |
-| Baseline (LR, stacked window) | 0.840 | 0.724 | 1.000 | 0.003 |
-| Persistence (no learning) | 0.998 | 0.998 | 0.999 | 0.000 |
+| World Model (Transformer) | 0.496 | 0.339 | 0.924 | 0.077 |
+| Baseline (LR, last window) | 0.167 | 0.125 | 0.251 | 0.075 |
+| Baseline (LR, stacked window) | 0.226 | 0.168 | 0.341 | 0.072 |
+| Persistence (no learning) | 0.990 | 0.990 | 0.989 | 0.000 |
 
 ## MITRE stage classification (5-way, `impact`-mapped windows excluded)
 
 | Model | F1 (macro) | Precision (macro) | Recall (macro) |
 |---|---|---|---|
-| World Model (Transformer) | 0.673 | 0.999 | 0.656 |
-| Baseline (LR, last window) | 0.648 | 0.969 | 0.595 |
-| Baseline (LR, stacked window) | 0.669 | 0.998 | 0.658 |
-| Persistence (no learning) | 0.998 | 0.998 | 0.999 |
+| World Model (Transformer) | 0.907 | 0.896 | 0.919 |
+| Baseline (LR, last window) | 0.497 | 0.509 | 0.501 |
+| Baseline (LR, stacked window) | 0.568 | 0.629 | 0.549 |
+| Persistence (no learning) | 1.000 | 1.000 | 1.000 |
 
 ## Interpretation
 
@@ -46,4 +46,3 @@ operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
 - **World Model vs Persistence**: persistence needs no training at all. If the world model doesn't
   clear this bar, it isn't learning real dynamics, whatever its other metrics say.
 
-**Honest caveat**: the stacked-window baseline matches or beats the world model here. On the current (small, synthetic) sample the attack-phase transitions are clean enough that a flat classifier with the same information does just as well — this benchmark hasn't yet demonstrated that sequential/recurrent structure earns its keep. That's exactly the kind of gap real CIC-IDS-2018 data, with much noisier and more overlapping traffic, is expected to actually show; see docs/02-dataset-and-features.md.

@@ -4,7 +4,7 @@
 paths:
   raw_flow_dir: data/raw/flows          # CICFlowMeter CSVs
   raw_pcap_dir: data/raw/pcap           # raw PCAP files (optional, packet-level features)
-  processed_dir: data/processed         # windowed sequence tensors + splits
+  processed_dir: data/processed/cicids2018/splits
   checkpoint_dir: checkpoints
   eval_report: docs/04-evaluation.md
 
@@ -45,6 +45,12 @@ features:
     - bidir_ratio
     - tcp_ratio
     - udp_ratio
+  graph_level:                        # per-window host-interaction graph features
+    - graph_out_degree               # unique destination IPs contacted this window
+    - graph_fan_out_ratio            # out_degree / flow_count — spread per flow
+    - graph_fan_in_ratio             # avg sources-to-my-dsts / flow_count — sharing signal
+    - graph_component_size           # nodes in this host's connected component
+    - graph_dst_entropy              # Shannon entropy of dst_ip distribution
   packet_level:
     - mean_ttl
     - var_ttl
@@ -71,7 +77,7 @@ model:
   dropout: 0.1
   batch_size: 64
   lr: 0.0003
-  epochs: 30
+  epochs: 3
   device: cuda                          # falls back to cpu automatically if unavailable
 
 mitre_stages:

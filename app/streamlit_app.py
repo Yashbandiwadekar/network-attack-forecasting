@@ -61,6 +61,10 @@ def _process_uploads(flow_csv_path: Path, pcap_path: Path | None, config: dict) 
         packet_windows = compute_packet_window_features(load_pcap(pcap_path), config["windowing"]["window_seconds"])
 
     windows = merge_packet_features(flow_windows, packet_windows, config)
+    from pipeline.graph_features import build_graph_window_features
+    graph_windows = build_graph_window_features(flow_df, config)
+    from pipeline.windowing import merge_graph_features
+    windows = merge_graph_features(windows, graph_windows, config)
     windows = apply_reconnaissance_heuristic(windows, config)
     return flow_df, windows
 

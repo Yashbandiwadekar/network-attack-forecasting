@@ -1,6 +1,6 @@
 import numpy as np
 
-from pipeline.build_dataset import _chronological_split
+from pipeline.build_dataset import chronological_split
 
 SPLIT_CONFIG = {"train_frac": 0.7, "val_frac": 0.15, "test_frac": 0.15}
 
@@ -22,7 +22,7 @@ def test_splits_within_each_group_not_globally():
     times = list(range(10)) + list(range(1000, 1010))
     seqs = _sequences(src_ips, times)
 
-    splits = _chronological_split(seqs, SPLIT_CONFIG)
+    splits = chronological_split(seqs, SPLIT_CONFIG)
 
     assert set(splits["train"]["src_ip"]) == {"a", "b"}
     assert set(splits["val"]["src_ip"]) == {"a", "b"}
@@ -37,7 +37,7 @@ def test_within_group_chronological_order_is_preserved_no_leakage():
     times = list(range(10))
     seqs = _sequences(src_ips, times)
 
-    splits = _chronological_split(seqs, SPLIT_CONFIG)
+    splits = chronological_split(seqs, SPLIT_CONFIG)
 
     max_train_time = splits["train"]["window_end_time"].max()
     min_val_time = splits["val"]["window_end_time"].min()
@@ -51,7 +51,7 @@ def test_every_row_assigned_to_exactly_one_split():
     times = list(range(20))
     seqs = _sequences(src_ips, times)
 
-    splits = _chronological_split(seqs, SPLIT_CONFIG)
+    splits = chronological_split(seqs, SPLIT_CONFIG)
 
     total = sum(len(s["src_ip"]) for s in splits.values())
     assert total == 20
@@ -60,6 +60,6 @@ def test_every_row_assigned_to_exactly_one_split():
 def test_tiny_group_does_not_crash():
     # a group with only 1-2 sequences can't meaningfully split 3 ways — must not error
     seqs = _sequences(["a"], [0])
-    splits = _chronological_split(seqs, SPLIT_CONFIG)
+    splits = chronological_split(seqs, SPLIT_CONFIG)
     total = sum(len(s["src_ip"]) for s in splits.values())
     assert total == 1
