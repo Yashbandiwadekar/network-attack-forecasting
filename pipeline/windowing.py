@@ -13,54 +13,64 @@ from pipeline.mitre_mapping import BENIGN, IMPACT, RECONNAISSANCE, label_to_stag
 
 def build_flow_windows(flow_df: pd.DataFrame, config: dict[str, Any]) -> pd.DataFrame:
     """Aggregate cleaned per-flow rows (from flow_features.clean_and_normalize) into per
-    (src_ip, window_start) state vectors, using the flow_level feature list from config."""
+    (src_ip, window_start) state vectors, using the flow_level feature list from config.
+
+    Vectorized via groupby().agg() rather than a Python loop over groups — real CIC-IDS-2018
+    collapses ~16M flows into ~1.5M (src_ip, window) groups, and iterating those one at a time in
+    Python took over 20 minutes; this does the equivalent work in well under a minute by pushing
+    the aggregation into pandas' C implementation. The one exception is `stage` (needs the mode of
+    non-benign labels per window), which still uses a per-group apply, but only over the attack
+    subset of rows — typically 1-2% of the data — not all of them.
+    """
     window_seconds = config["windowing"]["window_seconds"]
     df = flow_df.copy()
     df["window_start"] = df["timestamp"].dt.floor(f"{window_seconds}s")
     df["stage"] = df["label"].map(label_to_stage)
     if "has_ip_data" not in df.columns:
         df["has_ip_data"] = 1.0  # caller didn't route through flow_features.clean_and_normalize
+    df["iat_var"] = df["iat_std"] ** 2
 
-    rows = []
-    for (src_ip, window_start), group in df.groupby(["src_ip", "window_start"]):
-        total_pkts = group["total_pkts"].sum()
-        has_ip_data = float(group["has_ip_data"].iloc[0])
-        rows.append({
-            "src_ip": src_ip,
-            "window_start": window_start,
-            "flow_count": len(group),
-            "unique_dst_ports": group["dst_port"].nunique(),
-            # dst_ip is a constant sentinel ("UNKNOWN") when has_ip_data is 0 — nunique() would
-            # trivially read 1, which looks like a real "only one destination" signal but isn't
-            "unique_dst_ips": group["dst_ip"].nunique() if has_ip_data else 0.0,
-            "has_ip_data": has_ip_data,
-            "total_bytes": group["total_bytes"].sum(),
-            "total_packets": total_pkts,
-            "mean_duration": group["duration_s"].mean(),
-            "syn_ratio": group["syn_cnt"].sum() / total_pkts if total_pkts else 0.0,
-            "ack_ratio": group["ack_cnt"].sum() / total_pkts if total_pkts else 0.0,
-            "fin_ratio": group["fin_cnt"].sum() / total_pkts if total_pkts else 0.0,
-            "rst_ratio": group["rst_cnt"].sum() / total_pkts if total_pkts else 0.0,
-            "psh_ratio": group["psh_cnt"].sum() / total_pkts if total_pkts else 0.0,
-            "urg_ratio": group["urg_cnt"].sum() / total_pkts if total_pkts else 0.0,
-            "mean_iat": group["iat_mean"].mean(),
-            "var_iat": (group["iat_std"] ** 2).mean(),
-            "max_iat": group["iat_max"].max(),
-            "bidir_ratio": group["bidir_ratio"].mean(),
-            "tcp_ratio": group["is_tcp"].mean(),
-            "udp_ratio": group["is_udp"].mean(),
-            # majority non-benign label wins the window, so one attack flow among many benign
-            # flows still marks the window as an attack window (rare events must not get diluted away)
-            "stage": _majority_stage(group["stage"]),
-        })
-    return pd.DataFrame(rows).sort_values(["src_ip", "window_start"]).reset_index(drop=True)
+    group_keys = ["src_ip", "window_start"]
+    grouped = df.groupby(group_keys, sort=False)
 
+    agg = pd.DataFrame({
+        "flow_count": grouped.size(),
+        "unique_dst_ports": grouped["dst_port"].nunique(),
+        "unique_dst_ips": grouped["dst_ip"].nunique(),
+        "has_ip_data": grouped["has_ip_data"].first(),
+        "total_bytes": grouped["total_bytes"].sum(),
+        "total_packets": grouped["total_pkts"].sum(),
+        "mean_duration": grouped["duration_s"].mean(),
+        "mean_iat": grouped["iat_mean"].mean(),
+        "var_iat": grouped["iat_var"].mean(),
+        "max_iat": grouped["iat_max"].max(),
+        "bidir_ratio": grouped["bidir_ratio"].mean(),
+        "tcp_ratio": grouped["is_tcp"].mean(),
+        "udp_ratio": grouped["is_udp"].mean(),
+    })
 
-def _majority_stage(stages: pd.Series) -> str:
-    non_benign = stages[stages != BENIGN]
-    if len(non_benign) > 0:
-        return non_benign.mode().iloc[0]
-    return BENIGN
+    # dst_ip is a constant sentinel ("UNKNOWN") when has_ip_data is 0 — nunique() would trivially
+    # read 1, which looks like a real "only one destination" signal but isn't
+    agg.loc[agg["has_ip_data"] == 0.0, "unique_dst_ips"] = 0.0
+
+    safe_total = agg["total_packets"].where(agg["total_packets"] > 0)  # NaN where 0, guards /0
+    for ratio_col, count_col in [
+        ("syn_ratio", "syn_cnt"), ("ack_ratio", "ack_cnt"), ("fin_ratio", "fin_cnt"),
+        ("rst_ratio", "rst_cnt"), ("psh_ratio", "psh_cnt"), ("urg_ratio", "urg_cnt"),
+    ]:
+        agg[ratio_col] = (grouped[count_col].sum() / safe_total).fillna(0.0)
+
+    # majority non-benign label wins the window, so one attack flow among many benign flows still
+    # marks the window as an attack window (rare events must not get diluted away)
+    attack_rows = df[df["stage"] != BENIGN]
+    if len(attack_rows) > 0:
+        attack_stage = attack_rows.groupby(group_keys, sort=False)["stage"].agg(lambda s: s.mode().iloc[0])
+        agg["stage"] = attack_stage.reindex(agg.index)
+    else:
+        agg["stage"] = None
+    agg["stage"] = agg["stage"].fillna(BENIGN)
+
+    return agg.reset_index().sort_values(["src_ip", "window_start"]).reset_index(drop=True)
 
 
 def merge_packet_features(

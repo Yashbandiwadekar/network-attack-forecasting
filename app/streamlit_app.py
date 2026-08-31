@@ -27,16 +27,21 @@ from models.forecast import (
     ForecastEngine, latest_sequence, load_world_model,
     one_step_reconstruction_error, previous_sequence_and_actual,
 )
-from pipeline.flow_features import clean_and_normalize, load_flow_csv
+from pipeline.flow_features import clean_and_normalize, load_flow_csv, load_flow_dir
 from pipeline.packet_features import compute_packet_window_features, load_pcap
 from pipeline.windowing import apply_reconnaissance_heuristic, build_flow_windows, merge_packet_features
 
 st.set_page_config(page_title="Network Attack Forecasting", layout="wide")
 
+DATA_SOURCES = {
+    "Synthetic sample (fast demo)": "configs/default.yaml",
+    "Real CIC-IDS-2018 (trained model)": "configs/real_data.yaml",
+}
+
 
 @st.cache_resource
-def _load_backend():
-    config = load_config("configs/default.yaml")
+def _load_backend(config_path: str):
+    config = load_config(config_path)
     checkpoint_dir = resolve_path(config, "checkpoint_dir")
     checkpoint_path = checkpoint_dir / "world_model_best.pt"
     if not checkpoint_path.exists():
@@ -65,6 +70,29 @@ def _process_uploads(flow_csv_path: Path, pcap_path: Path | None, config: dict) 
     return flow_df, windows
 
 
+@st.cache_data(show_spinner=False)
+def _load_real_data(config_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Real CIC-IDS-2018 is ~16M flows across 10 files — this takes 1-3 minutes on first call, so
+    it's cached (by config_path) rather than reprocessed on every widget interaction. No PCAP
+    downloaded for real data (37 GB/day, see docs/02-dataset-and-features.md), so packet-level
+    features are zero-filled — flow-only mode, exactly as the model was trained.
+    """
+    config = load_config(config_path)
+    flow_df = clean_and_normalize(load_flow_dir(resolve_path(config, "raw_flow_dir")))
+    flow_windows = build_flow_windows(flow_df, config)
+    windows = merge_packet_features(flow_windows, None, config)
+    windows = apply_reconnaissance_heuristic(windows, config)
+    return flow_df, windows
+
+
+def _sort_ips_pseudo_hosts_first(ips: list[str]) -> list[str]:
+    """Real data mixes genuine per-host IPs (thousands, from the one file with real IPs) with a
+    handful of per-day network-wide pseudo-hosts ("NETWORK-<date>", see
+    pipeline/flow_features.py::_fill_missing_ip_columns) — the pseudo-hosts are the more useful
+    entries to see first in a dropdown of thousands."""
+    return sorted(ips, key=lambda ip: (not ip.startswith("NETWORK-"), ip))
+
+
 def main() -> None:
     st.title("AI-Based Network Attack Forecasting")
     st.caption(
@@ -73,49 +101,68 @@ def main() -> None:
         "synthetic sample."
     )
 
-    config, model, scaler, background = _load_backend()
+    with st.sidebar:
+        st.header("Data source")
+        source_label = st.radio("Model / dataset", list(DATA_SOURCES.keys()))
+        config_path = DATA_SOURCES[source_label]
+
+    config, model, scaler, background = _load_backend(config_path)
     if model is None:
         st.error(
-            "No trained checkpoint found. Run `python -m models.train` first "
-            "(after `python -m pipeline.build_dataset`)."
+            f"No trained checkpoint for this data source. Run `python -m pipeline.build_dataset "
+            f"--config {config_path}` then `python -m models.train --config {config_path}` first."
         )
         return
 
-    with st.sidebar:
-        st.header("Input")
-        use_synthetic = st.checkbox("Use bundled synthetic sample", value=True)
-        flow_file = None if use_synthetic else st.file_uploader("Flow CSV (CICFlowMeter)", type="csv")
-        pcap_file = None if use_synthetic else st.file_uploader("PCAP (optional)", type="pcap")
-        if use_synthetic:
+    is_real_data = config_path == DATA_SOURCES["Real CIC-IDS-2018 (trained model)"]
+
+    if is_real_data:
+        with st.sidebar:
             st.info(
-                "This is a synthetic, hand-built traffic sample used to demonstrate the pipeline "
-                "end-to-end — NOT real CIC-IDS-2018 data. See docs/02-dataset-and-features.md.",
-                icon="⚠️",
+                "Real CIC-IDS-2018 (10 days, 16M flows). No PCAP downloaded (37 GB/day) — flow-only, "
+                "same as training. 9 of 10 days lack real IPs and fall back to one network-wide "
+                "pseudo-host per day (`NETWORK-<date>`); only the DDoS day has genuine per-host IPs. "
+                "See docs/02-dataset-and-features.md.",
+                icon="📊",
             )
-
-    if use_synthetic:
-        flow_path = resolve_path(config, "raw_flow_dir") / "synthetic_sample.csv"
-        pcap_path = resolve_path(config, "raw_pcap_dir") / "synthetic_sample.pcap"
-        if not flow_path.exists():
-            st.error("Synthetic sample not found. Run `python -m scripts.make_synthetic_sample` first.")
-            return
+        with st.spinner("Loading and windowing real CIC-IDS-2018 data (16M flows, 1-3 min on first load)..."):
+            flow_df, windows = _load_real_data(config_path)
     else:
-        if flow_file is None:
-            st.info("Upload a flow CSV to begin.")
-            return
-        tmp_dir = Path(tempfile.mkdtemp())
-        flow_path = tmp_dir / "upload_flows.csv"
-        flow_path.write_bytes(flow_file.getvalue())
-        pcap_path = None
-        if pcap_file is not None:
-            pcap_path = tmp_dir / "upload.pcap"
-            pcap_path.write_bytes(pcap_file.getvalue())
+        with st.sidebar:
+            st.header("Input")
+            use_synthetic = st.checkbox("Use bundled synthetic sample", value=True)
+            flow_file = None if use_synthetic else st.file_uploader("Flow CSV (CICFlowMeter)", type="csv")
+            pcap_file = None if use_synthetic else st.file_uploader("PCAP (optional)", type="pcap")
+            if use_synthetic:
+                st.info(
+                    "This is a synthetic, hand-built traffic sample used to demonstrate the pipeline "
+                    "end-to-end — NOT real CIC-IDS-2018 data. See docs/02-dataset-and-features.md.",
+                    icon="⚠️",
+                )
 
-    with st.spinner("Running feature pipeline..."):
-        flow_df, windows = _process_uploads(flow_path, pcap_path, config)
+        if use_synthetic:
+            flow_path = resolve_path(config, "raw_flow_dir") / "synthetic_sample.csv"
+            pcap_path = resolve_path(config, "raw_pcap_dir") / "synthetic_sample.pcap"
+            if not flow_path.exists():
+                st.error("Synthetic sample not found. Run `python -m scripts.make_synthetic_sample` first.")
+                return
+        else:
+            if flow_file is None:
+                st.info("Upload a flow CSV to begin.")
+                return
+            tmp_dir = Path(tempfile.mkdtemp())
+            flow_path = tmp_dir / "upload_flows.csv"
+            flow_path.write_bytes(flow_file.getvalue())
+            pcap_path = None
+            if pcap_file is not None:
+                pcap_path = tmp_dir / "upload.pcap"
+                pcap_path.write_bytes(pcap_file.getvalue())
+
+        with st.spinner("Running feature pipeline..."):
+            flow_df, windows = _process_uploads(flow_path, pcap_path, config)
 
     seq_len = config["windowing"]["sequence_length"]
-    eligible_ips = sorted(windows.groupby("src_ip").size()[lambda s: s >= seq_len].index.tolist())
+    eligible_ips = _sort_ips_pseudo_hosts_first(windows.groupby("src_ip").size()[lambda s: s >= seq_len].index.tolist())
     if not eligible_ips:
         st.warning(f"No source IP has {seq_len}+ consecutive windows of history yet — need more traffic.")
         return
