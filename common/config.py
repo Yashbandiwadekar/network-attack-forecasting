@@ -24,8 +24,15 @@ def resolve_path(config: dict[str, Any], key: str) -> Path:
 
 
 def feature_columns(config: dict[str, Any]) -> list[str]:
-    """Full ordered feature vector: flow-level features followed by packet-level features."""
-    return list(config["features"]["flow_level"]) + list(config["features"]["packet_level"])
+    """Full ordered feature vector: flow-level → graph-level → packet-level features.
+
+    The ``graph_level`` section is optional for backward compatibility — configs
+    that pre-date graph features simply omit it and the vector is unchanged.
+    """
+    flow = list(config["features"]["flow_level"])
+    graph = list(config["features"].get("graph_level", []))
+    packet = list(config["features"]["packet_level"])
+    return flow + graph + packet
 
 
 def mitre_stages(config: dict[str, Any]) -> list[str]:

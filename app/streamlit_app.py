@@ -24,19 +24,122 @@ from common.config import feature_columns, load_config, resolve_path
 from models.dataset import FeatureScaler, load_split
 from models.explain import ShapExplainer, gradient_input_attribution, summarize_attention
 from models.forecast import (
-    ForecastEngine, latest_sequence, load_world_model,
+    ForecastEngine, latest_sequence, latest_sequences_batch, load_world_model,
     one_step_reconstruction_error, previous_sequence_and_actual,
 )
 from pipeline.flow_features import clean_and_normalize, load_flow_csv, load_flow_dir
+from pipeline.graph_features import build_graph_window_features
 from pipeline.packet_features import compute_packet_window_features, load_pcap
-from pipeline.windowing import apply_reconnaissance_heuristic, build_flow_windows, merge_packet_features
+from pipeline.windowing import (
+    apply_reconnaissance_heuristic, build_flow_windows, merge_graph_features, merge_packet_features,
+)
 
-st.set_page_config(page_title="Network Attack Forecasting", layout="wide")
+st.set_page_config(page_title="Network Attack Forecasting", layout="wide", page_icon="🛡️")
 
 DATA_SOURCES = {
     "Synthetic sample (fast demo)": "configs/default.yaml",
     "Real CIC-IDS-2018 (trained model)": "configs/real_data.yaml",
 }
+
+# Status palette (fixed roles — not themed, not reused for series identity). Severity thresholds
+# on the world model's own peak K-step infiltration probability. A host below WARNING never
+# appears in the alert feed at all — only counted in "hosts monitored" — so the feed doesn't drown
+# in near-zero noise.
+SEVERITY_LEVELS = [
+    (0.70, "critical", "#d03b3b", "#ffffff"),
+    (0.40, "serious", "#ec835a", "#0d0d0d"),
+    (0.15, "warning", "#fab219", "#0d0d0d"),
+]
+GOOD_COLOR = "#0ca30c"
+
+DASHBOARD_CSS = """
+<style>
+.live-pill {
+    display:inline-flex; align-items:center; gap:6px; background:rgba(12,163,12,0.12);
+    color:#0ca30c; border:1px solid rgba(12,163,12,0.35); padding:3px 12px; border-radius:999px;
+    font-size:12px; font-weight:600; letter-spacing:0.03em; text-transform:uppercase;
+}
+.live-dot { width:7px; height:7px; border-radius:50%; background:#0ca30c; animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+.stat-tile {
+    background:#1a1a19; border:1px solid rgba(255,255,255,0.10); border-radius:10px;
+    padding:14px 18px; height:100%;
+}
+.stat-tile-label { color:#898781; font-size:12px; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:6px; }
+.stat-tile-value { color:#ffffff; font-size:30px; font-weight:700; font-variant-numeric: tabular-nums; line-height:1.1; }
+
+.alert-card {
+    background:#1a1a19; border:1px solid rgba(255,255,255,0.10); border-left:4px solid;
+    border-radius:10px; padding:12px 16px; margin-bottom:8px;
+}
+.alert-card-top { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
+.severity-badge {
+    font-size:10.5px; font-weight:700; letter-spacing:0.05em; padding:3px 9px; border-radius:999px;
+    text-transform:uppercase;
+}
+.alert-host { color:#ffffff; font-weight:600; font-size:14px; font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+.alert-card-body { display:flex; align-items:center; justify-content:space-between; gap:14px; }
+.alert-stat-value { font-size:26px; font-weight:700; font-variant-numeric: tabular-nums; line-height:1; }
+.alert-stat-label { color:#c3c2b7; font-size:12px; margin-top:4px; }
+
+.empty-state {
+    color:#898781; text-align:center; padding:28px; border:1px dashed rgba(255,255,255,0.15);
+    border-radius:10px; font-size:14px;
+}
+</style>
+"""
+
+
+def _severity_for(peak_prob: float) -> tuple[str, str, str] | None:
+    """(label, background color, text color) for the given peak probability, or None if it's
+    below every threshold — such hosts don't get an alert card at all."""
+    for threshold, label, bg, fg in SEVERITY_LEVELS:
+        if peak_prob >= threshold:
+            return label, bg, fg
+    return None
+
+
+def _sparkline_svg(values: np.ndarray, color: str, width: int = 110, height: int = 30) -> str:
+    """A bare inline-SVG sparkline (Tier 2 component) — no axes, no legend, just the shape of the
+    K-step trajectory. Two points minimum; degenerates to a flat centered line otherwise."""
+    if len(values) < 2:
+        return ""
+    vmin, vmax = float(np.min(values)), float(np.max(values))
+    span = vmax - vmin if vmax > vmin else 1.0
+    pad = 3
+    xs = np.linspace(pad, width - pad, len(values))
+    ys = [height - pad - (v - vmin) / span * (height - 2 * pad) for v in values]
+    points = " ".join(f"{x:.1f},{y:.1f}" for x, y in zip(xs, ys))
+    return (
+        f'<svg width="{width}" height="{height}" viewBox="0 0 {width} {height}" '
+        f'role="img" aria-label="infiltration probability trend">'
+        f'<polyline points="{points}" fill="none" stroke="{color}" stroke-width="2" '
+        f'stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    )
+
+
+def _alert_card_html(
+    host: str, severity_label: str, severity_bg: str, severity_fg: str,
+    peak_prob: float, peak_step_seconds: int, stage: str, probs_curve: np.ndarray,
+) -> str:
+    spark = _sparkline_svg(probs_curve, severity_bg)
+    stage_readable = stage.replace("_", " ")
+    return f"""
+    <div class="alert-card" style="border-left-color:{severity_bg};">
+      <div class="alert-card-top">
+        <span class="severity-badge" style="background:{severity_bg}; color:{severity_fg};">{severity_label}</span>
+        <span class="alert-host">{host}</span>
+      </div>
+      <div class="alert-card-body">
+        <div>
+          <div class="alert-stat-value" style="color:{severity_bg};">{peak_prob:.0%}</div>
+          <div class="alert-stat-label">peaks in {peak_step_seconds}s &middot; predicted {stage_readable}</div>
+        </div>
+        <div>{spark}</div>
+      </div>
+    </div>
+    """
 
 
 @st.cache_resource
@@ -66,6 +169,8 @@ def _process_uploads(flow_csv_path: Path, pcap_path: Path | None, config: dict) 
         packet_windows = compute_packet_window_features(load_pcap(pcap_path), config["windowing"]["window_seconds"])
 
     windows = merge_packet_features(flow_windows, packet_windows, config)
+    graph_windows = build_graph_window_features(flow_df, config)
+    windows = merge_graph_features(windows, graph_windows, config)
     windows = apply_reconnaissance_heuristic(windows, config)
     return flow_df, windows
 
@@ -80,9 +185,29 @@ def _load_real_data(config_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     config = load_config(config_path)
     flow_df = clean_and_normalize(load_flow_dir(resolve_path(config, "raw_flow_dir")))
     flow_windows = build_flow_windows(flow_df, config)
-    windows = merge_packet_features(flow_windows, None, config)
+    graph_windows = build_graph_window_features(flow_df, config)
+    windows = merge_graph_features(flow_windows, graph_windows, config)
+    windows = merge_packet_features(windows, None, config)
     windows = apply_reconnaissance_heuristic(windows, config)
     return flow_df, windows
+
+
+def _stat_tile_html(label: str, value: str) -> str:
+    return f"""
+    <div class="stat-tile">
+      <div class="stat-tile-label">{label}</div>
+      <div class="stat-tile-value">{value}</div>
+    </div>
+    """
+
+
+def _score_all_hosts(_engine: ForecastEngine, windows: pd.DataFrame, feature_cols: list[str], seq_len: int):
+    """Peak infiltration probability + predicted stage for every eligible host, via one batched
+    rollout rather than one per host — see models/forecast.py::ForecastEngine.rollout_batch."""
+    host_ids, sequences = latest_sequences_batch(windows, feature_cols, seq_len)
+    if not host_ids:
+        return None
+    return _engine.rollout_batch(host_ids, sequences)
 
 
 def _sort_ips_pseudo_hosts_first(ips: list[str]) -> list[str]:
@@ -94,12 +219,21 @@ def _sort_ips_pseudo_hosts_first(ips: list[str]) -> list[str]:
 
 
 def main() -> None:
-    st.title("AI-Based Network Attack Forecasting")
-    st.caption(
-        "World-model forecast of attacker progression from network traffic — runs fully offline, "
-        "no cloud API calls. Upload a CICFlowMeter CSV (+ optional PCAP) or use the bundled "
-        "synthetic sample."
-    )
+    st.markdown(DASHBOARD_CSS, unsafe_allow_html=True)
+
+    title_col, status_col = st.columns([5, 1])
+    with title_col:
+        st.title("🛡️ Network Attack Forecasting")
+        st.caption(
+            "World-model alert dashboard — forecasts attacker progression before compromise "
+            "completes. Runs fully offline, no cloud API calls."
+        )
+    with status_col:
+        st.markdown(
+            '<div style="text-align:right; padding-top:28px;">'
+            '<span class="live-pill"><span class="live-dot"></span>Live</span></div>',
+            unsafe_allow_html=True,
+        )
 
     with st.sidebar:
         st.header("Data source")
@@ -167,18 +301,99 @@ def main() -> None:
         st.warning(f"No source IP has {seq_len}+ consecutive windows of history yet — need more traffic.")
         return
 
-    src_ip = st.selectbox("Source IP to forecast", eligible_ips)
     feature_cols = feature_columns(config)
+    engine = ForecastEngine(model, scaler, config)
+    window_s = config["windowing"]["window_seconds"]
+
+    # ----------------------------------------------------------------------------------------
+    # Alert dashboard — score every monitored host in one batched rollout (see
+    # models/forecast.py::ForecastEngine.rollout_batch) and surface the ones crossing a severity
+    # threshold as alert cards. Recomputed only when the data source or host count actually
+    # changes (host count is a cheap proxy for "the underlying data changed" — avoids re-hashing
+    # a multi-million-row DataFrame on every widget interaction).
+    # ----------------------------------------------------------------------------------------
+    score_cache_key = (config_path, len(eligible_ips))
+    if st.session_state.get("_score_cache_key") != score_cache_key:
+        with st.spinner(f"Scoring {len(eligible_ips):,} monitored hosts..."):
+            st.session_state._score_cache_key = score_cache_key
+            st.session_state._score_result = _score_all_hosts(engine, windows, feature_cols, seq_len)
+    batch_result = st.session_state._score_result
+
+    st.subheader("Alert Dashboard")
+
+    alerts = []  # (peak_prob, peak_step, host, stage_at_peak, probs_curve)
+    if batch_result is not None:
+        for i, host in enumerate(batch_result.host_ids):
+            probs_curve = batch_result.infiltration_probs[i]
+            peak_step = int(np.argmax(probs_curve))
+            peak_prob = float(probs_curve[peak_step])
+            severity = _severity_for(peak_prob)
+            if severity is None:
+                continue
+            stage_at_peak = batch_result.stage_predictions[i][peak_step]
+            alerts.append((peak_prob, peak_step, host, stage_at_peak, probs_curve, severity))
+    alerts.sort(key=lambda a: a[0], reverse=True)
+
+    n_critical = sum(1 for a in alerts if a[5][0] == "critical")
+    highest_risk = f"{alerts[0][0]:.0%}" if alerts else "—"
+
+    tile_cols = st.columns(4)
+    with tile_cols[0]:
+        st.markdown(_stat_tile_html("Hosts monitored", f"{len(eligible_ips):,}"), unsafe_allow_html=True)
+    with tile_cols[1]:
+        st.markdown(_stat_tile_html("Active alerts", f"{len(alerts):,}"), unsafe_allow_html=True)
+    with tile_cols[2]:
+        st.markdown(_stat_tile_html("Critical", f"{n_critical:,}"), unsafe_allow_html=True)
+    with tile_cols[3]:
+        st.markdown(_stat_tile_html("Highest risk", highest_risk), unsafe_allow_html=True)
+
+    st.write("")
+
+    # Guard against a stale selection from a previous data source — a host id from one source
+    # (e.g. real CIC-IDS-2018) won't exist in another's (e.g. the synthetic sample), which would
+    # otherwise crash the selectbox below.
+    if st.session_state.get("src_ip_select") not in eligible_ips:
+        st.session_state.src_ip_select = alerts[0][2] if alerts else eligible_ips[0]
+
+    if not alerts:
+        st.markdown(
+            '<div class="empty-state">✅ No hosts above the alert threshold right now — '
+            "everything monitored looks like normal traffic.</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        max_cards = 20
+        for peak_prob, peak_step, host, stage_at_peak, probs_curve, (label, bg, fg) in alerts[:max_cards]:
+            card_col, btn_col = st.columns([5, 1])
+            with card_col:
+                st.markdown(
+                    _alert_card_html(
+                        host, label, bg, fg, peak_prob, (peak_step + 1) * window_s, stage_at_peak, probs_curve,
+                    ),
+                    unsafe_allow_html=True,
+                )
+            with btn_col:
+                st.write("")
+                if st.button("Investigate →", key=f"investigate_{host}"):
+                    st.session_state.src_ip_select = host
+        if len(alerts) > max_cards:
+            st.caption(f"+ {len(alerts) - max_cards} more alerts not shown — investigate the highest-risk ones first.")
+
+    st.divider()
+
+    # ----------------------------------------------------------------------------------------
+    # Investigation — full detail for one selected host (from an alert card, or picked directly).
+    # ----------------------------------------------------------------------------------------
+    st.subheader("Investigate a host")
+    src_ip = st.selectbox("Source IP to forecast", eligible_ips, key="src_ip_select")
     raw_sequence = latest_sequence(windows, feature_cols, src_ip, seq_len)
 
-    engine = ForecastEngine(model, scaler, config)
     result = engine.rollout(raw_sequence)  # deterministic — drives the point predictions/explanations below
     with st.spinner("Estimating forecast uncertainty (MC-dropout)..."):
         uncertainty = engine.rollout_with_uncertainty(raw_sequence, n_samples=20)
 
     st.subheader(f"K-step infiltration forecast for {src_ip}")
     horizon = config["windowing"]["forecast_horizon"]
-    window_s = config["windowing"]["window_seconds"]
     timeline_df = pd.DataFrame({
         "step": [f"t+{(i + 1) * window_s}s" for i in range(horizon)],
         "infiltration_probability": result.infiltration_probs,

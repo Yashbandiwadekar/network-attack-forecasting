@@ -24,7 +24,8 @@ from common.config import feature_columns, load_config, resolve_path
 from models.dataset import FeatureScaler
 from models.forecast import ForecastEngine, latest_sequence, load_world_model
 from pipeline.flow_features import COLUMN_RENAME, clean_and_normalize
-from pipeline.windowing import build_flow_windows, merge_packet_features
+from pipeline.graph_features import build_graph_window_features
+from pipeline.windowing import build_flow_windows, merge_graph_features, merge_packet_features
 
 OOD_IP = "10.0.0.201"
 BACKUP_SERVER_IP = "203.0.113.200"
@@ -77,6 +78,8 @@ def main(config_path: str = "configs/default.yaml") -> None:
     raw.columns = [COLUMN_RENAME.get(c, c) for c in raw.columns]
     flow_df = clean_and_normalize(raw)
     windows = build_flow_windows(flow_df, config)
+    graph_windows = build_graph_window_features(flow_df, config)
+    windows = merge_graph_features(windows, graph_windows, config)
     windows = merge_packet_features(windows, None, config)  # flow-only capture, no PCAP
 
     feature_cols = feature_columns(config)

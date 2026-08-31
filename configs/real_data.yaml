@@ -51,6 +51,12 @@ features:
     - bidir_ratio
     - tcp_ratio
     - udp_ratio
+  graph_level:
+    - graph_out_degree
+    - graph_fan_out_ratio
+    - graph_fan_in_ratio
+    - graph_component_size
+    - graph_dst_entropy
   packet_level:
     - mean_ttl
     - var_ttl
