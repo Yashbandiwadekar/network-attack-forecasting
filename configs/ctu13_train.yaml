@@ -1,0 +1,80 @@
+paths:
+  raw_flow_dir: data/raw/ctu13
+  raw_pcap_dir: data/raw/pcap
+  processed_dir: data/processed/ctu13/final_splits
+  checkpoint_dir: checkpoints_ctu13
+  eval_report: docs/04-evaluation-ctu13.md
+
+windowing:
+  window_seconds: 10
+  sequence_length: 12
+  forecast_horizon: 6
+  group_by: src_ip
+  recon_port_scan_threshold: 0.5
+
+features:
+  flow_level:
+    - flow_count
+    - unique_dst_ports
+    - unique_dst_ips
+    - has_ip_data
+    - total_bytes
+    - total_packets
+    - mean_duration
+    - syn_ratio
+    - ack_ratio
+    - fin_ratio
+    - rst_ratio
+    - psh_ratio
+    - urg_ratio
+    - mean_iat
+    - var_iat
+    - max_iat
+    - bidir_ratio
+    - tcp_ratio
+    - udp_ratio
+  graph_level:
+    - graph_out_degree
+    - graph_fan_out_ratio
+    - graph_fan_in_ratio
+    - graph_component_size
+    - graph_dst_entropy
+  packet_level:
+    - mean_ttl
+    - var_ttl
+    - mean_window_size
+    - frag_ratio
+    - mean_payload_size
+    - std_payload_size
+    - port_scan_score
+    - retransmit_ratio
+    - has_packet_features
+
+split:
+  train_frac: 0.7
+  val_frac: 0.15
+  test_frac: 0.15
+  chronological: true
+
+model:
+  d_model: 64
+  n_heads: 4
+  n_layers: 3
+  d_ff: 128
+  dropout: 0.1
+  batch_size: 64
+  lr: 0.0003
+  epochs: 5
+  device: cuda
+
+mitre_stages:
+  - benign
+  - reconnaissance
+  - initial_access
+  - lateral_movement
+  - command_and_control
+  - exfiltration
+
+baseline:
+  model: logistic_regression
+  max_iter: 1000
