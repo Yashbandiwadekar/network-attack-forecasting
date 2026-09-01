@@ -1,6 +1,6 @@
 # Evaluation: World Model vs Baselines
 
-Test set: 194300 sequences. All four models predict the immediate next window (t+1) from
+Test set: 193993 sequences. All four models predict the immediate next window (t+1) from
 identical targets; the world model additionally supports K-step autoregressive rollout (see
 models/forecast.py), which none of the baselines have an equivalent of — demonstrated in the
 Streamlit app rather than benchmarked here, since there's nothing to compare it against fairly.
@@ -9,9 +9,9 @@ Streamlit app rather than benchmarked here, since there's nothing to compare it 
 
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
-| World Model (Transformer) | 0.919 | 0.972 | 0.871 | 0.000 |
-| Baseline (LR, last window) | 0.509 | 0.836 | 0.366 | 0.001 |
-| Baseline (LR, stacked window) | 0.873 | 0.937 | 0.817 | 0.000 |
+| World Model (Transformer) | 0.908 | 0.931 | 0.886 | 0.001 |
+| Baseline (LR, last window) | 0.783 | 0.944 | 0.669 | 0.000 |
+| Baseline (LR, stacked window) | 0.878 | 0.937 | 0.826 | 0.000 |
 | Persistence (no learning) | 0.988 | 0.987 | 0.989 | 0.000 |
 
 ## Infiltration probability — fixed 5% false-positive-rate budget
@@ -21,18 +21,18 @@ operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
 
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
-| World Model (Transformer) | 0.506 | 0.339 | 0.995 | 0.015 |
-| Baseline (LR, last window) | 0.222 | 0.125 | 0.958 | 0.053 |
-| Baseline (LR, stacked window) | 0.226 | 0.128 | 0.968 | 0.052 |
+| World Model (Transformer) | 0.535 | 0.366 | 0.999 | 0.014 |
+| Baseline (LR, last window) | 0.215 | 0.120 | 1.000 | 0.058 |
+| Baseline (LR, stacked window) | 0.529 | 0.359 | 1.000 | 0.014 |
 | Persistence (no learning) | 0.988 | 0.987 | 0.989 | 0.000 |
 
 ## MITRE stage classification (5-way, `impact`-mapped windows excluded)
 
 | Model | F1 (macro) | Precision (macro) | Recall (macro) |
 |---|---|---|---|
-| World Model (Transformer) | 0.823 | 0.954 | 0.786 |
-| Baseline (LR, last window) | 0.484 | 0.840 | 0.433 |
-| Baseline (LR, stacked window) | 0.513 | 0.682 | 0.488 |
+| World Model (Transformer) | 0.761 | 0.819 | 0.727 |
+| Baseline (LR, last window) | 0.476 | 0.698 | 0.431 |
+| Baseline (LR, stacked window) | 0.512 | 0.748 | 0.495 |
 | Persistence (no learning) | 0.998 | 0.997 | 0.999 |
 
 ## Interpretation
