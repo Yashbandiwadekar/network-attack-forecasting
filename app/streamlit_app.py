@@ -16,6 +16,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+import altair as alt
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -24,11 +25,12 @@ from common.config import feature_columns, load_config, resolve_path
 from models.dataset import FeatureScaler, load_split
 from models.explain import ShapExplainer, gradient_input_attribution, summarize_attention
 from models.forecast import (
-    ForecastEngine, latest_sequence, latest_sequences_batch, load_world_model,
+    ForecastEngine, latest_sequences_batch, load_world_model,
     one_step_reconstruction_error, previous_sequence_and_actual,
 )
 from pipeline.flow_features import clean_and_normalize, load_flow_csv, load_flow_dir
 from pipeline.graph_features import build_graph_window_features
+from pipeline.mitre_mapping import BENIGN
 from pipeline.packet_features import compute_packet_window_features, load_pcap
 from pipeline.windowing import (
     apply_reconnaissance_heuristic, build_flow_windows, merge_graph_features, merge_packet_features,
@@ -72,7 +74,11 @@ DASHBOARD_CSS = """
 .alert-card {
     background:#1a1a19; border:1px solid rgba(255,255,255,0.10); border-left:4px solid;
     border-radius:10px; padding:12px 16px; margin-bottom:8px;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
+.alert-card:hover { transform: translateX(2px); box-shadow: 0 4px 16px rgba(0,0,0,0.35); }
+.stat-tile { transition: transform 0.12s ease; }
+.stat-tile:hover { transform: translateY(-2px); }
 .alert-card-top { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
 .severity-badge {
     font-size:10.5px; font-weight:700; letter-spacing:0.05em; padding:3px 9px; border-radius:999px;
@@ -87,6 +93,18 @@ DASHBOARD_CSS = """
     color:#898781; text-align:center; padding:28px; border:1px dashed rgba(255,255,255,0.15);
     border-radius:10px; font-size:14px;
 }
+
+.stage-stepper { display:flex; align-items:stretch; gap:3px; margin: 4px 0 14px 0; }
+.stage-pill {
+    flex:1; text-align:center; padding:9px 4px; font-size:11px; font-weight:700;
+    text-transform:uppercase; letter-spacing:0.03em; color:#898781; background:#1a1a19;
+    border:1px solid rgba(255,255,255,0.10); border-radius:8px; white-space:nowrap;
+    transition: all 0.15s ease;
+}
+.stage-pill.active { border-color:transparent; transform: scale(1.04); }
+
+.gauge-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; }
+.gauge-caption { color:#898781; font-size:12px; margin-top:2px; text-align:center; }
 </style>
 """
 
@@ -199,6 +217,95 @@ def _stat_tile_html(label: str, value: str) -> str:
       <div class="stat-tile-value">{value}</div>
     </div>
     """
+
+
+def _gauge_chart(pct: float, color: str) -> alt.Chart:
+    """A ring/donut gauge for a single 0-1 probability — value arc in `color`, remainder faint.
+    Built with Altair (already a Streamlit dependency) rather than a hand-rolled SVG arc, since
+    Vega-Lite's arc mark handles the theta math for us."""
+    pct = float(np.clip(pct, 0.0, 1.0))
+    df = pd.DataFrame({"category": ["value", "remainder"], "amount": [pct, 1.0 - pct]})
+    ring = alt.Chart(df).mark_arc(innerRadius=48, outerRadius=68, cornerRadius=6).encode(
+        theta=alt.Theta("amount:Q", stack=True, sort=None),
+        color=alt.Color(
+            "category:N",
+            scale=alt.Scale(domain=["value", "remainder"], range=[color, "rgba(255,255,255,0.08)"]),
+            legend=None,
+        ),
+        order=alt.Order("amount:Q", sort="descending"),
+    )
+    label = alt.Chart(pd.DataFrame({"t": [f"{pct:.0%}"]})).mark_text(
+        size=26, fontWeight="bold", color=color,
+    ).encode(text="t:N")
+    return (ring + label).properties(width=170, height=170).configure_view(strokeWidth=0)
+
+
+def _stage_stepper_html(stages: list[str], current_stage: str, highlight_bg: str, highlight_fg: str) -> str:
+    """A MITRE-stage kill-chain strip — every stage as a pill, the model's predicted stage lit up."""
+    pills = []
+    for s in stages:
+        label = s.replace("_", " ")
+        if s == current_stage:
+            pills.append(
+                f'<div class="stage-pill active" style="background:{highlight_bg}; color:{highlight_fg};">'
+                f"{label}</div>"
+            )
+        else:
+            pills.append(f'<div class="stage-pill">{label}</div>')
+    return '<div class="stage-stepper">' + "".join(pills) + "</div>"
+
+
+def _forecast_chart(
+    timeline_df: pd.DataFrame,
+    window_s: int,
+    actual_infiltration: list[float] | None,
+) -> alt.Chart:
+    """Layered K-step forecast: MC-dropout uncertainty band, severity threshold guide lines, the
+    deterministic forecast line, and — when scrubbing history via the time-cursor slider — the
+    ground-truth infiltration state that actually followed, overlaid for a direct visual check of
+    whether the forecast called it right."""
+    df = timeline_df.reset_index().copy()
+    df["seconds"] = [(i + 1) * window_s for i in range(len(df))]
+
+    band = alt.Chart(df).mark_area(opacity=0.18, color="#2a78d6").encode(
+        x=alt.X("seconds:Q", title="seconds ahead"),
+        y=alt.Y("p10 (MC-dropout):Q", title="infiltration probability", scale=alt.Scale(domain=[0, 1])),
+        y2="p90 (MC-dropout):Q",
+    )
+    threshold_df = pd.DataFrame([{"y": t, "label": lbl} for t, lbl, *_ in SEVERITY_LEVELS])
+    rules = alt.Chart(threshold_df).mark_rule(strokeDash=[4, 3], color="#898781", opacity=0.55).encode(
+        y="y:Q", tooltip=["label", "y"],
+    )
+    line = alt.Chart(df).mark_line(point=alt.OverlayMarkDef(size=55), strokeWidth=3, color="#2a78d6").encode(
+        x="seconds:Q",
+        y="infiltration_probability:Q",
+        tooltip=["step", "infiltration_probability", "predicted_stage"],
+    )
+    layers = [band, rules, line]
+
+    if actual_infiltration:
+        adf = pd.DataFrame({
+            "seconds": df["seconds"].iloc[: len(actual_infiltration)],
+            "actual": actual_infiltration,
+        })
+        layers.append(
+            alt.Chart(adf).mark_line(strokeDash=[2, 2], color="#ffffff", point=alt.OverlayMarkDef(size=45)).encode(
+                x="seconds:Q", y=alt.Y("actual:Q", title="infiltration probability"), tooltip=["seconds", "actual"],
+            )
+        )
+
+    return alt.layer(*layers).properties(height=320)
+
+
+def _attention_heat_chart(attn_pairs: list[tuple[str, float]]) -> alt.Chart:
+    """A single-row heat-strip of attention weight per past window — a heatmap reads faster than a
+    bar chart for 'which windows mattered', and stays compact next to the other explainability panels."""
+    df = pd.DataFrame(attn_pairs, columns=["window", "attention_weight"])
+    return alt.Chart(df).mark_rect(cornerRadius=3).encode(
+        x=alt.X("window:N", title=None, sort=None),
+        color=alt.Color("attention_weight:Q", scale=alt.Scale(scheme="oranges"), legend=None),
+        tooltip=["window", "attention_weight"],
+    ).properties(height=70)
 
 
 def _score_all_hosts(_engine: ForecastEngine, windows: pd.DataFrame, feature_cols: list[str], seq_len: int):
@@ -349,6 +456,25 @@ def main() -> None:
 
     st.write("")
 
+    filter_col, search_col = st.columns([2, 3])
+    with filter_col:
+        severity_filter = st.segmented_control(
+            "Severity",
+            options=["critical", "serious", "warning"],
+            default=["critical", "serious", "warning"],
+            selection_mode="multi",
+            label_visibility="collapsed",
+        ) or []
+    with search_col:
+        host_query = st.text_input(
+            "Search host", placeholder="Filter by IP / host…", label_visibility="collapsed",
+        ).strip().lower()
+
+    visible_alerts = [
+        a for a in alerts
+        if a[5][0] in severity_filter and (not host_query or host_query in a[2].lower())
+    ]
+
     # Guard against a stale selection from a previous data source — a host id from one source
     # (e.g. real CIC-IDS-2018) won't exist in another's (e.g. the synthetic sample), which would
     # otherwise crash the selectbox below.
@@ -361,9 +487,14 @@ def main() -> None:
             "everything monitored looks like normal traffic.</div>",
             unsafe_allow_html=True,
         )
+    elif not visible_alerts:
+        st.markdown(
+            '<div class="empty-state">No alerts match the current filter/search.</div>',
+            unsafe_allow_html=True,
+        )
     else:
         max_cards = 20
-        for peak_prob, peak_step, host, stage_at_peak, probs_curve, (label, bg, fg) in alerts[:max_cards]:
+        for peak_prob, peak_step, host, stage_at_peak, probs_curve, (label, bg, fg) in visible_alerts[:max_cards]:
             card_col, btn_col = st.columns([5, 1])
             with card_col:
                 st.markdown(
@@ -376,8 +507,13 @@ def main() -> None:
                 st.write("")
                 if st.button("Investigate →", key=f"investigate_{host}"):
                     st.session_state.src_ip_select = host
-        if len(alerts) > max_cards:
-            st.caption(f"+ {len(alerts) - max_cards} more alerts not shown — investigate the highest-risk ones first.")
+        if len(visible_alerts) > max_cards:
+            st.caption(
+                f"+ {len(visible_alerts) - max_cards} more matching alerts not shown — "
+                "investigate the highest-risk ones first."
+            )
+        if len(visible_alerts) < len(alerts):
+            st.caption(f"Showing {len(visible_alerts)} of {len(alerts)} total alerts (filtered).")
 
     st.divider()
 
@@ -386,14 +522,65 @@ def main() -> None:
     # ----------------------------------------------------------------------------------------
     st.subheader("Investigate a host")
     src_ip = st.selectbox("Source IP to forecast", eligible_ips, key="src_ip_select")
-    raw_sequence = latest_sequence(windows, feature_cols, src_ip, seq_len)
+    horizon = config["windowing"]["forecast_horizon"]
+
+    host_windows = windows[windows["src_ip"] == src_ip].sort_values("window_start").reset_index(drop=True)
+    latest_idx = len(host_windows) - 1
+
+    # Reset the scrub cursor to "now" whenever the investigated host changes — a leftover cursor
+    # position from a different host's history is meaningless once carried over.
+    if st.session_state.get("_cursor_host") != src_ip:
+        st.session_state._cursor_host = src_ip
+        st.session_state.time_cursor_idx = latest_idx
+
+    if latest_idx >= seq_len:
+        cursor_idx = st.slider(
+            "⏱ Time cursor — replay this host's history",
+            min_value=seq_len - 1,
+            max_value=latest_idx,
+            key="time_cursor_idx",
+            help="Rewind to any earlier point in this host's traffic. The forecast below is "
+                 "recomputed from only the history available up to that point — and, when real "
+                 "traffic exists after it, overlaid with what actually happened next.",
+        )
+        cutoff_time = host_windows.loc[cursor_idx, "window_start"]
+        if cursor_idx == latest_idx:
+            st.caption(f"🟢 Live — most recent window ({cutoff_time})")
+        else:
+            st.caption(f"⏪ Replaying as of {cutoff_time} — {latest_idx - cursor_idx} window(s) before latest")
+    else:
+        cursor_idx = latest_idx
+        cutoff_time = host_windows.loc[cursor_idx, "window_start"]
+
+    truncated = host_windows.iloc[: cursor_idx + 1]
+    raw_sequence = truncated[feature_cols].to_numpy(dtype=np.float32)[-seq_len:]
+
+    future_rows = host_windows.iloc[cursor_idx + 1: cursor_idx + 1 + horizon]
+    actual_infiltration = (
+        [0.0 if s == BENIGN else 1.0 for s in future_rows["stage"]] if len(future_rows) > 0 else None
+    )
 
     result = engine.rollout(raw_sequence)  # deterministic — drives the point predictions/explanations below
     with st.spinner("Estimating forecast uncertainty (MC-dropout)..."):
         uncertainty = engine.rollout_with_uncertainty(raw_sequence, n_samples=20)
 
+    peak_step = int(np.argmax(result.infiltration_probs))
+    peak_prob = float(result.infiltration_probs[peak_step])
+    peak_stage = result.stage_predictions[peak_step]
+    severity = _severity_for(peak_prob)
+    if severity is not None:
+        stage_bg, stage_fg = severity[1], severity[2]
+    elif peak_stage == BENIGN:
+        stage_bg, stage_fg = GOOD_COLOR, "#ffffff"
+    else:
+        stage_bg, stage_fg = "#2a78d6", "#ffffff"
+
     st.subheader(f"K-step infiltration forecast for {src_ip}")
-    horizon = config["windowing"]["forecast_horizon"]
+    st.markdown(
+        _stage_stepper_html(config["mitre_stages"], peak_stage, stage_bg, stage_fg),
+        unsafe_allow_html=True,
+    )
+
     timeline_df = pd.DataFrame({
         "step": [f"t+{(i + 1) * window_s}s" for i in range(horizon)],
         "infiltration_probability": result.infiltration_probs,
@@ -404,24 +591,27 @@ def main() -> None:
 
     col1, col2 = st.columns([2, 1])
     with col1:
-        st.line_chart(timeline_df[["infiltration_probability", "p10 (MC-dropout)", "p90 (MC-dropout)"]])
-        st.caption(
-            "Solid line: deterministic forecast (dropout off, reproducible — matches eval/benchmark.py). "
-            "p10/p90: 10th-90th percentile band from 20 stochastic MC-dropout rollouts, showing how much "
-            "the forecast wobbles under the model's own uncertainty."
+        st.altair_chart(_forecast_chart(timeline_df, window_s, actual_infiltration), use_container_width=True)
+        caption = (
+            "Blue line: deterministic forecast (dropout off, reproducible — matches eval/benchmark.py). "
+            "Shaded band: 10th-90th percentile from 20 stochastic MC-dropout rollouts. "
+            "Dashed gray lines: warning/serious/critical thresholds."
         )
+        if actual_infiltration:
+            caption += " Dashed white line: what **actually** happened next (ground truth, only visible while replaying history)."
+        st.caption(caption)
     with col2:
         st.dataframe(timeline_df[["infiltration_probability", "predicted_stage"]], use_container_width=True)
 
-    peak_step = int(np.argmax(result.infiltration_probs))
-    metric_col1, metric_col2 = st.columns(2)
-    with metric_col1:
-        st.metric(
-            "Peak infiltration probability",
-            f"{result.infiltration_probs[peak_step]:.1%}",
-            help=f"At {timeline_df.index[peak_step]}, predicted stage: {result.stage_predictions[peak_step]}",
+    gauge_col, metric_col = st.columns([1, 2])
+    with gauge_col:
+        st.altair_chart(_gauge_chart(peak_prob, stage_bg), use_container_width=False)
+        st.markdown(
+            f'<div class="gauge-caption">Peak infiltration probability<br>'
+            f'at {timeline_df.index[peak_step]} · predicted <b>{peak_stage.replace("_", " ")}</b></div>',
+            unsafe_allow_html=True,
         )
-    with metric_col2:
+    with metric_col:
         st.metric(
             "Predicted transition magnitude (step 1)",
             f"{result.transition_magnitude[0]:.2f}",
@@ -430,19 +620,19 @@ def main() -> None:
                  "see the novelty check below for that.",
         )
 
-    prev_and_actual = previous_sequence_and_actual(windows, feature_cols, src_ip, seq_len)
-    if prev_and_actual is not None:
-        prior_seq, actual_state = prev_and_actual
-        novelty = one_step_reconstruction_error(model, scaler, prior_seq, actual_state)
-        st.metric(
-            "Novelty of most recently observed window",
-            f"{novelty:.2f}",
-            help="Ground-truth reconstruction error: how far the model's own prediction for the most "
-                 "recent window (made from the history before it) was from what actually happened. "
-                 "An unsupervised anomaly signal, independent of the infiltration/stage labels — a high "
-                 "value means this traffic didn't match learned dynamics at all, whether or not it's "
-                 "flagged as an attack.",
-        )
+        prev_and_actual = previous_sequence_and_actual(truncated, feature_cols, src_ip, seq_len)
+        if prev_and_actual is not None:
+            prior_seq, actual_state = prev_and_actual
+            novelty = one_step_reconstruction_error(model, scaler, prior_seq, actual_state)
+            st.metric(
+                "Novelty of most recently observed window",
+                f"{novelty:.2f}",
+                help="Ground-truth reconstruction error: how far the model's own prediction for the most "
+                     "recent window (made from the history before it) was from what actually happened. "
+                     "An unsupervised anomaly signal, independent of the infiltration/stage labels — a high "
+                     "value means this traffic didn't match learned dynamics at all, whether or not it's "
+                     "flagged as an attack.",
+            )
 
     st.subheader("Explainability")
     exp_col1, exp_col2, exp_col3 = st.columns(3)
@@ -450,7 +640,7 @@ def main() -> None:
     with exp_col1:
         st.markdown("**Attention** — which past windows drove the first forecast step")
         attn_pairs = summarize_attention(result.attentions[0], seq_len)
-        st.bar_chart(pd.DataFrame(attn_pairs, columns=["window", "attention_weight"]).set_index("window"))
+        st.altair_chart(_attention_heat_chart(attn_pairs), use_container_width=True)
 
     with exp_col2:
         st.markdown("**Gradient x input** — instant feature attribution")
@@ -478,12 +668,12 @@ def main() -> None:
     }).set_index("feature")
     st.dataframe(delta_df, use_container_width=True)
 
-    st.subheader(f"Flagged flows — most recent window for {src_ip}")
-    latest_window_start = windows[windows["src_ip"] == src_ip]["window_start"].max()
+    flagged_label = "most recent window" if cursor_idx == latest_idx else f"window as of {cutoff_time}"
+    st.subheader(f"Flagged flows — {flagged_label} for {src_ip}")
     flagged = flow_df[
         (flow_df["src_ip"] == src_ip)
-        & (flow_df["timestamp"] >= latest_window_start)
-        & (flow_df["timestamp"] < latest_window_start + pd.Timedelta(seconds=window_s))
+        & (flow_df["timestamp"] >= cutoff_time)
+        & (flow_df["timestamp"] < cutoff_time + pd.Timedelta(seconds=window_s))
     ]
     st.dataframe(
         flagged[["timestamp", "dst_ip", "dst_port", "protocol", "total_pkts", "total_bytes", "label"]],
