@@ -28,6 +28,8 @@ from models.forecast import (
     ForecastEngine, latest_sequences_batch, load_world_model,
     one_step_reconstruction_error, previous_sequence_and_actual,
 )
+from models.narrative import generate_attack_narrative
+from models.response import recommended_action
 from pipeline.flow_features import clean_and_normalize, load_flow_csv, load_flow_dir
 from pipeline.graph_features import build_graph_window_features
 from pipeline.mitre_mapping import BENIGN
@@ -105,6 +107,21 @@ DASHBOARD_CSS = """
 
 .gauge-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; }
 .gauge-caption { color:#898781; font-size:12px; margin-top:2px; text-align:center; }
+
+.narrative-card {
+    background:#1a1a19; border:1px solid rgba(255,255,255,0.10); border-radius:10px;
+    padding:16px 20px; line-height:1.6; color:#e6e5df; font-size:14.5px;
+}
+.response-card {
+    background:#1a1a19; border:1px solid rgba(255,255,255,0.10); border-left:4px solid;
+    border-radius:10px; padding:12px 16px; margin-top:10px;
+}
+.response-label {
+    font-size:10.5px; font-weight:700; letter-spacing:0.05em; text-transform:uppercase;
+    color:#898781; margin-bottom:4px;
+}
+.response-action { color:#ffffff; font-size:14.5px; font-weight:600; }
+.response-detail { color:#c3c2b7; font-size:12.5px; margin-top:4px; }
 </style>
 """
 
@@ -253,6 +270,20 @@ def _stage_stepper_html(stages: list[str], current_stage: str, highlight_bg: str
         else:
             pills.append(f'<div class="stage-pill">{label}</div>')
     return '<div class="stage-stepper">' + "".join(pills) + "</div>"
+
+
+def _response_card_html(stage: str, border_color: str) -> str:
+    """A compact, always-visible recommended-action callout — deliberately separate from the
+    narrative paragraph below it so a scanning analyst doesn't have to read prose to find the one
+    thing they came for. See models/response.py for the underlying playbook."""
+    entry = recommended_action(stage)
+    return f"""
+    <div class="response-card" style="border-left-color:{border_color};">
+      <div class="response-label">Recommended action &middot; {stage.replace('_', ' ')}</div>
+      <div class="response-action">{entry['action']}</div>
+      <div class="response-detail">{entry['detail']}</div>
+    </div>
+    """
 
 
 def _forecast_chart(
@@ -581,6 +612,18 @@ def main() -> None:
         unsafe_allow_html=True,
     )
 
+    current_observed_stage = host_windows.loc[cursor_idx, "stage"]
+    narrative_col, response_col = st.columns([3, 2])
+    with narrative_col:
+        st.markdown("**Attack narrative**")
+        narrative = generate_attack_narrative(
+            src_ip, result, feature_cols, window_s, current_stage=current_observed_stage,
+        )
+        st.markdown(f'<div class="narrative-card">{narrative}</div>', unsafe_allow_html=True)
+    with response_col:
+        st.markdown("**Response playbook**")
+        st.markdown(_response_card_html(peak_stage, stage_bg), unsafe_allow_html=True)
+
     timeline_df = pd.DataFrame({
         "step": [f"t+{(i + 1) * window_s}s" for i in range(horizon)],
         "infiltration_probability": result.infiltration_probs,
@@ -667,6 +710,42 @@ def main() -> None:
         "predicted_delta": result.state_deltas[0][delta_order],
     }).set_index("feature")
     st.dataframe(delta_df, use_container_width=True)
+
+    st.subheader("What-if analysis")
+    st.caption(
+        "Perturb one feature on the most recently observed window and see how the K-step forecast "
+        "shifts — a differentiable world model supports this natively; a black-box classifier "
+        "would only tell you the new score, not let you probe it like this."
+    )
+    wf_col1, wf_col2 = st.columns([1, 2])
+    with wf_col1:
+        wf_feature = st.selectbox("Feature to perturb", feature_cols, key="whatif_feature")
+        wf_feature_idx = feature_cols.index(wf_feature)
+        wf_delta_std = st.slider(
+            "Perturbation (standard deviations)", min_value=-5.0, max_value=5.0, value=2.0, step=0.5,
+            key="whatif_delta_std",
+        )
+        wf_delta_raw = wf_delta_std * float(scaler.std[wf_feature_idx])
+        st.caption(f"= {wf_delta_raw:+,.3g} raw units added to **{wf_feature}** on the most recent window")
+
+    perturbed_sequence = raw_sequence.copy()
+    perturbed_sequence[-1, wf_feature_idx] += wf_delta_raw
+    counterfactual_result = engine.rollout(perturbed_sequence)
+
+    with wf_col2:
+        whatif_df = pd.DataFrame({
+            "step": [f"t+{(i + 1) * window_s}s" for i in range(horizon)],
+            "baseline": result.infiltration_probs,
+            f"+{wf_delta_std:g} std {wf_feature}": counterfactual_result.infiltration_probs,
+        }).set_index("step")
+        st.line_chart(whatif_df)
+        baseline_peak = float(result.infiltration_probs.max())
+        cf_peak = float(counterfactual_result.infiltration_probs.max())
+        shift = cf_peak - baseline_peak
+        st.caption(
+            f"Peak infiltration probability: {baseline_peak:.0%} → {cf_peak:.0%} "
+            f"({'+' if shift >= 0 else ''}{shift:.0%}) after this perturbation."
+        )
 
     flagged_label = "most recent window" if cursor_idx == latest_idx else f"window as of {cutoff_time}"
     st.subheader(f"Flagged flows — {flagged_label} for {src_ip}")
