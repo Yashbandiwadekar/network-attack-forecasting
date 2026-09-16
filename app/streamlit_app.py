@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import sys
 import tempfile
+from datetime import timezone
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -29,6 +30,7 @@ from models.forecast import (
     one_step_reconstruction_error, previous_sequence_and_actual,
 )
 from models.audit_ledger import AuditLedger
+from models.compliance import generate_cert_in_report
 from models.narrative import generate_attack_narrative
 from models.response import recommended_action
 from pipeline.flow_features import clean_and_normalize, load_flow_csv, load_flow_dir
@@ -708,6 +710,46 @@ def main() -> None:
     with response_col:
         st.markdown("**Response playbook**")
         st.markdown(_response_card_html(peak_stage, stage_bg), unsafe_allow_html=True)
+
+    with st.expander("Compliance report draft (CERT-In aligned)"):
+        st.caption(
+            "Drafts the report a compliance/SOC team would need to file under CERT-In's 2022 "
+            "Directions (mandatory 6-hour reporting window, Section 70B(6) IT Act 2000) — a "
+            "starting draft for human review, not a submission this system makes itself. See "
+            "models/compliance.py for the honest scope caveats on the category mapping."
+        )
+        detected_at = cutoff_time.to_pydatetime().replace(tzinfo=timezone.utc)
+        host_ledger_entries = [e for e in ledger.entries if e.host == src_ip]
+        latest_hash = host_ledger_entries[-1].record_hash if host_ledger_entries else None
+        compliance_report = generate_cert_in_report(
+            src_ip, detected_at, peak_stage, peak_prob,
+            recommended_action=recommended_action(peak_stage)["action"],
+            narrative=narrative, ledger_hash=latest_hash,
+        )
+        if compliance_report.is_reportable:
+            remaining = compliance_report.hours_remaining
+            if remaining is not None:
+                urgency_color = SEVERITY_LEVELS[0][2] if remaining < 1 else stage_bg
+                status_line = f"⏱ {compliance_report.category} — {remaining:.1f}h remaining in the 6-hour reporting window"
+            else:
+                urgency_color = stage_bg
+                status_line = (
+                    f"⏱ {compliance_report.category} — historical/demo timestamp, "
+                    "no live countdown (see draft for detail)"
+                )
+            st.markdown(
+                f'<div class="ledger-status" style="background:rgba(208,59,59,0.10); color:{urgency_color};">'
+                f"{status_line}</div>",
+                unsafe_allow_html=True,
+            )
+            st.text_area("Draft report", compliance_report.text, height=320, key=f"cert_in_draft_{src_ip}")
+            st.download_button(
+                "Download draft (.txt)", compliance_report.text,
+                file_name=f"cert_in_draft_{src_ip}_{detected_at.strftime('%Y%m%dT%H%M%S')}.txt",
+                key=f"cert_in_download_{src_ip}",
+            )
+        else:
+            st.caption(compliance_report.text)
 
     timeline_df = pd.DataFrame({
         "step": [f"t+{(i + 1) * window_s}s" for i in range(horizon)],
