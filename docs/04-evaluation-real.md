@@ -3,7 +3,8 @@
 Test set: 194632 sequences. All four models predict the immediate next window (t+1) from
 identical targets; the world model additionally supports K-step autoregressive rollout (see
 models/forecast.py), which none of the baselines have an equivalent of — demonstrated in the
-Streamlit app rather than benchmarked here, since there's nothing to compare it against fairly.
+Streamlit app and scored directly in the lead-time section below, since there's no baseline to
+compare the rollout itself against fairly.
 
 ## Infiltration probability — default threshold (0.5)
 
@@ -34,6 +35,30 @@ operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
 | Baseline (LR, last window) | 0.453 | 0.659 | 0.416 |
 | Baseline (LR, stacked window) | 0.522 | 0.748 | 0.500 |
 | Persistence (no learning) | 0.998 | 0.997 | 0.999 |
+
+## K-step forecast lead time
+
+The metric the problem statement actually asks for: of the hosts that are benign right now but
+cross into an attack state within the next 6 windows (60s), how much *advance*
+warning does the K-step rollout give, at the same fixed-5%-FPR threshold used above?
+This has no baseline column — a single-window classifier has no mechanism to imagine a future
+state and alarm on it before that state is actually observed, so there is nothing to compare
+against fairly (same reasoning the module docstring already gives for not benchmarking K-step
+rollout itself against the baselines).
+
+| Metric | Value |
+|---|---|
+| Benign-to-attack transitions in test set | 32 |
+| Missed entirely (never alarmed within horizon) | 0 (0.0%) |
+| Detected *before* the attack actually started | 46.9% |
+| Mean lead time (detected cases; + = early, - = late) | +6.9s |
+| Median lead time (detected cases) | +0.0s |
+
+Lead time is `(actual attack-onset step) - (first step the alarm threshold is crossed)`, in
+seconds. A positive value is a genuine early warning — the alarm fired before the attack window
+it was warning about actually arrived. Missed transitions are excluded from the mean/median (there
+is no lead time to average when the model never alarmed at all) and reported separately as a miss
+rate instead, so a high miss rate can't silently inflate the mean by dropping out of it.
 
 ## Interpretation
 

@@ -28,6 +28,7 @@ from models.forecast import (
     ForecastEngine, latest_sequences_batch, load_world_model,
     one_step_reconstruction_error, previous_sequence_and_actual,
 )
+from models.audit_ledger import AuditLedger
 from models.narrative import generate_attack_narrative
 from models.response import recommended_action
 from pipeline.flow_features import clean_and_normalize, load_flow_csv, load_flow_dir
@@ -122,6 +123,14 @@ DASHBOARD_CSS = """
 }
 .response-action { color:#ffffff; font-size:14.5px; font-weight:600; }
 .response-detail { color:#c3c2b7; font-size:12.5px; margin-top:4px; }
+
+.ledger-status {
+    display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:8px;
+    font-size:13.5px; font-weight:700; margin-bottom:10px;
+}
+.ledger-hash {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size:11.5px; color:#898781;
+}
 </style>
 """
 
@@ -451,10 +460,29 @@ def main() -> None:
     # a multi-million-row DataFrame on every widget interaction).
     # ----------------------------------------------------------------------------------------
     score_cache_key = (config_path, len(eligible_ips))
+    ledger_path = resolve_path(config, "processed_dir") / "audit_ledger.jsonl"
     if st.session_state.get("_score_cache_key") != score_cache_key:
         with st.spinner(f"Scoring {len(eligible_ips):,} monitored hosts..."):
             st.session_state._score_cache_key = score_cache_key
             st.session_state._score_result = _score_all_hosts(engine, windows, feature_cols, seq_len)
+
+        # Log every alert-worthy host from this fresh scoring pass into the tamper-evident audit
+        # ledger — tied to genuine re-scoring events (data source / host-count change), not to
+        # every Streamlit rerun, so the ledger reflects real evaluation events, not UI redraws.
+        ledger = AuditLedger.load_or_create(ledger_path)
+        batch_result = st.session_state._score_result
+        if batch_result is not None:
+            for i, host in enumerate(batch_result.host_ids):
+                probs_curve = batch_result.infiltration_probs[i]
+                peak_step = int(np.argmax(probs_curve))
+                peak_prob = float(probs_curve[peak_step])
+                if _severity_for(peak_prob) is None:
+                    continue
+                stage_at_peak = batch_result.stage_predictions[i][peak_step]
+                action = recommended_action(stage_at_peak)["action"]
+                ledger.append(host, peak_prob, stage_at_peak, action)
+        ledger.save(ledger_path)
+
     batch_result = st.session_state._score_result
 
     st.subheader("Alert Dashboard")
@@ -545,6 +573,63 @@ def main() -> None:
             )
         if len(visible_alerts) < len(alerts):
             st.caption(f"Showing {len(visible_alerts)} of {len(alerts)} total alerts (filtered).")
+
+    st.subheader("Audit Ledger")
+    st.caption(
+        "Every alert above is appended to a hash-chained, tamper-evident ledger — each entry's "
+        "hash covers its own content plus the previous entry's hash, so altering any past record "
+        "invalidates every hash after it. A single local append-only log, not a distributed "
+        "blockchain — the tamper-evidence primitive without the multi-party consensus this "
+        "single-writer use case doesn't need."
+    )
+    ledger = AuditLedger.load_or_create(ledger_path)
+    simulate_tamper = st.checkbox(
+        "Simulate tampering with the oldest entry (demo only — edits an in-memory copy, never the real ledger file)",
+        key="simulate_tamper",
+    )
+    if simulate_tamper and ledger.entries:
+        import copy
+        tampered_ledger = copy.deepcopy(ledger)
+        original = tampered_ledger.entries[0]
+        tampered_ledger.entries[0] = original.__class__(
+            **{**original.__dict__, "peak_infiltration_prob": 0.01},
+        )
+        ok, bad_index = tampered_ledger.verify_integrity()
+    else:
+        ok, bad_index = ledger.verify_integrity()
+
+    if not ledger.entries:
+        st.markdown(
+            '<div class="empty-state">No ledger entries yet — alerts get logged the next time '
+            "hosts are scored.</div>",
+            unsafe_allow_html=True,
+        )
+    elif ok:
+        st.markdown(
+            f'<div class="ledger-status" style="background:rgba(12,163,12,0.12); color:{GOOD_COLOR};">'
+            f"✅ Chain verified — {len(ledger.entries):,} entries, no tampering detected</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f'<div class="ledger-status" style="background:rgba(208,59,59,0.14); color:{SEVERITY_LEVELS[0][2]};">'
+            f"❌ Chain broken at entry #{bad_index} — hash no longer matches recorded content</div>",
+            unsafe_allow_html=True,
+        )
+
+    if ledger.entries:
+        recent = ledger.entries[-10:][::-1]
+        ledger_df = pd.DataFrame([{
+            "index": e.index,
+            "timestamp": e.timestamp,
+            "host": e.host,
+            "peak_prob": f"{e.peak_infiltration_prob:.0%}",
+            "stage": e.peak_stage,
+            "recommended_action": e.recommended_action,
+            "hash": e.record_hash[:16] + "…",
+        } for e in recent])
+        st.dataframe(ledger_df.set_index("index"), use_container_width=True)
+        st.caption(f"Showing the {len(recent)} most recent of {len(ledger.entries):,} total ledger entries.")
 
     st.divider()
 

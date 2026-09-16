@@ -47,7 +47,7 @@ import numpy as np
 import torch
 
 from common.config import feature_columns, load_config, resolve_path
-from eval.metrics import binary_metrics, stage_metrics, threshold_at_fpr
+from eval.metrics import binary_metrics, lead_time_metrics, stage_metrics, threshold_at_fpr
 from models.baseline_lr import BaselineModel, PersistenceBaseline
 from models.dataset import FeatureScaler, SequenceDataset, build_datasets, load_split
 from models.forecast import load_world_model
@@ -67,6 +67,33 @@ def _world_model_predictions(model: WorldModel, ds: SequenceDataset, device) -> 
         infiltration_prob = torch.sigmoid(infiltration_logit).cpu().numpy()
         stage_pred = torch.softmax(stage_logits, dim=-1).argmax(dim=-1).cpu().numpy()
     return infiltration_prob, stage_pred
+
+
+def _rollout_infiltration_probs(
+    model: WorldModel, X_scaled: torch.Tensor, horizon: int, device, batch_size: int = 4096,
+) -> np.ndarray:
+    """K-step autoregressive rollout for the lead-time metric, mirroring
+    models.forecast.ForecastEngine.rollout_batch's loop exactly — but operating directly on
+    already-scaled sequences (SequenceDataset.X), since the benchmark never has the raw unscaled
+    tensors ForecastEngine.rollout_batch expects. Kept as a small local helper rather than adding
+    an "already scaled" flag to the tested, demo-facing ForecastEngine class.
+
+    Returns (N, horizon) predicted infiltration probability at each future step — the single-step
+    `model(x)` call the rest of this benchmark uses only ever sees step 0; this is what makes the
+    lead-time metric a genuine multi-step forecast evaluation instead of a repeated single-step one.
+    """
+    n = X_scaled.shape[0]
+    all_probs = []
+    with torch.no_grad():
+        for start in range(0, n, batch_size):
+            seq_t = X_scaled[start:start + batch_size].to(device)
+            probs_steps = []
+            for _ in range(horizon):
+                next_state, _, infiltration_logit = model(seq_t)
+                probs_steps.append(torch.sigmoid(infiltration_logit).cpu().numpy())
+                seq_t = torch.cat([seq_t[:, 1:, :], next_state.unsqueeze(1)], dim=1)
+            all_probs.append(np.stack(probs_steps, axis=1))  # (b, K)
+    return np.concatenate(all_probs, axis=0) if all_probs else np.zeros((0, horizon))
 
 
 def _evaluate_model(
@@ -126,7 +153,16 @@ def run(config_path: str = "configs/default.yaml") -> str:
     attack_now = test_ds.current_infiltration.numpy() == 1.0
     attack_persistence_rate = float(test_infiltration_target[attack_now].mean()) if attack_now.any() else None
 
-    report = _format_report(config, len(test_ds), results, attack_persistence_rate)
+    horizon = config["windowing"]["forecast_horizon"]
+    window_seconds = config["windowing"]["window_seconds"]
+    wm_fpr_threshold = threshold_at_fpr(val_infiltration_target, wm_val_prob, target_fpr=TARGET_FPR)
+    wm_rollout_probs = _rollout_infiltration_probs(model, test_ds.X, horizon, device)
+    lead_time = lead_time_metrics(
+        test_ds.infiltration.numpy(), test_ds.current_infiltration.numpy(), wm_rollout_probs,
+        threshold=wm_fpr_threshold, window_seconds=window_seconds,
+    )
+
+    report = _format_report(config, len(test_ds), results, attack_persistence_rate, lead_time)
 
     report_path = resolve_path(config, "eval_report")
     report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -291,12 +327,26 @@ def run_cross_dataset(
     ))
 
     # ------------------------------------------------------------------ #
+    # Lead-time metric — does the K-step forecast still give genuine      #
+    # advance warning under domain shift, not just held-out same-domain   #
+    # data?                                                                #
+    # ------------------------------------------------------------------ #
+    horizon = train_config["windowing"]["forecast_horizon"]
+    window_seconds = test_config["windowing"]["window_seconds"]
+    wm_fpr_threshold = threshold_at_fpr(val_infiltration_target, wm_val_prob, target_fpr=TARGET_FPR)
+    wm_rollout_probs = _rollout_infiltration_probs(model, test_ds.X, horizon, device)
+    lead_time = lead_time_metrics(
+        test_ds.infiltration.numpy(), test_ds.current_infiltration.numpy(), wm_rollout_probs,
+        threshold=wm_fpr_threshold, window_seconds=window_seconds,
+    )
+
+    # ------------------------------------------------------------------ #
     # Format + save report                                                #
     # ------------------------------------------------------------------ #
     report = _format_cross_dataset_report(
         train_config, test_config,
         train_label, test_label,
-        len(test_ds), cross_results,
+        len(test_ds), cross_results, lead_time,
     )
 
     if combined_report_path:
@@ -316,7 +366,54 @@ def run_cross_dataset(
 # Report formatters
 # ---------------------------------------------------------------------------
 
-def _format_report(config, n_test, results: list[dict], attack_persistence_rate: float | None) -> str:
+def _format_lead_time_section(lead_time: dict | None, horizon: int, window_seconds: int) -> str:
+    """Renders the K-step forecast lead-time result — the one metric in this report that
+    measures the world model's actual K-step rollout capability, which none of the baselines
+    have an equivalent of (a single-window classifier cannot imagine future states to alarm on
+    early), so this section has no baseline comparison column by design."""
+    if lead_time is None:
+        return (
+            "\n## K-step forecast lead time\n\n"
+            "No benign-to-attack transitions occurred within the forecast horizon in this test "
+            "set, so lead time is undefined here (not zero — there was nothing to detect early)."
+        )
+
+    max_lead_s = horizon * window_seconds
+    mean_s = lead_time["mean_lead_time_s"]
+    median_s = lead_time["median_lead_time_s"]
+    mean_str = f"{mean_s:+.1f}s" if mean_s is not None else "n/a (all missed)"
+    median_str = f"{median_s:+.1f}s" if median_s is not None else "n/a (all missed)"
+
+    return f"""
+## K-step forecast lead time
+
+The metric the problem statement actually asks for: of the hosts that are benign right now but
+cross into an attack state within the next {horizon} windows ({max_lead_s}s), how much *advance*
+warning does the K-step rollout give, at the same fixed-{TARGET_FPR:.0%}-FPR threshold used above?
+This has no baseline column — a single-window classifier has no mechanism to imagine a future
+state and alarm on it before that state is actually observed, so there is nothing to compare
+against fairly (same reasoning the module docstring already gives for not benchmarking K-step
+rollout itself against the baselines).
+
+| Metric | Value |
+|---|---|
+| Benign-to-attack transitions in test set | {lead_time['n_transitions']} |
+| Missed entirely (never alarmed within horizon) | {lead_time['n_missed']} ({lead_time['miss_rate']:.1%}) |
+| Detected *before* the attack actually started | {lead_time['pct_detected_early']:.1%} |
+| Mean lead time (detected cases; + = early, - = late) | {mean_str} |
+| Median lead time (detected cases) | {median_str} |
+
+Lead time is `(actual attack-onset step) - (first step the alarm threshold is crossed)`, in
+seconds. A positive value is a genuine early warning — the alarm fired before the attack window
+it was warning about actually arrived. Missed transitions are excluded from the mean/median (there
+is no lead time to average when the model never alarmed at all) and reported separately as a miss
+rate instead, so a high miss rate can't silently inflate the mean by dropping out of it.
+"""
+
+
+def _format_report(
+    config, n_test, results: list[dict], attack_persistence_rate: float | None, lead_time: dict | None = None,
+) -> str:
     def row(r, key):
         m = r[key]
         return f"| {r['name']} | {m['f1']:.3f} | {m['precision']:.3f} | {m['recall']:.3f} | {m['false_positive_rate']:.3f} |"
@@ -328,13 +425,17 @@ def _format_report(config, n_test, results: list[dict], attack_persistence_rate:
     default_rows = "\n".join(row(r, "default") for r in results)
     budget_rows = "\n".join(row(r, "budget") for r in results)
     stage_rows = "\n".join(stage_row(r) for r in results)
+    lead_time_section = _format_lead_time_section(
+        lead_time, config["windowing"]["forecast_horizon"], config["windowing"]["window_seconds"],
+    )
 
     return f"""# Evaluation: World Model vs Baselines
 
 Test set: {n_test} sequences. All four models predict the immediate next window (t+1) from
 identical targets; the world model additionally supports K-step autoregressive rollout (see
 models/forecast.py), which none of the baselines have an equivalent of — demonstrated in the
-Streamlit app rather than benchmarked here, since there's nothing to compare it against fairly.
+Streamlit app and scored directly in the lead-time section below, since there's no baseline to
+compare the rollout itself against fairly.
 
 ## Infiltration probability — default threshold (0.5)
 
@@ -356,7 +457,7 @@ operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
 | Model | F1 (macro) | Precision (macro) | Recall (macro) |
 |---|---|---|---|
 {stage_rows}
-
+{lead_time_section}
 ## Interpretation
 
 - **World Model vs Baseline (LR, last window)**: the last-window baseline sees only the current
@@ -401,7 +502,7 @@ def _persistence_caveat(results: list[dict], attack_persistence_rate: float | No
 def _format_cross_dataset_report(
     train_config, test_config,
     train_label: str, test_label: str,
-    n_test: int, results: list[dict],
+    n_test: int, results: list[dict], lead_time: dict | None = None,
 ) -> str:
     def row(r, key):
         m = r[key]
@@ -422,6 +523,9 @@ def _format_cross_dataset_report(
     stage_rows = "\n".join(stage_row(r) for r in results)
 
     seq_len = train_config["windowing"]["sequence_length"]
+    lead_time_section = _format_lead_time_section(
+        lead_time, train_config["windowing"]["forecast_horizon"], test_config["windowing"]["window_seconds"],
+    )
 
     return f"""# Cross-Dataset Evaluation: Train on {train_label} / Test on {test_label}
 
@@ -455,7 +559,7 @@ Threshold selected on the **{test_label} val split** only (never test).
 | Model | F1 (macro) | Precision (macro) | Recall (macro) |
 |---|---|---|---|
 {stage_rows}
-
+{lead_time_section}
 ## Interpretation
 
 - **Cross-dataset World Model vs native baselines**: a cross-dataset world model that outperforms
