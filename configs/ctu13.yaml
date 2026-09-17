@@ -39,6 +39,15 @@ features:
     - graph_fan_in_ratio
     - graph_component_size
     - graph_dst_entropy
+  graph_embedding:                    # learned per-window host embedding (models/graph_encoder.py); see pipeline/graph_embedding_features.py for scope caveat (frozen random-init encoder)
+    - graph_embed_0
+    - graph_embed_1
+    - graph_embed_2
+    - graph_embed_3
+    - graph_embed_4
+    - graph_embed_5
+    - graph_embed_6
+    - graph_embed_7
   packet_level:
     - mean_ttl
     - var_ttl

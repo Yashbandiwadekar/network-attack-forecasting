@@ -35,11 +35,13 @@ from models.cve_lookup import related_cves, snapshot_metadata
 from models.narrative import generate_attack_narrative
 from models.response import recommended_action
 from pipeline.flow_features import clean_and_normalize, load_flow_csv, load_flow_dir
+from pipeline.graph_embedding_features import build_graph_embedding_window_features
 from pipeline.graph_features import build_graph_window_features
 from pipeline.mitre_mapping import BENIGN
 from pipeline.packet_features import compute_packet_window_features, load_pcap
 from pipeline.windowing import (
-    apply_reconnaissance_heuristic, build_flow_windows, merge_graph_features, merge_packet_features,
+    apply_reconnaissance_heuristic, build_flow_windows, merge_graph_embedding_features,
+    merge_graph_features, merge_packet_features,
 )
 
 st.set_page_config(page_title="Network Attack Forecasting", layout="wide", page_icon="🛡️")
@@ -218,6 +220,8 @@ def _process_uploads(flow_csv_path: Path, pcap_path: Path | None, config: dict) 
     windows = merge_packet_features(flow_windows, packet_windows, config)
     graph_windows = build_graph_window_features(flow_df, config)
     windows = merge_graph_features(windows, graph_windows, config)
+    embedding_windows = build_graph_embedding_window_features(flow_df, config)
+    windows = merge_graph_embedding_features(windows, embedding_windows, config)
     windows = apply_reconnaissance_heuristic(windows, config)
     return flow_df, windows
 
@@ -234,6 +238,8 @@ def _load_real_data(config_path: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     flow_windows = build_flow_windows(flow_df, config)
     graph_windows = build_graph_window_features(flow_df, config)
     windows = merge_graph_features(flow_windows, graph_windows, config)
+    embedding_windows = build_graph_embedding_window_features(flow_df, config)
+    windows = merge_graph_embedding_features(windows, embedding_windows, config)
     windows = merge_packet_features(windows, None, config)
     windows = apply_reconnaissance_heuristic(windows, config)
     return flow_df, windows

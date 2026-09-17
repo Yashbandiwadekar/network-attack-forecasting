@@ -23,11 +23,13 @@ import numpy as np
 from common.config import feature_columns, load_config, resolve_path
 from pipeline.adapters.ctu13 import load_ctu13_directory
 from pipeline.adapters.ctu13_features import add_ctu13_features
+from pipeline.graph_embedding_features import build_graph_embedding_window_features
 from pipeline.graph_features import build_graph_window_features
 from pipeline.windowing import (
     apply_reconnaissance_heuristic,
     build_flow_windows,
     build_sequences,
+    merge_graph_embedding_features,
     merge_graph_features,
     merge_packet_features,
 )
@@ -68,6 +70,10 @@ def process_scenario(
     print("Building graph features...")
     graph_windows = build_graph_window_features(df, config)
     windows = merge_graph_features(windows, graph_windows, config)
+
+    print("Building graph embedding features...")
+    embedding_windows = build_graph_embedding_window_features(df, config)
+    windows = merge_graph_embedding_features(windows, embedding_windows, config)
 
     print("Adding packet features...")
 

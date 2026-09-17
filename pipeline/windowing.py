@@ -385,6 +385,50 @@ def merge_graph_features(
     return merged
 
 
+def merge_graph_embedding_features(
+    flow_windows: pd.DataFrame,
+    embedding_windows: pd.DataFrame | None,
+    config: dict[str, Any],
+) -> pd.DataFrame:
+    """Merge learned graph-embedding window features onto the flow-window DataFrame. Parallel to
+    merge_graph_features -- same zero-fill-when-absent convention, same join keys -- for the
+    output of pipeline.graph_embedding_features.build_graph_embedding_window_features instead of
+    pipeline.graph_features.build_graph_window_features.
+    """
+    embed_cols = list(config["features"].get("graph_embedding", []))
+
+    merged = flow_windows.copy()
+
+    if not embed_cols:
+        return merged
+
+    if embedding_windows is None or embedding_windows.empty:
+        for col in embed_cols:
+            merged[col] = 0.0
+        return merged
+
+    join_keys = ["src_ip", "window_start"]
+    if (
+        "scenario_id" in flow_windows.columns
+        and "scenario_id" in embedding_windows.columns
+    ):
+        join_keys = ["scenario_id"] + join_keys
+
+    embed_subset = embedding_windows[
+        join_keys + [c for c in embed_cols if c in embedding_windows.columns]
+    ]
+
+    merged = merged.merge(embed_subset, on=join_keys, how="left")
+
+    for col in embed_cols:
+        if col in merged.columns:
+            merged[col] = merged[col].fillna(0.0)
+        else:
+            merged[col] = 0.0
+
+    return merged
+
+
 def apply_reconnaissance_heuristic(
     windows_df: pd.DataFrame,
     config: dict[str, Any],
