@@ -1,0 +1,67 @@
+{
+  "_meta": {
+    "source": "NVD (National Vulnerability Database), https://nvd.nist.gov/",
+    "fetched": "2026-09-17",
+    "note": "Snapshot of real NVD records for well-documented CVEs historically exploited at each MITRE ATT&CK stage this project forecasts. Cached locally (not a live API call) so the dashboard runs fully offline, same as the rest of this project's demo path. See models/cve_lookup.py for the scope caveat on what this mapping does and does not claim."
+  },
+  "reconnaissance": [
+    {
+      "cve_id": "CVE-2021-26855",
+      "description": "Microsoft Exchange Server Remote Code Execution Vulnerability (\"ProxyLogon\") -- an SSRF flaw mass-scanned for and used to fingerprint vulnerable Exchange servers ahead of exploitation.",
+      "cvss_v3_score": 9.8,
+      "severity": "CRITICAL",
+      "published": "2021-03-03",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2021-26855"
+    }
+  ],
+  "initial_access": [
+    {
+      "cve_id": "CVE-2021-44228",
+      "description": "Apache Log4j2 JNDI lookup remote code execution (\"Log4Shell\") -- unauthenticated, network-exploitable, one of the most widely used initial-access vectors ever recorded.",
+      "cvss_v3_score": 10.0,
+      "severity": "CRITICAL",
+      "published": "2021-12-10",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2021-44228"
+    }
+  ],
+  "lateral_movement": [
+    {
+      "cve_id": "CVE-2020-1472",
+      "description": "Netlogon elevation of privilege (\"Zerologon\") -- lets an attacker who has landed on the internal network impersonate a domain controller and pivot with domain admin rights.",
+      "cvss_v3_score": 10.0,
+      "severity": "CRITICAL",
+      "published": "2020-08-17",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2020-1472"
+    }
+  ],
+  "command_and_control": [
+    {
+      "cve_id": "CVE-2019-19781",
+      "description": "Citrix ADC/Gateway directory traversal -- widely exploited to drop web shells and establish a persistent, remotely-controllable foothold (C2) on the appliance.",
+      "cvss_v3_score": 9.8,
+      "severity": "CRITICAL",
+      "published": "2019-12-27",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2019-19781"
+    }
+  ],
+  "exfiltration": [
+    {
+      "cve_id": "CVE-2023-34362",
+      "description": "Progress MOVEit Transfer SQL injection -- exploited at mass scale in 2023 to directly access and exfiltrate database contents from managed file-transfer deployments.",
+      "cvss_v3_score": 9.8,
+      "severity": "CRITICAL",
+      "published": "2023-06-02",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2023-34362"
+    }
+  ],
+  "impact": [
+    {
+      "cve_id": "CVE-2018-1002105",
+      "description": "Kubernetes API server privilege escalation via crafted proxied upgrade requests -- lets an attacker send arbitrary commands to backend services, used for high-impact disruption of cluster workloads.",
+      "cvss_v3_score": 9.8,
+      "severity": "CRITICAL",
+      "published": "2018-12-05",
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2018-1002105"
+    }
+  ]
+}
