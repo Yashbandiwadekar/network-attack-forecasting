@@ -31,6 +31,7 @@ from models.forecast import (
 )
 from models.audit_ledger import AuditLedger
 from models.compliance import generate_cert_in_report
+from models.cve_lookup import related_cves, snapshot_metadata
 from models.narrative import generate_attack_narrative
 from models.response import recommended_action
 from pipeline.flow_features import clean_and_normalize, load_flow_csv, load_flow_dir
@@ -750,6 +751,29 @@ def main() -> None:
             )
         else:
             st.caption(compliance_report.text)
+
+    with st.expander("Related CVEs (NVD)"):
+        st.caption(
+            "Real, notable CVEs historically exploited to reach this forecasted MITRE stage in "
+            "major reported incidents — a starting reference for an analyst's own investigation, "
+            "not an automated match against this specific host (flow records carry no software/"
+            "version field this system could fingerprint against). See models/cve_lookup.py."
+        )
+        cves = related_cves(peak_stage)
+        if cves:
+            for entry in cves:
+                st.markdown(
+                    f'<div class="ledger-status" style="background:rgba(208,59,59,0.10); color:{stage_bg};">'
+                    f'<a href="{entry["url"]}" target="_blank">{entry["cve_id"]}</a> — '
+                    f'CVSS {entry["cvss_v3_score"]:.1f} ({entry["severity"]}), published {entry["published"]}'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+                st.caption(entry["description"])
+            meta = snapshot_metadata()
+            st.caption(f"Source: {meta.get('source', 'NVD')} — snapshot cached {meta.get('fetched', 'n/a')}.")
+        else:
+            st.caption(f"No curated CVE reference for stage '{peak_stage}'.")
 
     timeline_df = pd.DataFrame({
         "step": [f"t+{(i + 1) * window_s}s" for i in range(horizon)],

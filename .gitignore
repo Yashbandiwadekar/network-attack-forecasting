@@ -1,4 +1,5 @@
-data/
+data/*
+!data/threat_intel/
 checkpoints/
 *.pt
 *.pth
