@@ -1,6 +1,6 @@
 # Evaluation: World Model vs Baselines
 
-Test set: 72 sequences. All four models predict the immediate next window (t+1) from
+Test set: 72 sequences. All models below predict the immediate next window (t+1) from
 identical targets; the world model additionally supports K-step autoregressive rollout (see
 models/forecast.py), which none of the baselines have an equivalent of — demonstrated in the
 Streamlit app and scored directly in the lead-time section below, since there's no baseline to
@@ -12,7 +12,7 @@ compare the rollout itself against fairly.
 |---|---|---|---|---|
 | World Model (Transformer) | 1.000 | 1.000 | 1.000 | 0.000 |
 | Baseline (LSTM) | 1.000 | 1.000 | 1.000 | 0.000 |
-| Baseline (LR, last window) | 0.984 | 0.968 | 1.000 | 0.024 |
+| Baseline (LR, last window) | 1.000 | 1.000 | 1.000 | 0.000 |
 | Baseline (LR, stacked window) | 1.000 | 1.000 | 1.000 | 0.000 |
 | Baseline (Markov chain) | 1.000 | 1.000 | 1.000 | 0.000 |
 | Persistence (no learning) | 1.000 | 1.000 | 1.000 | 0.000 |
@@ -26,7 +26,7 @@ operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
 |---|---|---|---|---|
 | World Model (Transformer) | 1.000 | 1.000 | 1.000 | 0.000 |
 | Baseline (LSTM) | 1.000 | 1.000 | 1.000 | 0.000 |
-| Baseline (LR, last window) | 0.929 | 1.000 | 0.867 | 0.000 |
+| Baseline (LR, last window) | 0.909 | 1.000 | 0.833 | 0.000 |
 | Baseline (LR, stacked window) | 1.000 | 1.000 | 1.000 | 0.000 |
 | Baseline (Markov chain) | 1.000 | 1.000 | 1.000 | 0.000 |
 | Persistence (no learning) | 1.000 | 1.000 | 1.000 | 0.000 |
@@ -58,3 +58,5 @@ No benign-to-attack transitions occurred within the forecast horizon in this tes
 
 **Honest caveat**: the stacked-window baseline matches or beats the world model here. On the current (small, synthetic) sample the attack-phase transitions are clean enough that a flat classifier with the same information does just as well — this benchmark hasn't yet demonstrated that sequential/recurrent structure earns its keep. That's exactly the kind of gap real CIC-IDS-2018 data, with much noisier and more overlapping traffic, is expected to actually show; see docs/02-dataset-and-features.md.
 
+
+**Honest caveat**: the Markov chain baseline essentially matches Persistence here (F1 1.000 vs 1.000). This is expected, not a coincidence: with no flow features at all, a first-order transition table over long, contiguous attack bursts learns that the diagonal ("stage persists") dominates the table, which is exactly what Persistence already assumes outright. The two only diverge where the label sequence isn't purely persistent -- i.e. at actual stage transitions -- which is a much smaller slice of this metric than the immediate next-step task as a whole.

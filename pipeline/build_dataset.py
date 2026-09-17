@@ -13,9 +13,11 @@ from common.config import (
 )
 
 from pipeline.flow_features import load_flow_dir
+from pipeline.graph_embedding_features import build_graph_embedding_window_features
 from pipeline.graph_features import build_graph_window_features
 from pipeline.windowing import (
     build_flow_windows,
+    merge_graph_embedding_features,
     merge_graph_features,
     merge_packet_features,
     apply_reconnaissance_heuristic,
@@ -349,6 +351,31 @@ def build_dataset(config_path: str = "configs/default.yaml") -> dict[str, dict[s
 
     print(
         "Graph features merged."
+    )
+
+    # ---------------------------------------------------------
+    # STEP 2c — Learned graph-embedding features (GraphSAGE, frozen at
+    # fixed random init -- see pipeline/graph_embedding_features.py
+    # for the scope caveat on why it's not jointly trained yet).
+    # ---------------------------------------------------------
+
+    print(
+        "\n=== STEP 2c: Building graph embedding features ==="
+    )
+
+    embedding_windows = build_graph_embedding_window_features(
+        flow_df,
+        config,
+    )
+
+    windows = merge_graph_embedding_features(
+        windows,
+        embedding_windows,
+        config,
+    )
+
+    print(
+        "Graph embedding features merged."
     )
 
     # ---------------------------------------------------------
