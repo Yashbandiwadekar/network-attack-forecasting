@@ -57,7 +57,9 @@ def _frozen_encoder(
     return encoder
 
 
-def build_graph_embedding_window_features(flow_df: pd.DataFrame, config: dict[str, Any]) -> pd.DataFrame:
+def build_graph_embedding_window_features(
+    flow_df: pd.DataFrame, config: dict[str, Any], graphs: dict[Any, Any] | None = None,
+) -> pd.DataFrame:
     """One row per (src_ip, window_start) [+ scenario_id when present] with EMBED_DIM
     `graph_embed_*` columns -- parallel output shape to
     pipeline.graph_features.build_graph_window_features, so it plugs into the same
@@ -67,6 +69,13 @@ def build_graph_embedding_window_features(flow_df: pd.DataFrame, config: dict[st
     embeddings are computed in a single forward pass and then indexed per host, since
     GraphSAGEEncoder.embed_host would otherwise redundantly recompute the whole graph's
     embeddings for every host in it.
+
+    `graphs`: an already-built {window_key: WindowGraph} dict (pipeline.graph_builder.
+    build_window_graphs) may be passed in to avoid rebuilding it -- pipeline/build_dataset.py and
+    build_ctu13_dataset.py build it once and reuse it here AND for
+    pipeline.graph_builder.save_window_graphs (needed by joint GNN training). Built internally
+    from `flow_df` when omitted, for backward-compatible standalone use (e.g. the Streamlit app's
+    live feature pipeline, tests).
     """
     window_seconds = int(config["windowing"]["window_seconds"])
     df = flow_df.copy()
@@ -81,7 +90,8 @@ def build_graph_embedding_window_features(flow_df: pd.DataFrame, config: dict[st
     src_window_cols = (["scenario_id", "src_ip", "window_start"] if has_scenario
                         else ["src_ip", "window_start"])
 
-    graphs = build_window_graphs(df, config)
+    if graphs is None:
+        graphs = build_window_graphs(df, config)
     encoder = _frozen_encoder()
 
     rows: list[dict[str, Any]] = []

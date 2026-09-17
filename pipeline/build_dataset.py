@@ -13,6 +13,7 @@ from common.config import (
 )
 
 from pipeline.flow_features import load_flow_dir
+from pipeline.graph_builder import build_window_graphs, save_window_graphs
 from pipeline.graph_embedding_features import build_graph_embedding_window_features
 from pipeline.graph_features import build_graph_window_features
 from pipeline.windowing import (
@@ -363,9 +364,15 @@ def build_dataset(config_path: str = "configs/default.yaml") -> dict[str, dict[s
         "\n=== STEP 2c: Building graph embedding features ==="
     )
 
+    window_graphs = build_window_graphs(
+        flow_df,
+        config,
+    )
+
     embedding_windows = build_graph_embedding_window_features(
         flow_df,
         config,
+        graphs=window_graphs,
     )
 
     windows = merge_graph_embedding_features(
@@ -376,6 +383,17 @@ def build_dataset(config_path: str = "configs/default.yaml") -> dict[str, dict[s
 
     print(
         "Graph embedding features merged."
+    )
+
+    # Persisted for joint GNN training (models/world_model_joint.py), which needs the exact
+    # WindowGraph behind any of a sequence's input steps without re-parsing raw flow CSVs.
+    save_window_graphs(
+        window_graphs,
+        processed_dir / "window_graphs.pkl",
+    )
+
+    print(
+        f"Window graphs saved: {processed_dir / 'window_graphs.pkl'}"
     )
 
     # ---------------------------------------------------------

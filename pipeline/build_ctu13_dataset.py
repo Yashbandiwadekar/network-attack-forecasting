@@ -23,6 +23,7 @@ import numpy as np
 from common.config import feature_columns, load_config, resolve_path
 from pipeline.adapters.ctu13 import load_ctu13_directory
 from pipeline.adapters.ctu13_features import add_ctu13_features
+from pipeline.graph_builder import build_window_graphs, save_window_graphs
 from pipeline.graph_embedding_features import build_graph_embedding_window_features
 from pipeline.graph_features import build_graph_window_features
 from pipeline.windowing import (
@@ -72,7 +73,8 @@ def process_scenario(
     windows = merge_graph_features(windows, graph_windows, config)
 
     print("Building graph embedding features...")
-    embedding_windows = build_graph_embedding_window_features(df, config)
+    window_graphs = build_window_graphs(df, config)
+    embedding_windows = build_graph_embedding_window_features(df, config, graphs=window_graphs)
     windows = merge_graph_embedding_features(windows, embedding_windows, config)
 
     print("Adding packet features...")
@@ -116,6 +118,10 @@ def process_scenario(
         exist_ok=True,
     )
 
+    # Persisted for joint GNN training (models/world_model_joint.py) -- see
+    # pipeline/build_dataset.py's equivalent step for why.
+    save_window_graphs(window_graphs, scenario_dir / "window_graphs.pkl")
+
     path = scenario_dir / "all.npz"
 
     np.savez(
@@ -128,6 +134,11 @@ def process_scenario(
         current_infiltration=sequences["current_infiltration"],
         window_end_time=(
             sequences["window_end_time"]
+            .astype("datetime64[ns]")
+            .astype(np.int64)
+        ),
+        window_times=(
+            sequences["window_times"]
             .astype("datetime64[ns]")
             .astype(np.int64)
         ),
@@ -181,6 +192,7 @@ def combine_scenarios(
         "current_stage": [],
         "current_infiltration": [],
         "window_end_time": [],
+        "window_times": [],
         "src_ip": [],
         "scenario_id": [],
     }
@@ -251,6 +263,10 @@ def combine_scenarios(
         ),
         window_end_time=np.concatenate(
             arrays["window_end_time"],
+            axis=0,
+        ),
+        window_times=np.concatenate(
+            arrays["window_times"],
             axis=0,
         ),
         src_ip=np.concatenate(

@@ -25,7 +25,9 @@ graph-visualization view) independent of which encoder architecture eventually c
 """
 from __future__ import annotations
 
+import pickle
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -160,3 +162,37 @@ def build_window_graphs(
     for key, wdf in df.groupby(group_cols, sort=False, observed=True, dropna=False):
         graphs[key] = build_window_graph(wdf, window_key=key, edge_feature_cols=edge_feature_cols)
     return graphs
+
+
+def save_window_graphs(graphs: dict[Any, WindowGraph], path: str | Path) -> None:
+    """Persist a {window_key: WindowGraph} dict built by build_window_graphs to disk (plain
+    pickle -- WindowGraph is a small numpy-only dataclass, no torch tensors involved, so there's
+    no device/serialization concern beyond what pickle already handles). Read back by
+    load_window_graphs. Used by pipeline/build_dataset.py and build_ctu13_dataset.py so joint GNN
+    training (models/world_model_joint.py) can look up the exact graph behind any of a sequence's
+    input steps without re-parsing the raw flow CSVs at training time.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "wb") as f:
+        pickle.dump(graphs, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+def load_window_graphs(path: str | Path) -> dict[Any, WindowGraph]:
+    with open(path, "rb") as f:
+        return pickle.load(f)
+
+
+def window_graph_key(window_time: Any, scenario_id: Any = None) -> Any:
+    """Reconstructs the exact dict key build_window_graphs uses for a given window, from a raw
+    `window_time` value read back out of a saved sequence (models.dataset.SequenceDataset.
+    window_times) -- e.g. a numpy.datetime64 (possibly a different time resolution than the
+    pd.Timestamp objects build_window_graphs' own pandas groupby produces as keys). Wrapping this
+    in pd.Timestamp(...) normalizes resolution so the reconstructed key hashes/compares equal to
+    the original — confirmed empirically, since numpy.datetime64 and pd.Timestamp at matching
+    instants but different declared units (e.g. 'us' vs 'ns') do NOT hash equal to each other
+    directly. Used by joint GNN training (models/world_model_joint.py) to look up the WindowGraph
+    behind any of a sequence's saved input steps.
+    """
+    ts = pd.Timestamp(window_time)
+    return (scenario_id, ts) if scenario_id is not None else (ts,)

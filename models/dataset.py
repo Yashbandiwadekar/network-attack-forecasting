@@ -79,6 +79,13 @@ class SequenceDataset(Dataset):
         self.infiltration = torch.tensor(split["infiltration"], dtype=torch.float32)
         self.current_stage = torch.tensor(split["current_stage"], dtype=torch.long)
         self.current_infiltration = torch.tensor(split["current_infiltration"], dtype=torch.float32)
+        # (N, L) window_start timestamp of every input step -- absent from datasets built before
+        # the joint-GNN-training schema change; kept optional so older processed_dir/*.npz still
+        # load. Only models/world_model_joint.py's training loop reads this (to look up each
+        # step's WindowGraph); every other consumer of SequenceDataset is unaffected.
+        self.window_times = split.get("window_times")
+        self.src_ip = split.get("src_ip")
+        self.scenario_id = split.get("scenario_id")
 
     def __len__(self) -> int:
         return len(self.X)
