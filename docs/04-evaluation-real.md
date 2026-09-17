@@ -1,6 +1,6 @@
 # Evaluation: World Model vs Baselines
 
-Test set: 194632 sequences. All four models predict the immediate next window (t+1) from
+Test set: 194632 sequences. All models below predict the immediate next window (t+1) from
 identical targets; the world model additionally supports K-step autoregressive rollout (see
 models/forecast.py), which none of the baselines have an equivalent of — demonstrated in the
 Streamlit app and scored directly in the lead-time section below, since there's no baseline to
@@ -11,8 +11,10 @@ compare the rollout itself against fairly.
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
 | World Model (Transformer) | 0.920 | 0.966 | 0.879 | 0.000 |
+| Baseline (LSTM) | 0.896 | 0.955 | 0.843 | 0.000 |
 | Baseline (LR, last window) | 0.791 | 0.946 | 0.680 | 0.000 |
 | Baseline (LR, stacked window) | 0.886 | 0.937 | 0.839 | 0.000 |
+| Baseline (Markov chain) | 0.988 | 0.987 | 0.989 | 0.000 |
 | Persistence (no learning) | 0.988 | 0.987 | 0.989 | 0.000 |
 
 ## Infiltration probability — fixed 5% false-positive-rate budget
@@ -23,8 +25,10 @@ operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
 | World Model (Transformer) | 0.503 | 0.336 | 1.000 | 0.016 |
+| Baseline (LSTM) | 0.554 | 0.383 | 0.997 | 0.013 |
 | Baseline (LR, last window) | 0.211 | 0.118 | 1.000 | 0.059 |
 | Baseline (LR, stacked window) | 0.481 | 0.317 | 1.000 | 0.017 |
+| Baseline (Markov chain) | 0.988 | 0.987 | 0.989 | 0.000 |
 | Persistence (no learning) | 0.988 | 0.987 | 0.989 | 0.000 |
 
 ## MITRE stage classification (5-way, `impact`-mapped windows excluded)
@@ -32,8 +36,10 @@ operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
 | Model | F1 (macro) | Precision (macro) | Recall (macro) |
 |---|---|---|---|
 | World Model (Transformer) | 0.841 | 0.932 | 0.795 |
+| Baseline (LSTM) | 0.569 | 0.771 | 0.544 |
 | Baseline (LR, last window) | 0.453 | 0.659 | 0.416 |
 | Baseline (LR, stacked window) | 0.522 | 0.748 | 0.500 |
+| Baseline (Markov chain) | 0.998 | 0.997 | 0.999 |
 | Persistence (no learning) | 0.998 | 0.997 | 0.999 |
 
 ## K-step forecast lead time
@@ -73,3 +79,5 @@ rate instead, so a high miss rate can't silently inflate the mean by dropping ou
 
 
 **Honest caveat**: persistence beats the world model on the immediate next-step (t+1) task (measured on this test set: 98.7% of currently-attacked windows are still under attack one step later). This isn't the model failing to learn — at a 10-second window size, attacks in this dataset are long, contiguous bursts rather than isolated blips, so 'assume nothing changes' is a genuinely strong predictor of the *very next* window specifically. It cannot, however, anticipate a transition — a benign window about to turn into an attack, or one attack stage handing off to the next — which is exactly what the K-step rollout (models/forecast.py) is for, and persistence has no equivalent of. That capability is demonstrated in the Streamlit app rather than in this single-step benchmark number.
+
+**Honest caveat**: the Markov chain baseline essentially matches Persistence here (F1 0.988 vs 0.988). This is expected, not a coincidence: with no flow features at all, a first-order transition table over long, contiguous attack bursts learns that the diagonal ("stage persists") dominates the table, which is exactly what Persistence already assumes outright. The two only diverge where the label sequence isn't purely persistent -- i.e. at actual stage transitions -- which is a much smaller slice of this metric than the immediate next-step task as a whole.

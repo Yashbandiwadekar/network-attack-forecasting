@@ -1,13 +1,21 @@
-"""Benchmark: world model vs three baselines on the immediate next-step prediction task (the
+"""Benchmark: world model vs four baselines on the immediate next-step prediction task (the
 world model's K-step rollout is a separate capability none of the baselines have — demonstrated
 in the Streamlit app, not benchmarked here, since there's nothing to compare it against fairly).
 
-Three baselines, each isolating a different question:
+Four baselines, each isolating a different question:
+  - Baseline (LSTM): the SAME multi-task heads and training loop as the world model, with the
+    self-attention encoder swapped for a recurrent LSTM — isolates "does self-attention
+    specifically matter, or would any sequential architecture do as well." Optional: only included
+    if `python -m models.train --arch lstm` has been run for this config (see models/lstm_model.py);
+    skipped with a printed note otherwise, since it needs its own trained checkpoint.
   - Baseline (LR, last window): no temporal context at all — the traditional "classify each flow
     in isolation" approach the problem statement contrasts world models against.
   - Baseline (LR, stacked window): the SAME L-window history the world model sees, flattened into
     one vector for a non-sequential classifier — isolates "does temporal/sequential modeling
     matter, or would more columns alone do the same job."
+  - Baseline (Markov chain): a first-order transition table over the discrete MITRE stage label
+    alone, no flow features at all (see models/markov_baseline.py) — isolates "is the label
+    sequence itself markovian enough to explain the result, without any dense feature history."
   - Persistence: no learning — predicts the current window's own state persists unchanged. If the
     world model can't beat this, it isn't learning real dynamics.
 
@@ -51,6 +59,8 @@ from eval.metrics import binary_metrics, lead_time_metrics, stage_metrics, thres
 from models.baseline_lr import BaselineModel, PersistenceBaseline
 from models.dataset import FeatureScaler, SequenceDataset, build_datasets, load_split
 from models.forecast import load_world_model
+from models.lstm_model import load_lstm_baseline
+from models.markov_baseline import MarkovBaseline
 from models.world_model import WorldModel
 
 TARGET_FPR = 0.05
@@ -133,6 +143,19 @@ def run(config_path: str = "configs/default.yaml") -> str:
         test_infiltration_target, test_stage_target, stage_valid_mask,
     ))
 
+    lstm_path = checkpoint_dir / "lstm_baseline_best.pt"
+    if lstm_path.exists():
+        lstm_model, _ = load_lstm_baseline(lstm_path, device=device)
+        lstm_val_prob, _ = _world_model_predictions(lstm_model, val_ds, device)
+        lstm_test_prob, lstm_stage_pred = _world_model_predictions(lstm_model, test_ds, device)
+        results.append(_evaluate_model(
+            "Baseline (LSTM)", val_infiltration_target, lstm_val_prob, lstm_test_prob, lstm_stage_pred,
+            test_infiltration_target, test_stage_target, stage_valid_mask,
+        ))
+    else:
+        print(f"LSTM baseline checkpoint not found at {lstm_path} -- skipping "
+              f"(train with `python -m models.train --config {config_path} --arch lstm`).")
+
     for mode, label in [(("last"), "Baseline (LR, last window)"), (("stacked"), "Baseline (LR, stacked window)")]:
         baseline = BaselineModel(config, mode=mode).fit(train_ds)
         val_prob, _ = baseline.predict(val_ds.X.numpy())
@@ -141,6 +164,15 @@ def run(config_path: str = "configs/default.yaml") -> str:
             label, val_infiltration_target, val_prob, test_prob, test_stage_probs.argmax(axis=-1),
             test_infiltration_target, test_stage_target, stage_valid_mask,
         ))
+
+    markov = MarkovBaseline().fit(train_ds)
+    markov_val_prob, _ = markov.predict(val_ds)
+    markov_test_prob, markov_test_stage_probs = markov.predict(test_ds)
+    results.append(_evaluate_model(
+        "Baseline (Markov chain)", val_infiltration_target, markov_val_prob, markov_test_prob,
+        markov_test_stage_probs.argmax(axis=-1),
+        test_infiltration_target, test_stage_target, stage_valid_mask,
+    ))
 
     persistence = PersistenceBaseline()
     val_prob, _ = persistence.predict(val_ds)
@@ -294,6 +326,20 @@ def run_cross_dataset(
         )
     ]
 
+    lstm_path = train_ckpt_dir / "lstm_baseline_best.pt"
+    if lstm_path.exists():
+        lstm_model, _ = load_lstm_baseline(lstm_path, device=device)
+        lstm_val_prob, _ = _world_model_predictions(lstm_model, val_ds, device)
+        lstm_test_prob, lstm_stage_pred = _world_model_predictions(lstm_model, test_ds, device)
+        cross_results.append(_evaluate_model(
+            f"Baseline (LSTM, Train: {train_label} / Test: {test_label})",
+            val_infiltration_target, lstm_val_prob, lstm_test_prob, lstm_stage_pred,
+            test_infiltration_target, test_stage_target, stage_valid_mask,
+        ))
+    else:
+        print(f"LSTM baseline checkpoint not found at {lstm_path} -- skipping "
+              f"(train with `python -m models.train --config {train_config_path} --arch lstm`).")
+
     # ------------------------------------------------------------------ #
     # Baselines trained on *test* dataset's train split (with test scaler)#
     #                                                                     #
@@ -316,6 +362,15 @@ def run_cross_dataset(
             label, val_target_ts, val_prob, test_prob, test_stage_probs.argmax(axis=-1),
             test_infiltration_target, test_stage_target, stage_valid_mask,
         ))
+
+    markov = MarkovBaseline().fit(train_ds_test)
+    markov_val_prob, _ = markov.predict(val_ds_test_scaler)
+    markov_test_prob, markov_test_stage_probs = markov.predict(test_ds_test_scaler)
+    cross_results.append(_evaluate_model(
+        f"Baseline (Markov chain, native {test_label})",
+        val_target_ts, markov_val_prob, markov_test_prob, markov_test_stage_probs.argmax(axis=-1),
+        test_infiltration_target, test_stage_target, stage_valid_mask,
+    ))
 
     persistence = PersistenceBaseline()
     val_prob_p, _ = persistence.predict(val_ds_test_scaler)
@@ -431,7 +486,7 @@ def _format_report(
 
     return f"""# Evaluation: World Model vs Baselines
 
-Test set: {n_test} sequences. All four models predict the immediate next window (t+1) from
+Test set: {n_test} sequences. All models below predict the immediate next window (t+1) from
 identical targets; the world model additionally supports K-step autoregressive rollout (see
 models/forecast.py), which none of the baselines have an equivalent of — demonstrated in the
 Streamlit app and scored directly in the lead-time section below, since there's no baseline to
@@ -470,6 +525,7 @@ operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
   clear this bar, it isn't learning real dynamics, whatever its other metrics say.
 {_stacked_baseline_caveat(results)}
 {_persistence_caveat(results, attack_persistence_rate)}
+{_markov_caveat(results)}
 """
 
 
@@ -496,6 +552,32 @@ def _persistence_caveat(results: list[dict], attack_persistence_rate: float | No
         "or one attack stage handing off to the next — which is exactly what the K-step rollout "
         "(models/forecast.py) is for, and persistence has no equivalent of. That capability is "
         "demonstrated in the Streamlit app rather than in this single-step benchmark number."
+    )
+
+
+def _markov_caveat(results: list[dict]) -> str:
+    """Computed, not hand-written -- same reasoning as _stacked_baseline_caveat/_persistence_caveat.
+    The Markov chain has no access to flow features at all, only the discrete stage label the
+    input sequence ends on -- if it ties Persistence, that's not a coincidence: on this dataset's
+    long contiguous attack bursts, "current stage persists" IS what the transition table learns
+    (the diagonal dominates), so the two baselines converging is expected, not a bug in either."""
+    by_name = {r["name"]: r for r in results}
+    markov_key = "Baseline (Markov chain)"
+    persistence_key = "Persistence (no learning)"
+    if markov_key not in by_name or persistence_key not in by_name:
+        return ""
+    markov_f1 = by_name[markov_key]["default"]["f1"]
+    persistence_f1 = by_name[persistence_key]["default"]["f1"]
+    if abs(markov_f1 - persistence_f1) > 0.02:
+        return ""
+    return (
+        "\n**Honest caveat**: the Markov chain baseline essentially matches Persistence here "
+        f"(F1 {markov_f1:.3f} vs {persistence_f1:.3f}). This is expected, not a coincidence: with "
+        "no flow features at all, a first-order transition table over long, contiguous attack "
+        "bursts learns that the diagonal (\"stage persists\") dominates the table, which is exactly "
+        "what Persistence already assumes outright. The two only diverge where the label sequence "
+        "isn't purely persistent -- i.e. at actual stage transitions -- which is a much smaller "
+        "slice of this metric than the immediate next-step task as a whole."
     )
 
 
