@@ -179,6 +179,27 @@ def test_build_sequences_shapes_and_alignment():
     assert seqs["current_stage"].tolist() == [0, 0]  # 0 == benign's index in STAGE_CLASSIFICATION_LABELS
 
 
+def test_build_sequences_window_times_covers_every_input_step_not_just_the_last():
+    # Same 5-window setup as test_build_sequences_shapes_and_alignment: seq_len=2, horizon=2 ->
+    # 2 samples (i=0,1). window_times should carry the window_start of BOTH input steps per
+    # sample, not just the final one window_end_time already captures.
+    feature_cols = ["flow_count"]
+    starts = [pd.Timestamp("2026-01-01") + pd.Timedelta(seconds=10 * i) for i in range(5)]
+    windows = pd.DataFrame([
+        {"src_ip": "a", "window_start": starts[i], "flow_count": float(i),
+         "stage": BENIGN if i != 3 else "command_and_control"}
+        for i in range(5)
+    ])
+    seqs = build_sequences(windows, feature_cols, TEST_CONFIG)
+
+    assert seqs["window_times"].shape == (2, 2)
+    # sample 0 uses input windows i=0,1; sample 1 uses input windows i=1,2
+    np.testing.assert_array_equal(seqs["window_times"][0], np.array([starts[0], starts[1]], dtype="datetime64[ns]"))
+    np.testing.assert_array_equal(seqs["window_times"][1], np.array([starts[1], starts[2]], dtype="datetime64[ns]"))
+    # the last column must always match window_end_time, which was already correct before this field existed
+    np.testing.assert_array_equal(seqs["window_times"][:, -1], seqs["window_end_time"])
+
+
 def test_build_sequences_current_infiltration_true_when_last_input_window_is_an_attack():
     # 5 windows, index 1 (the src_ip's second window) is itself an attack
     feature_cols = ["flow_count"]

@@ -1,7 +1,10 @@
 import numpy as np
 import pandas as pd
 
-from pipeline.graph_builder import EDGE_FEATURE_COLS, build_window_graph, build_window_graphs
+from pipeline.graph_builder import (
+    EDGE_FEATURE_COLS, build_window_graph, build_window_graphs, load_window_graphs,
+    save_window_graphs, window_graph_key,
+)
 
 
 def _flows(rows):
@@ -115,3 +118,51 @@ def test_build_window_graphs_respects_scenario_id_grouping():
     graphs = build_window_graphs(df, config)
 
     assert len(graphs) == 2  # same window_start, different scenario_id -> separate graphs
+
+
+def test_save_and_load_window_graphs_round_trips(tmp_path):
+    df = pd.DataFrame({
+        "src_ip": ["A", "B"],
+        "dst_ip": ["B", "C"],
+        "timestamp": pd.to_datetime(["2024-01-01 00:00:01", "2024-01-01 00:00:02"]),
+        "total_pkts": [1.0, 2.0],
+        "has_ip_data": [1.0, 1.0],
+    })
+    config = {"windowing": {"window_seconds": 10}}
+    graphs = build_window_graphs(df, config)
+
+    path = tmp_path / "window_graphs.pkl"
+    save_window_graphs(graphs, path)
+    loaded = load_window_graphs(path)
+
+    assert loaded.keys() == graphs.keys()
+    key = list(graphs.keys())[0]
+    np.testing.assert_array_equal(loaded[key].edge_index, graphs[key].edge_index)
+    np.testing.assert_array_equal(loaded[key].edge_attr, graphs[key].edge_attr)
+    assert loaded[key].node_ids == graphs[key].node_ids
+
+
+def test_window_graph_key_reconstructs_a_matching_dict_key_from_numpy_datetime64():
+    df = pd.DataFrame({
+        "src_ip": ["A"],
+        "dst_ip": ["B"],
+        "timestamp": pd.to_datetime(["2024-01-01 00:00:01"]),
+        "total_pkts": [1.0],
+        "has_ip_data": [1.0],
+    })
+    config = {"windowing": {"window_seconds": 10}}
+    graphs = build_window_graphs(df, config)
+    real_key = list(graphs.keys())[0]
+
+    # Simulate the round-trip a saved sequence's window_times array actually goes through:
+    # pandas Timestamp -> numpy datetime64 (possibly a different declared resolution) -> back.
+    as_numpy_datetime64 = np.array([real_key[0]], dtype="datetime64[us]")[0]
+    reconstructed = window_graph_key(as_numpy_datetime64)
+
+    assert reconstructed == real_key
+    assert reconstructed in graphs
+
+
+def test_window_graph_key_includes_scenario_id_when_given():
+    key = window_graph_key(pd.Timestamp("2024-01-01"), scenario_id="s1")
+    assert key == ("s1", pd.Timestamp("2024-01-01"))

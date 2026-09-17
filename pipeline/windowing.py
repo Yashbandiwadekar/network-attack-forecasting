@@ -492,6 +492,7 @@ def build_sequences(
     current_stage_parts = []
     current_infiltration_parts = []
     window_end_time_parts = []
+    window_times_parts = []
     src_ip_parts = []
     scenario_id_parts = []
 
@@ -603,6 +604,16 @@ def build_sequences(
             seq_len - 1 + sample_count
         ]
 
+        # The window_start timestamp of EVERY one of the seq_len input steps per sample (not just
+        # the last one, which window_end_time already captures) -- joint GNN training
+        # (models/world_model_joint.py) needs this to look up the exact WindowGraph backing each
+        # step, since a sequence's steps can have gaps in wall-clock time (a host silent for a
+        # window simply has no row for it, so consecutive rows here aren't always window_seconds
+        # apart) and so can't be reconstructed from window_end_time alone.
+        window_times_group = np.lib.stride_tricks.sliding_window_view(
+            times, seq_len,
+        )[:sample_count].copy()
+
         src_ip_value = group["src_ip"].iloc[0]
 
         X_parts.append(X_group)
@@ -615,6 +626,9 @@ def build_sequences(
         )
         window_end_time_parts.append(
             window_end_time_group
+        )
+        window_times_parts.append(
+            window_times_group
         )
 
         src_ip_parts.append(
@@ -670,6 +684,7 @@ def build_sequences(
                 dtype=np.float32,
             ),
             "window_end_time": np.array([]),
+            "window_times": np.zeros((0, seq_len), dtype="datetime64[ns]"),
             "src_ip": np.array([]),
         }
 
@@ -705,6 +720,10 @@ def build_sequences(
         ),
         "window_end_time": np.concatenate(
             window_end_time_parts,
+            axis=0,
+        ),
+        "window_times": np.concatenate(
+            window_times_parts,
             axis=0,
         ),
         "src_ip": np.concatenate(
