@@ -3,15 +3,18 @@
 Test set: 72 sequences. All four models predict the immediate next window (t+1) from
 identical targets; the world model additionally supports K-step autoregressive rollout (see
 models/forecast.py), which none of the baselines have an equivalent of — demonstrated in the
-Streamlit app rather than benchmarked here, since there's nothing to compare it against fairly.
+Streamlit app and scored directly in the lead-time section below, since there's no baseline to
+compare the rollout itself against fairly.
 
 ## Infiltration probability — default threshold (0.5)
 
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
 | World Model (Transformer) | 1.000 | 1.000 | 1.000 | 0.000 |
+| Baseline (LSTM) | 1.000 | 1.000 | 1.000 | 0.000 |
 | Baseline (LR, last window) | 0.984 | 0.968 | 1.000 | 0.024 |
 | Baseline (LR, stacked window) | 1.000 | 1.000 | 1.000 | 0.000 |
+| Baseline (Markov chain) | 1.000 | 1.000 | 1.000 | 0.000 |
 | Persistence (no learning) | 1.000 | 1.000 | 1.000 | 0.000 |
 
 ## Infiltration probability — fixed 5% false-positive-rate budget
@@ -22,8 +25,10 @@ operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
 | World Model (Transformer) | 1.000 | 1.000 | 1.000 | 0.000 |
+| Baseline (LSTM) | 1.000 | 1.000 | 1.000 | 0.000 |
 | Baseline (LR, last window) | 0.929 | 1.000 | 0.867 | 0.000 |
 | Baseline (LR, stacked window) | 1.000 | 1.000 | 1.000 | 0.000 |
+| Baseline (Markov chain) | 1.000 | 1.000 | 1.000 | 0.000 |
 | Persistence (no learning) | 1.000 | 1.000 | 1.000 | 0.000 |
 
 ## MITRE stage classification (5-way, `impact`-mapped windows excluded)
@@ -31,10 +36,15 @@ operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
 | Model | F1 (macro) | Precision (macro) | Recall (macro) |
 |---|---|---|---|
 | World Model (Transformer) | 0.891 | 0.965 | 0.858 |
+| Baseline (LSTM) | 0.681 | 0.667 | 0.700 |
 | Baseline (LR, last window) | 0.891 | 0.965 | 0.858 |
 | Baseline (LR, stacked window) | 0.891 | 0.965 | 0.858 |
+| Baseline (Markov chain) | 0.891 | 0.965 | 0.858 |
 | Persistence (no learning) | 0.891 | 0.965 | 0.858 |
 
+## K-step forecast lead time
+
+No benign-to-attack transitions occurred within the forecast horizon in this test set, so lead time is undefined here (not zero — there was nothing to detect early).
 ## Interpretation
 
 - **World Model vs Baseline (LR, last window)**: the last-window baseline sees only the current

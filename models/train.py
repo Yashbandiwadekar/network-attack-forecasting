@@ -23,7 +23,10 @@ from tqdm import tqdm
 
 from common.config import load_config, resolve_path
 from models.dataset import build_datasets
+from models.lstm_model import LSTMWorldModel
 from models.world_model import WorldModel
+
+ARCH_CHECKPOINT_STEM = {"transformer": "world_model", "lstm": "lstm_baseline"}
 
 
 def _device(config: dict) -> torch.device:
@@ -31,7 +34,13 @@ def _device(config: dict) -> torch.device:
     return torch.device("cuda" if want_cuda and torch.cuda.is_available() else "cpu")
 
 
-def _step_loss(model: WorldModel, batch, device: torch.device) -> tuple[torch.Tensor, dict[str, float]]:
+def _build_model(arch: str, n_features: int, n_stage_classes: int, config: dict) -> nn.Module:
+    if arch == "lstm":
+        return LSTMWorldModel(n_features, n_stage_classes, config)
+    return WorldModel(n_features, n_stage_classes, config)
+
+
+def _step_loss(model: nn.Module, batch, device: torch.device) -> tuple[torch.Tensor, dict[str, float]]:
     X, next_state, future_stages, infiltration = [t.to(device) for t in batch]
     pred_next_state, stage_logits, infiltration_logit = model(X)
 
@@ -50,10 +59,10 @@ def _step_loss(model: WorldModel, batch, device: torch.device) -> tuple[torch.Te
     return total, {"mse": mse.item(), "ce": ce.item(), "bce": bce.item(), "total": total.item()}
 
 
-def train(config_path: str = "configs/default.yaml") -> None:
+def train(config_path: str = "configs/default.yaml", arch: str = "transformer") -> None:
     config = load_config(config_path)
     device = _device(config)
-    print(f"Training on device: {device}")
+    print(f"Training on device: {device} (arch: {arch})")
 
     train_ds, val_ds, _, scaler = build_datasets(config)
     n_features = train_ds.X.shape[-1]
@@ -62,11 +71,12 @@ def train(config_path: str = "configs/default.yaml") -> None:
     train_loader = DataLoader(train_ds, batch_size=config["model"]["batch_size"], shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=config["model"]["batch_size"], shuffle=False)
 
-    model = WorldModel(n_features, n_stage_classes, config).to(device)
+    model = _build_model(arch, n_features, n_stage_classes, config).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config["model"]["lr"])
 
     checkpoint_dir = resolve_path(config, "checkpoint_dir")
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint_stem = ARCH_CHECKPOINT_STEM[arch]
     best_val_loss = float("inf")
 
     for epoch in range(config["model"]["epochs"]):
@@ -97,19 +107,22 @@ def train(config_path: str = "configs/default.yaml") -> None:
                 "n_features": n_features,
                 "n_stage_classes": n_stage_classes,
                 "config": config,
-            }, checkpoint_dir / "world_model_best.pt")
+            }, checkpoint_dir / f"{checkpoint_stem}_best.pt")
 
     torch.save({
         "model_state": model.state_dict(),
         "n_features": n_features,
         "n_stage_classes": n_stage_classes,
         "config": config,
-    }, checkpoint_dir / "world_model_final.pt")
+    }, checkpoint_dir / f"{checkpoint_stem}_final.pt")
     print(f"Best val loss: {best_val_loss:.4f}. Checkpoints saved to {checkpoint_dir}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/default.yaml")
+    parser.add_argument("--arch", default="transformer", choices=["transformer", "lstm"],
+                         help="Sequence encoder to train: the world model's Transformer (default) "
+                              "or the LSTM baseline (see docs/05-related-work-and-competitive-landscape.md).")
     args = parser.parse_args()
-    train(args.config)
+    train(args.config, args.arch)
