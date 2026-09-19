@@ -10,10 +10,10 @@ compare the rollout itself against fairly.
 
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
-| World Model (Transformer) | 0.920 | 0.966 | 0.879 | 0.000 |
-| Baseline (LSTM) | 0.896 | 0.955 | 0.843 | 0.000 |
-| Baseline (LR, last window) | 0.791 | 0.946 | 0.680 | 0.000 |
-| Baseline (LR, stacked window) | 0.886 | 0.937 | 0.839 | 0.000 |
+| World Model (Transformer) | 0.917 | 0.943 | 0.892 | 0.000 |
+| Baseline (LSTM) | 0.908 | 0.947 | 0.872 | 0.000 |
+| Baseline (LR, last window) | 0.787 | 0.943 | 0.676 | 0.000 |
+| Baseline (LR, stacked window) | 0.866 | 0.926 | 0.814 | 0.001 |
 | Baseline (Markov chain) | 0.988 | 0.987 | 0.989 | 0.000 |
 | Persistence (no learning) | 0.988 | 0.987 | 0.989 | 0.000 |
 
@@ -24,10 +24,10 @@ operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
 
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
-| World Model (Transformer) | 0.503 | 0.336 | 1.000 | 0.016 |
-| Baseline (LSTM) | 0.554 | 0.383 | 0.997 | 0.013 |
-| Baseline (LR, last window) | 0.211 | 0.118 | 1.000 | 0.059 |
-| Baseline (LR, stacked window) | 0.481 | 0.317 | 1.000 | 0.017 |
+| World Model (Transformer) | 0.535 | 0.365 | 0.999 | 0.014 |
+| Baseline (LSTM) | 0.535 | 0.366 | 0.996 | 0.014 |
+| Baseline (LR, last window) | 0.314 | 0.186 | 1.000 | 0.035 |
+| Baseline (LR, stacked window) | 0.534 | 0.364 | 1.000 | 0.014 |
 | Baseline (Markov chain) | 0.988 | 0.987 | 0.989 | 0.000 |
 | Persistence (no learning) | 0.988 | 0.987 | 0.989 | 0.000 |
 
@@ -35,10 +35,10 @@ operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
 
 | Model | F1 (macro) | Precision (macro) | Recall (macro) |
 |---|---|---|---|
-| World Model (Transformer) | 0.841 | 0.932 | 0.795 |
-| Baseline (LSTM) | 0.569 | 0.771 | 0.544 |
-| Baseline (LR, last window) | 0.453 | 0.659 | 0.416 |
-| Baseline (LR, stacked window) | 0.522 | 0.748 | 0.500 |
+| World Model (Transformer) | 0.820 | 0.849 | 0.796 |
+| Baseline (LSTM) | 0.715 | 0.819 | 0.682 |
+| Baseline (LR, last window) | 0.450 | 0.600 | 0.418 |
+| Baseline (LR, stacked window) | 0.506 | 0.748 | 0.481 |
 | Baseline (Markov chain) | 0.998 | 0.997 | 0.999 |
 | Persistence (no learning) | 0.998 | 0.997 | 0.999 |
 
