@@ -210,7 +210,7 @@ def _load_backend(config_path: str):
 
 
 def _process_uploads(flow_csv_path: Path, pcap_path: Path | None, config: dict) -> pd.DataFrame:
-    flow_df = clean_and_normalize(load_flow_csv(flow_csv_path))
+    flow_df = clean_and_normalize(load_flow_csv(flow_csv_path, require_label=False))
     flow_windows = build_flow_windows(flow_df, config)
 
     packet_windows = None
@@ -468,7 +468,10 @@ def main() -> None:
     # changes (host count is a cheap proxy for "the underlying data changed" — avoids re-hashing
     # a multi-million-row DataFrame on every widget interaction).
     # ----------------------------------------------------------------------------------------
-    score_cache_key = (config_path, len(eligible_ips))
+    # Keyed on the input's identity, not just its size: two different uploads with the same host
+    # count must not reuse each other's scores (or skip the audit-ledger write).
+    score_cache_key = (config_path, len(eligible_ips), len(windows), str(windows["window_start"].max()),
+                       float(windows[feature_cols].to_numpy().sum()))
     ledger_path = resolve_path(config, "processed_dir") / "audit_ledger.jsonl"
     if st.session_state.get("_score_cache_key") != score_cache_key:
         with st.spinner(f"Scoring {len(eligible_ips):,} monitored hosts..."):
