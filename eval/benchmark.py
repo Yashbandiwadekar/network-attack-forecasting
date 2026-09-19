@@ -383,8 +383,9 @@ def run_cross_dataset(
     # "does a dataset-native shallow model beat the cross-dataset world   #
     # model?"  Uses the test dataset's own train scaler.                  #
     # ------------------------------------------------------------------ #
-    test_scaler = FeatureScaler().fit(test_split["X"])
-    train_ds_test = SequenceDataset(load_split(test_processed_dir, "train"), test_scaler)
+    native_train_split = load_split(test_processed_dir, "train")
+    test_scaler = FeatureScaler().fit(native_train_split["X"])  # train split only — fitting on test leaks
+    train_ds_test = SequenceDataset(native_train_split, test_scaler)
     val_ds_test_scaler = SequenceDataset(val_split, test_scaler)
     test_ds_test_scaler = SequenceDataset(test_split, test_scaler)
     val_target_ts = val_ds_test_scaler.infiltration[:, 0].numpy()

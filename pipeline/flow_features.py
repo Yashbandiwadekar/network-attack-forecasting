@@ -67,8 +67,13 @@ UDP = 17
 _RELEVANT_RAW_COLUMNS = set(COLUMN_RENAME.keys())
 
 
-def load_flow_csv(path: str | Path) -> pd.DataFrame:
+def load_flow_csv(path: str | Path, require_label: bool = True) -> pd.DataFrame:
     """Load one CICFlowMeter CSV and rename to the internal schema.
+
+    `require_label=False` is for inference on unlabeled live captures (the demo's upload path):
+    a missing Label column is filled with BENIGN so windowing still runs. Ground-truth overlays
+    are then meaningless for that capture, but the model's own forecast is unaffected, since
+    labels are never model input.
 
     `usecols` skips parsing the ~60 CICFlowMeter columns we never use (real files have ~80;
     COLUMN_RENAME only names ~20) — on the full real CIC-IDS-2018 download (6.5 GiB across 10
@@ -78,6 +83,8 @@ def load_flow_csv(path: str | Path) -> pd.DataFrame:
     df = pd.read_csv(path, low_memory=False, usecols=lambda c: c.strip() in _RELEVANT_RAW_COLUMNS)
     df.columns = [c.strip() for c in df.columns]
     df = df.rename(columns=COLUMN_RENAME)
+    if not require_label and "label" not in df.columns:
+        df["label"] = "BENIGN"
     missing = [c for c in STRICTLY_REQUIRED_COLUMNS if c not in df.columns]
     if missing:
         raise ValueError(f"{path}: missing required columns after rename: {missing}")
