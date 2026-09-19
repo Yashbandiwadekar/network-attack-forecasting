@@ -11,6 +11,7 @@ compare the rollout itself against fairly.
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
 | World Model (Transformer) | 1.000 | 1.000 | 1.000 | 0.000 |
+| World Model (Transformer + jointly-trained GNN) | 0.846 | 1.000 | 0.733 | 0.000 |
 | Baseline (LSTM) | 1.000 | 1.000 | 1.000 | 0.000 |
 | Baseline (LR, last window) | 1.000 | 1.000 | 1.000 | 0.000 |
 | Baseline (LR, stacked window) | 1.000 | 1.000 | 1.000 | 0.000 |
@@ -25,6 +26,7 @@ operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
 | World Model (Transformer) | 1.000 | 1.000 | 1.000 | 0.000 |
+| World Model (Transformer + jointly-trained GNN) | 0.846 | 1.000 | 0.733 | 0.000 |
 | Baseline (LSTM) | 1.000 | 1.000 | 1.000 | 0.000 |
 | Baseline (LR, last window) | 0.909 | 1.000 | 0.833 | 0.000 |
 | Baseline (LR, stacked window) | 1.000 | 1.000 | 1.000 | 0.000 |
@@ -36,6 +38,7 @@ operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
 | Model | F1 (macro) | Precision (macro) | Recall (macro) |
 |---|---|---|---|
 | World Model (Transformer) | 0.891 | 0.965 | 0.858 |
+| World Model (Transformer + jointly-trained GNN) | 0.856 | 0.962 | 0.801 |
 | Baseline (LSTM) | 0.681 | 0.667 | 0.700 |
 | Baseline (LR, last window) | 0.891 | 0.965 | 0.858 |
 | Baseline (LR, stacked window) | 0.891 | 0.965 | 0.858 |
