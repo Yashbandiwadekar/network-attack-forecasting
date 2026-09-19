@@ -83,7 +83,9 @@ def _build_graph_items(
     items: list[tuple[WindowGraph, str]] = []
     for i in indices.tolist():
         host = str(ds.src_ip[i])
-        scenario_id = str(ds.scenario_id[i]) if ds.scenario_id is not None else None
+        # .item() keeps the native type (CTU-13 scenario ids are ints) -- stringifying it would
+        # never match the (scenario_id, Timestamp) keys build_window_graphs produced.
+        scenario_id = ds.scenario_id[i].item() if ds.scenario_id is not None else None
         for t in range(seq_len):
             key = window_graph_key(ds.window_times[i, t], scenario_id=scenario_id)
             items.append((graphs.get(key, _EMPTY_GRAPH), host))
@@ -102,7 +104,9 @@ def _step_loss(
     items = _build_graph_items(ds, indices, graphs)
     pred_next_state, stage_logits, infiltration_logit = model(X, items)
 
-    mse = nn.functional.mse_loss(pred_next_state, next_state)
+    # The Transformer's next-state head predicts its full input width (base + live embedding), but
+    # the learned embedding part has no ground-truth target -- supervise only the base slice.
+    mse = nn.functional.mse_loss(pred_next_state[:, :next_state.shape[1]], next_state)
 
     stage_target = future_stages[:, 0]
     mask = stage_target != -1

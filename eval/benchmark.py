@@ -61,6 +61,8 @@ from models.dataset import FeatureScaler, SequenceDataset, build_datasets, load_
 from models.forecast import load_world_model
 from models.lstm_model import load_lstm_baseline
 from models.markov_baseline import MarkovBaseline
+from models.train_joint import _base_feature_mask, _build_graph_items, load_joint_world_model
+from pipeline.graph_builder import load_window_graphs
 from models.world_model import WorldModel
 
 TARGET_FPR = 0.05
@@ -77,6 +79,24 @@ def _world_model_predictions(model: WorldModel, ds: SequenceDataset, device) -> 
         infiltration_prob = torch.sigmoid(infiltration_logit).cpu().numpy()
         stage_pred = torch.softmax(stage_logits, dim=-1).argmax(dim=-1).cpu().numpy()
     return infiltration_prob, stage_pred
+
+
+def _joint_predictions(model, ds: SequenceDataset, graphs: dict, base_mask: np.ndarray, device,
+                       batch_size: int = 512) -> tuple[np.ndarray, np.ndarray]:
+    """Single-step predictions from a JointWorldModel: same outputs as _world_model_predictions,
+    but each batch also needs the per-step WindowGraphs (models/train_joint.py::_build_graph_items).
+    K-step rollout is deliberately not benchmarked for this model -- a rollout would need graphs for
+    *predicted* future windows, which don't exist."""
+    probs, stages = [], []
+    with torch.no_grad():
+        for start in range(0, len(ds), batch_size):
+            idx = torch.arange(start, min(start + batch_size, len(ds)))
+            x = ds.X[idx][:, :, base_mask].to(device)
+            items = _build_graph_items(ds, idx, graphs)
+            _, stage_logits, infiltration_logit = model(x, items)
+            probs.append(torch.sigmoid(infiltration_logit).cpu().numpy())
+            stages.append(torch.softmax(stage_logits, dim=-1).argmax(dim=-1).cpu().numpy())
+    return np.concatenate(probs), np.concatenate(stages)
 
 
 def _rollout_infiltration_probs(
@@ -142,6 +162,22 @@ def run(config_path: str = "configs/default.yaml") -> str:
         "World Model (Transformer)", val_infiltration_target, wm_val_prob, wm_test_prob, wm_stage_pred,
         test_infiltration_target, test_stage_target, stage_valid_mask,
     ))
+
+    joint_path = checkpoint_dir / "joint_gnn_world_model_best.pt"
+    graphs_path = resolve_path(config, "processed_dir") / "window_graphs.pkl"
+    if joint_path.exists() and graphs_path.exists() and val_ds.window_times is not None:
+        joint_model, _ = load_joint_world_model(joint_path, device=device)
+        graphs = load_window_graphs(graphs_path)
+        base_mask = _base_feature_mask(config)
+        joint_val_prob, _ = _joint_predictions(joint_model, val_ds, graphs, base_mask, device)
+        joint_test_prob, joint_stage_pred = _joint_predictions(joint_model, test_ds, graphs, base_mask, device)
+        results.append(_evaluate_model(
+            "World Model (Transformer + jointly-trained GNN)", val_infiltration_target, joint_val_prob,
+            joint_test_prob, joint_stage_pred, test_infiltration_target, test_stage_target, stage_valid_mask,
+        ))
+    else:
+        print(f"Joint-GNN checkpoint or window_graphs.pkl not found -- skipping "
+              f"(train with `python -m models.train_joint --config {config_path}`).")
 
     lstm_path = checkpoint_dir / "lstm_baseline_best.pt"
     if lstm_path.exists():

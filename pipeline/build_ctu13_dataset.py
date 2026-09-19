@@ -23,7 +23,7 @@ import numpy as np
 from common.config import feature_columns, load_config, resolve_path
 from pipeline.adapters.ctu13 import load_ctu13_directory
 from pipeline.adapters.ctu13_features import add_ctu13_features
-from pipeline.graph_builder import build_window_graphs, save_window_graphs
+from pipeline.graph_builder import build_window_graphs, load_window_graphs, save_window_graphs
 from pipeline.graph_embedding_features import build_graph_embedding_window_features
 from pipeline.graph_features import build_graph_window_features
 from pipeline.windowing import (
@@ -407,6 +407,17 @@ def main(
         "val": val_count,
         "test": test_count,
     }
+
+    # Merge the per-scenario window graphs into the single window_graphs.pkl joint GNN training
+    # expects next to train/val/test.npz. Keys already carry scenario_id, so they can't collide.
+    merged_graphs = {}
+    for scenario_id in range(1, 14):
+        path = temporary_dir / f"scenario_{scenario_id}" / "window_graphs.pkl"
+        if path.exists():
+            merged_graphs.update(load_window_graphs(path))
+    save_window_graphs(merged_graphs, final_dir / "window_graphs.pkl")
+    print(f"Merged {len(merged_graphs):,} window graphs -> {final_dir / 'window_graphs.pkl'}")
+    del merged_graphs
 
     # ---------------------------------------------------------
     # Metadata
