@@ -17,3 +17,5 @@ venv/
 configs/_*.yaml
 # Third-party publication used as source material for models/compliance.py — not ours to redistribute
 certin_directions.txt
+# Generated submission report (rebuilt from docs/, not a source file)
+docs/CipherWraiths-Project-Report.pdf
