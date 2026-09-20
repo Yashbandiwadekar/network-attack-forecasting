@@ -10,3 +10,10 @@ __pycache__/
 venv/
 *.egg-info/
 .ipynb_checkpoints/
+
+# Run logs from pipeline/training/benchmark scripts (regenerated on every run)
+*.log
+# Temp configs written by pipeline/build_ctu13_dataset.py
+configs/_*.yaml
+# Third-party publication used as source material for models/compliance.py — not ours to redistribute
+certin_directions.txt
