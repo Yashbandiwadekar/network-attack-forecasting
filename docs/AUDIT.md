@@ -1,6 +1,6 @@
 # Project Audit: AI-Based Network Attack Forecasting (SIH PS 26153)
 
-**Audit date:** 2026-09-19
+**Audit date:** 2026-09-19 (revised 2026-09-20 for the problem statement's added "Dataset Link" section)
 **Audited state:** commit `de75a3b` (branch head), real-data checkpoint `checkpoints_real/world_model_best.pt` (41 features), processed data `data/processed_real/` (rebuilt 2026-09-19).
 **Scope:** code, trained models, evaluation reports, documentation, and the problem statement itself.
 **Method:** read-only. The test suite was run, and every number marked "measured" was recomputed with a separate script against the checkpoint and splits on disk, without re-running `eval/benchmark.py` (which would overwrite the reports being audited).
@@ -43,6 +43,8 @@
 | S10 | Jointly-trained GNN model is built but unused by the app, and shows no benefit | Low | Scope | Open |
 | S11 | README checklist is stale; repo root is cluttered with untracked logs and scripts | Low | Docs | Open |
 | S12 | Demo video and 5-slide deck are not in the repo | Low | Deliverables | Open |
+| D1 | The PS's "Dataset Link" section permits 6 datasets; the project uses 2, and uses no authentication-log telemetry (LANL) at all. Unused datasets are the cheapest route out of E1. | Medium | Data scope | Open |
+| D2 | The PS names CAPEC alongside ATT&CK and CVE/NVD. The project maps to ATT&CK stages and enriches with CVE/NVD, but has no CAPEC linkage. | Low | PS compliance | Open |
 
 ---
 
@@ -216,6 +218,9 @@ Every table comes from one training run with one seed. There are no bootstrap co
 | README with setup | ✅ Met | Stale in places (S11, E11) |
 | Architecture doc ≤2 pages | ⚠️ Check | ~1,045 words |
 | Demo video ≤2 min, deck ≤5 slides | ❌ Not in repo | S12 |
+| Datasets from the permitted list (CIC-IDS2017/2018, UNSW-NB15, CTU-13, CICIoT2023, LANL auth, DARPA) | ⚠️ Partial | CIC-IDS-2018 (trained) + CTU-13 (cross-dataset eval). UNSW-NB15, CICIoT2023, LANL and DARPA unused — see D1 |
+| Public knowledge bases (MITRE ATT&CK, CAPEC, CVE/NVD) | ⚠️ Partial | ATT&CK stage mapping + offline CVE/NVD snapshot; no CAPEC (D2) |
+| Applicability to enterprise and Critical Information Infrastructure; NCIIPC contact given | ⚠️ Partial | CERT-In-style compliance report exists (`models/compliance.py`); no CII-specific validation, and the NCIIPC contact route was not used |
 
 ---
 
@@ -229,7 +234,8 @@ These aren't project defects. They are places where the PS is ambiguous or can't
 4. **"Unseen attack patterns" has no protocol.** Neither a held-out attack family nor a cross-dataset test is specified.
 5. **Flow + packet "required", but PCAP isn't practical.** CIC-IDS-2018 PCAP is about 37 GB per day. The PS demands both levels without acknowledging that the recommended CSVs are flow-only.
 6. **The "world model" definition is loose.** It requires P(S_t+1 | S_t) but doesn't say whether infiltration and stage must be predicted *from the imagined state*, or can come from separate heads. K (number of steps and their duration) is also left undefined.
-7. **Known label noise.** CIC-IDS-2018 has documented labelling error rates of about 6.7–7.5% (over 75% for some classes; Cantone et al. 2024). The PS treats its annotations as ground truth for "supervised dynamics learning".
+7. **The dataset list postdates the main text.** The "Dataset Link" section permits authentication logs (LANL) and IoT traffic (CICIoT2023), but Section 1 still mandates flow-level *and* packet-level features as described for NetFlow/PCAP — which an authentication log cannot supply. A team using LANL cannot satisfy Section 1 literally.
+8. **Known label noise.** CIC-IDS-2018 has documented labelling error rates of about 6.7–7.5% (over 75% for some classes; Cantone et al. 2024). The PS treats its annotations as ground truth for "supervised dynamics learning".
 
 ---
 
@@ -237,7 +243,7 @@ These aren't project defects. They are places where the PS is ambiguous or can't
 
 Ranked by how much each changes what a judge concludes. None of this has been implemented.
 
-1. **Re-split by day / attack family and add a leave-one-family-out evaluation** (E1, S8). This is the only way to make any generalisation claim, and it will likely lower headline numbers. Do this before the numbers go in slides.
+1. **Re-split by day / attack family and add a leave-one-family-out evaluation** (E1, S8). This is the only way to make any generalisation claim, and it will likely lower headline numbers. Do this before the numbers go in slides. The PS's dataset list makes a second route available: a zero-shot evaluation on **UNSW-NB15 or CICIoT2023** would reuse the existing `run_cross_dataset` path (D1) and give unseen-attack evidence that doesn't depend on re-splitting CIC-IDS-2018 at all.
 2. **Rework the lead-time section** (E2, E3). Measure wall-clock warning time per host over consecutive forecasts, report the false-alarm rate and alarm precision, count distinct episodes rather than re-onsets, and break results down by stage.
 3. **Fix the operating-point reporting** (E5). Use 0.1% and 1% FPR budgets, show the achieved FPR, and add AUPRC.
 4. **Relabel persistence and Markov as label oracles** (E6), and add a deployable persistence-on-predicted-label baseline.
