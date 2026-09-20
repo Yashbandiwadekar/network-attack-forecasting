@@ -124,3 +124,8 @@ The solution may include:
 
 • Technical Presentation (Max 5 Slides) .
 
+###### **Dataset Link**
+
+• Check nciipc.gov.in; helpdesk1@nciipc.gov.in
+
+• Use publicly available datasets such as CIC-IDS2017/2018, UNSW-NB15, CTU-13, CICIoT2023, LANL Authentication Dataset, DARPA Intrusion Detection datasets, together with public knowledge bases such as MITRE ATT&CK, CAPEC, CVE/NVD and other open cybersecurity resources.
