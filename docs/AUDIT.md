@@ -43,6 +43,7 @@
 | S10 | Jointly-trained GNN model is built but unused by the app, and shows no benefit | Low | Scope | Open |
 | S11 | README checklist is stale; repo root is cluttered with untracked logs and scripts | Low | Docs | Open |
 | S12 | Demo video and 5-slide deck are not in the repo | Low | Deliverables | Open |
+| S13 | Both robustness scripts (`check_robustness.py`, `check_adversarial_robustness.py`) raise `KeyError` on the 41-feature schema — they never build the `graph_embed_*` columns. Neither has run since the GNN work landed. | **High** | Scripts | Open |
 | D1 | The PS's "Dataset Link" section permits 6 datasets; the project uses 2, and uses no authentication-log telemetry (LANL) at all. Unused datasets are the cheapest route out of E1. | Medium | Data scope | Open |
 | D2 | The PS names CAPEC alongside ATT&CK and CVE/NVD. The project maps to ATT&CK stages and enriches with CVE/NVD, but has no CAPEC linkage. | Low | PS compliance | Open |
 
@@ -189,6 +190,8 @@ Every table comes from one training run with one seed. There are no bootstrap co
 - **S6 (High):** real data has zero Reconnaissance and zero Exfiltration labels (the latter exists only in the synthetic generator), and the model never predicts either on real data. Only 3 of the PS's 5 stages are exercised.
 - **S7 (High):** DoS/DDoS windows (label `impact`, excluded from stage training) come out as command_and_control 570 / 684 times. The dashboard shows floods as C2.
 - **S8 (High):** no leave-one-attack-family-out evaluation. See E1.
+- **S13 (High, found 2026-09-20):** `scripts/check_robustness.py:80-82` and `scripts/check_adversarial_robustness.py:147-149` call `build_flow_windows` + `merge_graph_features` + `merge_packet_features`, but never `merge_graph_embedding_features`. Since the GNN Phase-3 commit (`ed065b6`, 2026-09-17) added 8 `graph_embed_*` columns, both scripts fail with `KeyError: ['graph_embed_0', ...] not in index` against `configs/real_data.yaml`. Reproduced 2026-09-20. Consequences: (a) the robustness fix that motivated `scripts/augment_benign_high_volume.py` is no longer verified against the shipped checkpoint; (b) the adversarial-evasion finding (99.98% → 0.00%) was measured on the 33-feature model and has not been re-measured on the 41-feature one, so quoting it as a current result is unsupported. The app's `_process_uploads` does call `merge_graph_embedding_features`, which is why the demo still works — the drift is script-only.
+
 - **S9 (Low):** `_load_backend` scales the full train split (~877k × 12 × 41 floats) only to draw 20 SHAP background rows.
 - **S10 (Low):** the joint GNN (`models/world_model_joint.py`) is trained but not exposed in the app, and its ablation showed no benefit. Either present it as a documented negative result or leave it out of the pitch.
 - **S11 (Low):** the README checklist still shows "[ ] Trained on full CIC-IDS-2018" and doesn't mention the GNN, CVE, compliance, ledger or lead-time work. The repo root has untracked `*.log` files, `certin_directions.txt`, `configs/_ctu13_build_tmp.yaml`, and loose `inspect_*.py` / `fix_sequence_chronology.py` / `check_chronology.py`.
