@@ -179,8 +179,13 @@ lower-data attack families. This should go in the final report plainly, not soft
 
 ## CIC->UNSW-NB15 cross-dataset, re-run on v2 checkpoint (2026-09-23)
 
-`docs/04-evaluation-unsw_cross_from_real_data_v2.md`. Same direction as the LOFO result, and
-worse than the v1 checkpoint's cross-dataset number: **AUROC 0.443 -- below chance.** Alarm
+**SUPERSEDED by W5 below (G4): this section's AUROC 0.443 used a broken adapter (constant-zero TCP
+flags, un-converted IAT units) and must not be quoted. The re-measured, adapter-fixed number is
+AUROC 0.4239 -- see the W5 row in the work-order table below.** Original text, kept for history:
+
+`docs/04-evaluation-unsw_cross_from_real_data_v2.md` (since overwritten by the W5 rebuild). Same
+direction as the LOFO result, and worse than the v1 checkpoint's cross-dataset number: **AUROC
+0.443 -- below chance.** Alarm
 precision on the lead-time metric is 0.1% (11,390 false alarms against essentially no true early
 warnings). Native UNSW-NB15 baselines score AUROC 0.99+ on their own data, so this isn't
 "UNSW-NB15 is unlearnable" -- it's specifically that the CIC-trained model's zero-shot transfer is
@@ -510,3 +515,61 @@ exactly:
 
 Acceptance: both documents now state the corrected figures; `pytest tests -q` -> 222 passed
 (no code touched, so unchanged from before this item).
+
+## W5 -- UNSW-NB15 adapter fix (G4) -- FIXED
+
+`pipeline/adapters/unsw_nb15.py::_normalize_columns` changed:
+1. `iat_mean` now converts `(Sintpkt+Dintpkt)/2` from **milliseconds to microseconds** (`*1000`) to
+   match CIC's `Flow IAT Mean` units -- previously never converted at all (the core G4 bug).
+2. The six TCP flag ratios are no longer constant zero. Derived honestly, TCP flows only, one
+   flag-equivalent per flow (not invented per-packet counts): `syn_cnt`/`ack_cnt` from the
+   `synack`/`ackdat` handshake-completion timers being > 0 (a completed handshake structurally
+   implies exactly one SYN and one final ACK); `fin_cnt`/`rst_cnt` from `state` == `FIN`/`RST`.
+   `psh_cnt`/`urg_cnt` stay at zero -- UNSW-NB15 has no push/urgent signal anywhere in its schema,
+   and inventing one would violate the "never invent labels/data" rule.
+3. Rebuilt the UNSW-NB15 dataset into a **new** location, `data/processed_unsw_v2/` (via new
+   `configs/unsw_nb15_v2.yaml`), never touching `data/processed_unsw/` or any protected artefact:
+   108,372 sequences, same split sizes as before (75,845/16,238/16,289) since only feature values
+   changed, not windowing.
+4. Re-ran `eval.benchmark --train-config configs/real_data_v2.yaml --test-config
+   configs/unsw_nb15_v2.yaml --output docs/04-evaluation-unsw_cross_from_real_data_v2.md` (this path
+   already carries a `_v2` suffix, so overwriting the earlier broken-adapter version there is
+   within the protection rule, not an exception to it). The new report lists every zero-filled or
+   derived feature with its caveat, per the work-order's item 4.
+
+**Feature-mean comparison (BUILD_REPORT acceptance table, train-split means, before vs. after):**
+
+| Feature | UNSW before (broken) | UNSW after (fixed) | CIC (`real_data_v2` train, reference) |
+|---|---:|---:|---:|
+| `syn_ratio` | 0.0000 | 0.0134 | 0.0368 |
+| `ack_ratio` | 0.0000 | 0.0134 | 0.2166 |
+| `fin_ratio` | 0.0000 | 0.0137 | 0.0054 |
+| `rst_ratio` | 0.0000 | 0.0000 | 0.0123 |
+| `psh_ratio` | 0.0000 | 0.0000 | 0.0387 |
+| `urg_ratio` | 0.0000 | 0.0000 | 0.0471 |
+| `mean_iat` | 34.00 | 34,004.85 | 4,180,031.25 |
+| `var_iat` | 0.0000 | 0.0000 | 29,328,377,118,720.00 |
+| `max_iat` | 0.0000 | 0.0000 | 12,543,920.00 |
+
+`rst_ratio`/`psh_ratio`/`urg_ratio` are honestly still zero (no derivable UNSW signal for them);
+`syn_ratio`/`ack_ratio`/`fin_ratio` are no longer constant zero, though they measure something
+structurally different from CIC's per-packet counts (documented in the report). `mean_iat` closed
+~1000x of the gap (the ms->us fix); a further ~123x residual gap vs. CIC's own mean is a genuine
+distributional difference (UNSW-NB15 flows are shorter/burstier on average), not a further bug.
+
+**Re-measured AUROC: 0.4239** (was 0.443 under the broken adapter -- essentially unchanged, both
+below-chance). **This is a real, negative result, reported honestly**: fixing the adapter did not
+make the CIC-trained model transfer to UNSW-NB15; it only removed the confound of testing it on
+obviously-wrong feature values. Native UNSW-NB15 baselines still score AUROC 0.99+ on their own
+data (LR-stacked 0.9993, Markov/Persistence ORACLE 0.9969), so this remains independent
+confirmation of E1/S8/LOFO's finding, not new evidence against it. Full table in
+`docs/04-evaluation-unsw_cross_from_real_data_v2.md`.
+
+Per the work order's binding constraint, **the old AUROC 0.443 must not be quoted as current
+anywhere** -- `docs/AUDIT.md` Part A's D1 row and this file's earlier "CIC->UNSW-NB15 cross-dataset"
+section are both now marked superseded, pointing to this section's 0.4239. (`docs/AUDIT.md` Part G's
+own text was left untouched, per the work order's instruction to only edit Part A / W6 there.)
+
+New tests: `tests/test_unsw_adapter.py` adds 5 cases (flags derived from handshake timers and
+`state`, no-handshake -> no flags, RST state, flags never set for non-TCP rows, ms->us conversion) --
+14 total in that file, 227 passing overall.
