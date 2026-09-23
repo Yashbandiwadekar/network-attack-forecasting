@@ -54,7 +54,9 @@ class FeatureScaler:
 
 
 def load_split(processed_dir: Path, split: str) -> dict[str, np.ndarray]:
-    d = np.load(processed_dir / f"{split}.npz", allow_pickle=True)
+    # allow_pickle=False: every array in these splits is a plain numeric / datetime / unicode dtype
+    # (verified against all processed_* dirs), so nothing here needs to execute pickled code.
+    d = np.load(processed_dir / f"{split}.npz", allow_pickle=False)
     return {k: d[k] for k in d.files}
 
 
