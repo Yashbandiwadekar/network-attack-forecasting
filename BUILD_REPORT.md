@@ -6,15 +6,27 @@ branch for review, not merged; none of the project's original checkpoints, proce
 `docs/04-*` reports (other than newly-added `*_v2`/`*_REGEN`/`*_unsw` files) have been touched or
 overwritten.
 
-## Findings status
+## Findings status (rebuilt for W10 from the sections below; keyed to audit ID and work-order item)
 
-| ID | Status | Files changed | Note |
+| Audit ID | W-item | Status | Where documented |
 |---|---|---|---|
-| S13 | FIXED | `scripts/check_robustness.py`, `scripts/check_adversarial_robustness.py` | Added the missing `graph_embed_*` merge. Both scripts ran on `configs/real_data.yaml`. |
-| E1 | IN PROGRESS | `pipeline/build_dataset.py`, `configs/real_data_v2.yaml` | Day-disjoint split built into `data/processed_real_v2/`. Model NOT yet retrained or re-evaluated on it. |
-| E8 | IN PROGRESS | `pipeline/build_dataset.py` | Split drops sequences whose window span crosses a day boundary. Reported 0 dropped in the v2 build. Not independently verified. |
-| S8 | IN PROGRESS | `eval/lofo.py` | Runner written. Only a 1-epoch smoke run on one fold (command_and_control) has been done, so no LOFO result exists yet. |
-| Everything else (E2-E7, E9-E11, S4-S7, S9-S12, D1, D2) | NOT STARTED | | E7 stays open by your decision. D1 waits on the dataset download. |
+| S13 | - | FIXED | Robustness scripts on 41-feature schema (see W8/W11 runs) |
+| E1 | W7 | PARTIALLY FIXED | Day-disjoint split built and model retrained (`checkpoints_real_v2_converged`); F1 0.370 / AUROC 0.706 vs v1 0.917; val curve not stable, no multi-seed CIs |
+| E8 | - | PARTIALLY FIXED | Day-boundary embargo in `day_disjoint_split`; 0 dropped, which is vacuous with one pseudo-host per day |
+| S8 | - | FIXED (negative result) | LOFO results section: AUROC 0.432-0.872, no unseen-family generalisation except DDoS |
+| E2 | W6 | PARTIALLY FIXED | 628 windows / 181 episodes / 3 pseudo-hosts / 96% one day (re-measured) |
+| E3, E4, E5, E6 | W9 (E5/lead-time) | FIXED | Honest-metrics section; W9 adds achieved FPR to lead-time section |
+| E7 | - | OPEN by owner decision | |
+| E9 | W1 | FIXED | CTU-13 report regenerated and swapped in; retraction in README |
+| E10, E11 | - | NOT DONE | No seeds/CIs; README still partly stale |
+| S4, S5 | W2, W3 | FIXED | PCAP-only path, real-model uploads, IAT unit fix, flow-only packet zero-fill |
+| S6, S7 | W8 | FIXED | Heuristic stage override, now gated on infiltration probability |
+| G4 (UNSW adapter) | W5 | FIXED | AUROC 0.4239 re-measured, negative |
+| G12 (deserialisation) | W4 | FIXED | `weights_only=True`; two allow_pickle loads remain, disclosed |
+| G10 | W12 | FIXED | Batched benchmark inference |
+| Adversarial evasion | W11 | PARTIALLY FIXED | Threat model + OR-gate done; scale-invariance run: see W11 part 3 section |
+| D1 | W5 | PARTIALLY FIXED | UNSW-NB15 added; no LANL/auth telemetry |
+| S9-S12, D2 | - | NOT STARTED | |
 
 ## Measured today
 
