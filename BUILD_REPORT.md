@@ -85,9 +85,11 @@ set, 8,731 sequences -> `docs/04-evaluation-real-v2.md`:
 
 - Next-step F1 @ 0.5 threshold: World Model 0.431 vs label-persistence ORACLE 0.878 (gap widens
   sharply vs the old leaky split's 0.917 vs 0.988).
-- Lead time: 628 real transitions (vs 32 on the old split), **93.5% missed**, only 3.7% detected
-  early. This is the honest number the old "0 missed, 46.9% early" result (measured on 32
-  near-duplicate re-onsets) was overstating.
+- Lead time: 628 transition windows across 181 episodes on 3 day-level pseudo-hosts, 96% from
+  2018-02-23 (vs 32 windows / ~2 episodes / 2 hosts on the old split; re-measured independently
+  under W6 below, not "many hosts/days" as an earlier draft of this section said), **93.5% missed**,
+  only 3.7% detected early. This is the honest number the old "0 missed, 46.9% early" result
+  (measured on 32 near-duplicate re-onsets) was overstating.
 - This confirms E1's core finding: the old headline numbers came from train/test session overlap,
   not real generalisation.
 
@@ -474,3 +476,37 @@ new (batched bs=16)  {'f1': 0.43050430504305043, 'precision': 0.54858934169279, 
 ```
 Also confirmed the benchmark run's `build_datasets` call did not perturb the protected synthetic
 scaler: `git status --short data` shows no change to `data/processed/cicids2018/splits/scaler.npz`.
+
+## W6 -- correct two overstated claims in the audit's own status table (G2, G6) -- FIXED
+
+No code change, per the acceptance criteria. Both numbers re-measured independently from
+`data/processed_real_v2/*.npz` (not copied from the auditor's own G2/G6 write-up), matching it
+exactly:
+
+1. **G2** (`docs/AUDIT.md` Part A, E2 row): reworded from "628 real transitions across many
+   hosts/days" to "628 transition windows across 181 episodes on 3 day-level pseudo-hosts, 96% from
+   2018-02-23", with the comparison to the original 32 stated as windows/episodes/hosts, not just a
+   count. Same reword applied to `BUILD_REPORT.md`'s "Measured today" section. Re-measurement
+   (`current_infiltration==0` sequences whose K-step trajectory contains an attack step, per
+   `eval/metrics.py::lead_time_metrics`'s own definition of a transition):
+   ```
+   n_transitions: 628
+   distinct hosts: 3 {NETWORK-2018-02-23, NETWORK-2018-02-16, NETWORK-2018-03-01}
+   day concentration: 2018-02-23: 604 (96.2%), 2018-02-16: 12 (1.9%), 2018-03-01: 12 (1.9%)
+   onset stage counts: initial_access 604, lateral_movement 12, impact(masked -1) 12
+   episodes (consecutive-index runs collapsed): 181
+   ```
+   (Only Part A of `docs/AUDIT.md` was touched, per the work order; Part G's own G2 text was left alone.)
+
+2. **G6** (`docs/04-evaluation-real-v2.md`): added a disclosure header stating the fabricated-traffic
+   fraction. Re-measured directly from the split files (day = `window_end_time` truncated to date):
+   ```
+   val:  total 9110, april(fabricated) 2425  -> 26.6%   (2018-02-15: 3412, 2018-02-22: 3273, 2018-04-01: 2425)
+   test: total 8731, april(fabricated) 1540  -> 17.6%   (2018-03-01: 3390, 2018-02-23: 3318, 2018-04-02: 1540, 2018-02-16: 483)
+   ```
+   Matches the audit's 26.6%/17.6% exactly. Note: this report will be regenerated in W7 (retrain) --
+   the disclosure needs to be re-added there (or moved into the report generator) if W7 rewrites the
+   whole file; flagged in the W7 section below.
+
+Acceptance: both documents now state the corrected figures; `pytest tests -q` -> 222 passed
+(no code touched, so unchanged from before this item).

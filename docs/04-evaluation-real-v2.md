@@ -1,5 +1,14 @@
 # Evaluation: World Model vs Baselines
 
+**Disclosure (audit G6/W6, added 2026-09-23, re-measured independently, not copied from the
+audit):** this is not a pure CIC-IDS-2018 evaluation. **26.6% of the val split (2,425 / 9,110
+sequences) and 17.6% of the test split (1,540 / 8,731 sequences) are fabricated benign traffic**
+from `scripts/augment_benign_high_volume.py`, dated `2018-04-01` (val) and `2018-04-02` (test) —
+CIC-IDS-2018 has no April data; these two days do not exist in the real dataset. Per-split day
+breakdown: val = `2018-02-15` (3,412), `2018-02-22` (3,273), `2018-04-01` (2,425, fabricated);
+test = `2018-03-01` (3,390), `2018-02-23` (3,318), `2018-04-02` (1,540, fabricated),
+`2018-02-16` (483). See W7 for whether/how this is addressed in the retrain.
+
 Test set: 8731 sequences. All models below predict the immediate next window (t+1) from
 identical targets; the world model additionally supports K-step autoregressive rollout (see
 models/forecast.py), which none of the baselines have an equivalent of — demonstrated in the
