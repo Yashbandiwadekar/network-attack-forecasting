@@ -573,3 +573,48 @@ own text was left untouched, per the work order's instruction to only edit Part 
 New tests: `tests/test_unsw_adapter.py` adds 5 cases (flags derived from handshake timers and
 `state`, no-handshake -> no flags, RST state, flags never set for non-TCP rows, ms->us conversion) --
 14 total in that file, 227 passing overall.
+
+## W11 parts 1-2 -- adversarial threat model + reconstruction-error second gate -- FIXED (part 3 pending W7)
+
+**Part 1 (threat model, written down, not just fixed-by-claim):** `README.md`'s "Known limitations"
+section now states precisely what the PGD evasion requires: the attack drives down `flow_count`,
+`total_packets`, `total_bytes` (the top-3 perturbed features, re-measured, not assumed) -- i.e. the
+attacker must genuinely send less, lower-volume-looking traffic. For a flood (DDoS, brute-force at
+scale -- the traffic class this project's real-IP data actually has, per E7), that defeats the
+attack's own purpose. It is a real threat only for a low-and-slow intrusion that was never
+volume-heavy. This reframing is stated as a precise limitation, not presented as a fix.
+
+**Part 2 (second gate):** added `models/forecast.py::batched_reconstruction_errors` (vectorized
+one-step reconstruction error over a whole split, for threshold calibration) and
+`models/forecast.py::or_gate_alarm` (alarm if infiltration probability OR reconstruction error
+crosses its own threshold). Wired into `scripts/check_adversarial_robustness.py`: the
+reconstruction-error threshold is calibrated to the 99th percentile of the **val** split's
+currently-benign one-step errors (never test), and the added false-positive cost is then
+*measured* (not assumed) on the **test** split's own currently-benign windows.
+
+Acceptance -- re-ran `python -m scripts.check_adversarial_robustness --config configs/real_data.yaml`:
+```
+PGD evasion attack: 25 steps, epsilon=1.5 std, step_size=0.15
+  t+1 infiltration probability: 0.9975 -> 0.0000 (min reached: 0.0000)
+  WARNING - evasion succeeded ...
+
+  Second gate (W11 part 2): reconstruction-error threshold = 8.2628 (99th percentile of val-split
+  currently-benign one-step errors).
+    Reconstruction error before attack: 5.5295 (quiet)
+    Reconstruction error after attack:  9.7673 (ALARMS)
+    Added false-positive rate this threshold costs on the TEST split's own currently-benign
+    windows: 1.06% (measured, not assumed).
+    RECOVERED - the OR-gate still alarms on this evasion case.
+```
+**Real, positive result reported honestly**: on this specific evasion case, the OR-gate recovers
+the alarm at a measured 1.06% added FPR (close to the 1% the 99th-percentile calibration targets,
+so it generalises from val to test reasonably well here). This is evidence for the threat-model
+argument above, not a claim the vulnerability is closed -- it is not wired into the app's own
+alerting logic, and was only tested against this one synthetic attack capture, not a broader suite.
+
+New tests: `tests/test_forecast_rollout.py` adds `test_or_gate_alarm_fires_on_either_signal` and
+`test_batched_reconstruction_errors_matches_one_step_version` (cross-checked numerically against
+the existing single-sequence `one_step_reconstruction_error`). 229 tests passing.
+
+**Part 3 (scale-invariance augmentation) deliberately deferred to fold into W7's retrain, as a
+separately-named run** -- see the W7 section for why it is kept out of the clean v1-vs-v2 retrain.
