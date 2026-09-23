@@ -618,3 +618,26 @@ the existing single-sequence `one_step_reconstruction_error`). 229 tests passing
 
 **Part 3 (scale-invariance augmentation) deliberately deferred to fold into W7's retrain, as a
 separately-named run** -- see the W7 section for why it is kept out of the clean v1-vs-v2 retrain.
+
+## W9 -- report achieved FPR in the lead-time section (G8) -- FIXED
+
+`eval/benchmark.py::_format_lead_time_section` now takes `achieved_test_fpr` (the World Model's
+own row from the already-computed 5%-FPR-budget `binary_metrics` table -- no new computation) and
+adds a row plus a plain-language note when it diverges sharply (>2x the budget) from the budget it
+was tuned for. Wired into both `run()` and `run_cross_dataset()`.
+
+Acceptance -- regenerated `docs/04-evaluation-real-v2.md` (re-running `eval.benchmark` against the
+existing, still-undertrained `checkpoints_real_v2` checkpoint -- this file is regenerated again,
+converged, under W7 below):
+```
+| Achieved FPR on this test split, at the val-tuned 5%-budget threshold | 35.9% |
+...
+Audit G8/W9: the threshold above is tuned on the val split for a 5% FPR budget, then applied here
+to the test split unchanged, exactly as a deployment would carry it forward. Here it came out
+35.9% -- 7.2x the 5% budget it was tuned for. The operating threshold does not transfer across
+days; this is a result worth stating plainly, not a footnote -- a defender who tunes on one day's
+traffic and deploys the next day should expect the false-positive rate to move substantially, not
+stay near the budget they picked.
+```
+35.9% matches the audit's own cited figure exactly (re-measured independently, not copied).
+`pytest tests -q` -> 229 passed.
