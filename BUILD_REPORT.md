@@ -392,3 +392,22 @@ Acceptance evidence:
   (194,632 sequences): outputs from `weights_only=False` (old path) and `weights_only=True` (new
   path) are bit-identical (`torch.equal`), and infiltration F1@0.5 matches exactly: **0.917142**
   both ways.
+
+## W8 -- gate stage override on infiltration probability (G7) -- FIXED
+
+`models/forecast.py::_heuristic_stage_override` now takes `infiltration_prob` and returns
+immediately (no override, `stage_is_heuristic=False`) unless it has crossed `windowing.alert_threshold`
+(default 0.3 -- the same value `scripts/check_robustness.py` already uses as its own pass/fail
+line). Both `rollout` (passes the just-computed `inf_prob`) and `rollout_batch` (passes each row's
+freshly computed probability) now thread this through, so a stage label can no longer disagree with
+a PASS-ing (benign) probability next to it.
+
+Acceptance (`python -m scripts.check_robustness --config configs/real_data.yaml`):
+```
+OOD-benign capture (large legitimate transfer, 10.0.0.201 -> 203.0.113.200):
+  infiltration probability per step: [0.0369, 0.0342, 0.0316, 0.0278, 0.0251, 0.022]
+  peak: 0.0369 at step 0 (predicted stage: benign)
+  PASS - peak stays below 0.3 despite unusual volume
+```
+Before the fix this same capture was labelled `stage: impact` at step 0 despite PASSing (per the
+audit's finding); it is now `benign`. `pytest tests` still 211 passed.
