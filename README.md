@@ -105,9 +105,11 @@ sequence) score higher still at t+1 — they read the current window's ground-tr
 deployed system never has. See `docs/04-evaluation-real.md` for that discussion and
 `docs/AUDIT.md` for why the single-step comparison flatters them.
 
-Zero-shot on CTU-13 (trained on CIC-IDS-2018, never fine-tuned): F1 0.534 at a calibrated
-operating point, versus 0.045 for CTU-13-native LR. Binary "is this suspicious" transfers across
-datasets; the specific MITRE stage label does not (macro-F1 0.328).
+Zero-shot on CTU-13 (trained on CIC-IDS-2018, never fine-tuned): **the model does not transfer.**
+Recomputed against the shipped checkpoint and the current CTU-13 build: F1 0.009 at the 5% FPR
+budget, AUROC 0.517 (chance level), stage macro-F1 0.328 (attack-class F1 0.000). An earlier
+version of this README quoted F1 0.534; that number came from a 33-feature checkpoint and dataset
+build that no longer exist and is withdrawn (see `docs/AUDIT.md` G1).
 
 ## Known limitations
 
