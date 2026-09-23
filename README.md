@@ -126,9 +126,35 @@ These are documented rather than hidden. `docs/AUDIT.md` is the full list with m
   downloaded (37 GB/day), so the real-data model is trained with them zero-filled.
 - **Demo input.** The upload path accepts a flow CSV (labelled or unlabelled); a PCAP can supplement
   it but cannot yet be used on its own.
-- **Adversarial evasion works.** A PGD-style attack suppressing `flow_count`/`total_packets` drove
-  the infiltration probability from 99.98% to 0.00% when last run against the 33-feature model
-  (`scripts/check_adversarial_robustness.py`).
+- **Adversarial evasion works, but only under a specific threat model (audit W11, re-measured
+  2026-09-23 on the current 41-feature checkpoint).** A white-box PGD attack that perturbs only
+  the most recent window's raw features drives the t+1 infiltration probability from 0.9975 to
+  0.0000 within an epsilon=1.5-std budget (`scripts/check_adversarial_robustness.py`). **What this
+  attack actually requires, stated precisely rather than left implicit:** the top perturbed
+  features are `flow_count`, `total_packets`, `total_bytes` (all pushed sharply down) and
+  `has_ip_data`/`mean_duration` (pushed up) — the model has learned "volume = attack", and evading
+  it means the attacker must genuinely send less traffic that looks less voluminous. For a flood
+  (DDoS, brute-force at scale), that defeats the attack's own purpose — an attacker who
+  successfully evades this way has, by construction, stopped flooding. **It is a real threat only
+  for a low-and-slow intrusion** that was never volume-heavy to begin with, where suppressing
+  volume features costs the attacker little. Claiming this is "unfixed" without that qualification
+  overstates the risk for the traffic class (DDoS/brute-force) this project's real-IP data
+  actually covers (E7), and understates it for the low-and-slow case it doesn't have real examples
+  of.
+  - **A second, independent gate helps.** `models/forecast.py::one_step_reconstruction_error`
+    (does the observed window match what the model's own dynamics predicted from the L windows
+    before it, independent of the trained probability head?) is now combined with the probability
+    threshold via `models/forecast.py::or_gate_alarm` inside
+    `scripts/check_adversarial_robustness.py`: alarm if infiltration probability **or**
+    reconstruction error crosses its own threshold (the latter calibrated to the 99th percentile
+    of the val split's own currently-benign one-step errors). On this specific evasion case the
+    OR-gate **recovers the alarm** (reconstruction error 5.53 -> 9.77 against an 8.26 threshold,
+    while probability drops to 0.0000) at a measured added false-positive cost of **1.06%** on the
+    test split's own currently-benign windows — close to the 1% the calibration targets, so it
+    generalises from val to test reasonably well here. This is not deployed as the app's alerting
+    logic (that would need its own tuning and a wider evaluation than one synthetic attack
+    capture); it is reported here as evidence for the threat model above, not as a claim the
+    vulnerability is closed.
 - **Both robustness scripts are broken.** `scripts/check_robustness.py` and
   `scripts/check_adversarial_robustness.py` build their windows without the 8 `graph_embed_*`
   columns added in the GNN work, so they raise `KeyError` against the current 41-feature

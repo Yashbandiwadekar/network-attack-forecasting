@@ -328,6 +328,40 @@ def one_step_reconstruction_error(
     return float(np.linalg.norm(predicted_next.squeeze(0).cpu().numpy() - scaled_actual))
 
 
+def batched_reconstruction_errors(
+    model: WorldModel, X: torch.Tensor, next_state: torch.Tensor, device: torch.device | None = None,
+    batch_size: int = 4096,
+) -> np.ndarray:
+    """Audit W11 part 2: the vectorized counterpart to one_step_reconstruction_error, over an
+    already-scaled split (models.dataset.SequenceDataset's X/next_state) rather than one raw
+    sequence at a time -- used to calibrate an alarm threshold from a whole split's worth of
+    genuine (ground-truth) one-step transitions, e.g. the 99th percentile of a val split's
+    currently-benign windows."""
+    device = device or next(model.parameters()).device
+    errors = []
+    with torch.no_grad():
+        for start in range(0, len(X), batch_size):
+            xb = X[start:start + batch_size].to(device)
+            nb = next_state[start:start + batch_size].to(device)
+            pred, _, _ = model(xb)
+            errors.append(torch.linalg.norm(pred - nb, dim=-1).cpu().numpy())
+    return np.concatenate(errors) if errors else np.zeros(0)
+
+
+def or_gate_alarm(
+    infiltration_prob: float, reconstruction_error: float, prob_threshold: float, recon_threshold: float,
+) -> bool:
+    """Audit W11 part 2: a second, independent alarm condition alongside the infiltration
+    probability. The PGD evasion in scripts/check_adversarial_robustness.py works by pushing the
+    MOST RECENT window's raw feature values (e.g. flow_count, total_packets) into a
+    low-volume-looking shape, which fools the probability head -- but the resulting window is
+    itself an implausible one-step continuation of the L windows before it (an attack that was
+    mid-progression a moment ago does not really drop to near-zero volume), which
+    one_step_reconstruction_error can catch independently of the probability head. Alarms if
+    EITHER signal crosses its own threshold."""
+    return infiltration_prob >= prob_threshold or reconstruction_error >= recon_threshold
+
+
 def latest_sequence(windows_df, feature_cols: list[str], src_ip: str, sequence_length: int) -> np.ndarray | None:
     """Pull the most recent `sequence_length` windows for one source IP out of a windows
     DataFrame (as produced by pipeline/windowing.py), ready for ForecastEngine.rollout. Returns
