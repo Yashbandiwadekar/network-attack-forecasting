@@ -18,6 +18,9 @@
 
 ## Part A: Summary
 
+> Status values in this table were edited by the builder agent on 2026-09-23. **Part G** holds the
+> independent verification of those statuses and takes precedence where the two disagree.
+
 | # | Finding | Severity | Area | Status |
 |---|---|---|---|---|
 | E1 | Train/val/test are split per host in time order, so test attacks are the *same attack sessions* seen in training. The data cannot support any "unseen attacks" claim. | **Critical** | Evaluation | **IN PROGRESS** — day-disjoint split + v2 checkpoint built (`configs/real_data_v2.yaml`, `docs/04-evaluation-real-v2.md`); leave-one-family-out results now exist (see S8) and are negative except for DDoS. Not FIXED: this is honest new evidence *against* generalisation, not a resolution. See BUILD_REPORT.md. |
@@ -257,3 +260,312 @@ Ranked by how much each changes what a judge concludes. None of this has been im
 7. **Close the PS compliance gaps** S4, S5 and S7 (PCAP-only input, real-model uploads, separate Impact stage in the UI).
 8. **Add split embargo, seeds and bootstrap CIs** (E8, E10). Store the scaler in the checkpoint (E11).
 9. **Documentation cleanup** (E11, S11, S12).
+
+---
+
+## Part G: Branch review — `builder/audit-fixes-2026-09-23` (`db49ea0`)
+
+**Review date:** 2026-09-23. **Reviewed:** the builder's single commit on
+`builder/audit-fixes-2026-09-23`, its `BUILD_REPORT.md`, and the status edits it made to Part A
+above. **Method:** read-only. `pytest` was run (194 passed). Every number below was recomputed in
+a scratch directory against the artefacts on disk; `eval/benchmark.py`, `eval/lofo.py` and the
+`build_*` pipelines were NOT run, so no report, checkpoint or scaler was overwritten.
+
+Part A's status column was edited by the builder and is left as it stands. This part is the
+independent verification of those statuses; where the two disagree, this part is the audit's
+position.
+
+### G.0 What holds up
+
+| Builder claim | Verdict | Evidence |
+|---|---|---|
+| S13 fixed; both robustness scripts run on the 41-feature schema | **Verified** | Ran `scripts.check_robustness` against `configs/real_data.yaml`: completes, OOD-benign peak 0.0369, PASS. |
+| 194 tests pass | **Verified** | `pytest` → 194 passed. |
+| Protected artefacts untouched | **Verified** | mtimes unchanged: `checkpoints_real/world_model_best.pt` 09-17 17:44, `data/processed_real/scaler.npz` 09-19 15:39, `docs/04-evaluation-real.md` 09-19 15:40, original CTU-13 report 09-11 14:22. |
+| v2 next-step F1 @0.5 = 0.431 | **Verified** | Recomputed: 0.4305. |
+| E1's direction: the old headline numbers depended on session overlap | **Verified** | v2 (day-disjoint) test AUROC 0.7791 vs v1's 0.9995. Holds after removing every synthetic row (real-only AUROC 0.7784), so it is not an artefact of G6 below. |
+| E9 regeneration is correct and the branch did not change inference | **Verified** | Independent recompute of the CTU-13 world-model row on current data: F1@0.5 = 0.0065, matching the REGEN's 0.006, not the original's 0.001. The builder's "unexplained" flag is resolved — see G1. |
+| E3–E6 honest-metric changes implemented | **Verified (code + tests)** | `false_alarm_rate`/`alarm_precision`, `n_classes_present`/`support`, 1%/0.1% FPR tables, `[ORACLE ...]` labels and `PersistenceOnPredictedLabel` all present, with tests. |
+| Stage metrics are not contaminated by the new S6/S7 heuristic | **Verified** | `eval/benchmark.py::_world_model_predictions` uses the raw softmax; the override lives only in `ForecastEngine`. Reported stage-F1 is still the trained classifier's. |
+| S4/S5 verified live in the browser (upload widgets, "Scored by" caption) | **Not verified** | Not re-run here. The builder states it did not inject a file through the browser either, relying on a direct-call integration test. The code path is reviewed in G11 below. |
+| S6 recon heuristic usable on PCAP-only uploads | **Not verified** | Never fires on the bundled flow-only data; exercising it needs a port-scan PCAP, which the repo does not contain. |
+| LOFO AUROC values (0.612 / 0.432 / 0.531 / 0.872) | **Not re-run** | Taken from `docs/lofo_results_v2.json` as produced by the builder; re-running means retraining 4 folds. Fold sizes were checked — see the notes below. |
+| D1 UNSW-NB15 build (108,372 sequences, label mapping) | **Partially verified** | The processed split exists and loads with 41 features; the adapter's feature fidelity is the subject of G4. |
+
+Honest reporting in `BUILD_REPORT.md` is, on the whole, good: the negative LOFO and UNSW results
+are stated plainly rather than spun, the 1-epoch smoke result was withheld from quotation, and an
+earlier `threshold_at_fpr` claim was retracted. The findings below are about significance missed
+and numbers that don't survive recomputation, not about dishonesty.
+
+### G1 (Critical, NEW): the project's flagship cross-dataset number is stale and does not hold for the shipped checkpoint
+
+`docs/04-evaluation-ctu13_cross_from_real_data.md` has been the submission's headline evidence for
+zero-shot generalisation: **"F1 0.534 at a calibrated operating point vs 0.045 for CTU-13-native
+LR."** That number is quoted in `README.md`, in Part B/E9 of this audit, and in the project's
+working notes.
+
+Recomputed against the current checkpoint and the current CTU-13 data, following exactly the
+procedure the report describes (CIC scaler, threshold tuned on the CTU-13 val split at a 5% FPR
+budget):
+
+| Quantity | Original report | Recomputed (2026-09-23) | Builder's REGEN |
+|---|---|---|---|
+| F1 @ 0.5 | 0.001 | **0.0065** | 0.006 |
+| F1 @ 5% FPR budget | **0.534** | **0.0086** | 0.009 |
+| Test AUROC | not reported | **0.5172** | — |
+| Val AUROC | not reported | **0.4965** | — |
+
+AUROC 0.517 on test and 0.497 on val is **chance**. A recall of 0.651 at 2.8% FPR, as the original
+table claims, is arithmetically incompatible with a chance-level ranking — the original row cannot
+be reproduced from any current artefact.
+
+The cause is established by file dates, not inferred: the report is dated 2026-09-11, while the
+current checkpoint was trained 2026-09-17 and the CTU-13 data was rebuilt 2026-09-19 (adding the 8
+`graph_embed_*` columns). The report was therefore necessarily produced by a different, 33-feature
+checkpoint against a 33-feature CTU-13 build — a self-consistent pair that no longer exists on
+disk. Whether 0.534 was valid for that older pair cannot now be verified. Either way it does not
+describe anything the project currently ships, and it is **not quotable**.
+
+This is a correction to my own earlier work as well: E9 states "the world-model row is unaffected:
+it uses the CIC scaler." That was wrong. The scaler was not the only thing that went stale, and I
+did not recompute the row when I wrote it.
+
+**Consequence.** The evidence for generalisation is now clearly negative, but the strands are not
+equally clean. The **LOFO folds are the sound evidence** (AUROC 0.612 / 0.432 / 0.531, DDoS 0.872):
+they stay within CIC-IDS-2018 and use no adapter. The UNSW-NB15 transfer (AUROC 0.443) and the
+corrected CTU-13 result (AUROC 0.517) point the same way but are both confounded by the adapter
+zero-fills described in G4, so they should be cited as consistent with the LOFO finding, not as
+independent confirmations of it. **`README.md` currently quotes 0.534 as a headline result and must
+be corrected before this is shown to anyone.**
+
+### G2 (High, NEW): "628 real transitions across many hosts/days" is not what the data contains
+
+Part A's E2 row, as edited by the builder, says the day-disjoint split "produces 628 real
+transitions across many hosts/days". Recomputed on `data/processed_real_v2/test.npz`:
+
+| Property | Value |
+|---|---|
+| Transitions as the metric counts them | 628 |
+| Distinct hosts | **3** — all `NETWORK-` day aggregates, no real-IP hosts |
+| Concentration | **604 of 628 (96%) on a single day**, 2018-02-23; 12 each on 02-16 and 03-01 |
+| Distinct episodes (contiguous runs collapsed) | **181** |
+| Stage at onset | 604 initial_access, 12 lateral_movement, 12 impact |
+
+This is a genuine improvement over the original 32 (3 hosts not 2, 181 episodes not ~2, and PS
+stages rather than pure DDoS), so E2 is **partially** addressed. But the row's wording repeats the
+exact error E2 was raised about: counting re-onsets as independent events and describing 3
+pseudo-hosts as "many hosts". The "93.5% missed" figure is measured over those same re-onsets and
+is dominated by one day. Reword to "628 transition windows across 181 episodes on 3 day-level
+pseudo-hosts, 96% from 2018-02-23".
+
+### G3 (High, NEW): the v1 to v2 comparison changes three things at once
+
+`configs/real_data_v2.yaml` differs from `configs/real_data.yaml` in more than the split:
+
+| Setting | v1 | v2 |
+|---|---|---|
+| split | per-host chronological | day-disjoint |
+| `batch_size` | 64 | **512** |
+| `epochs` | 30 | **15** |
+
+The learning rate is unchanged at 3e-4 while the batch grew 8x, epochs were halved, and the
+builder's own note records that the best validation loss came at the **final** epoch with the loss
+oscillating 0.9–1.25 throughout — that model is not converged. Train is also 98% one DDoS day.
+
+So "F1 0.917 -> 0.431 confirms E1" cannot separate split leakage from undertraining and a changed
+training mix. The direction is independently supported (G.0, AUROC 0.9995 -> 0.778), but the
+*magnitude* is not attributable to leakage alone. To make this claim cleanly, retrain v2 at v1's
+batch size and epoch count, or train v1's split under v2's hyperparameters, and compare like with
+like. As E1 is my own finding, this is the place to be strictest.
+
+### G4 (High, NEW): the UNSW-NB15 adapter feeds the model 9 systematically wrong features
+
+`pipeline/adapters/unsw_nb15.py` zero-fills every TCP flag count (lines 73–75) because UNSW-NB15
+reports Argus state rather than flag tallies, and zero-fills `iat_std`/`iat_max`. Measured across
+the UNSW test split under the CIC scaler, against the CIC test split:
+
+| Feature | UNSW mean | CIC mean | Status in UNSW |
+|---|---|---|---|
+| syn_ratio, ack_ratio, fin_ratio, rst_ratio, psh_ratio, urg_ratio | 0 | 0.037, 0.224, 0.006, 0.012, 0.039, 0.047 | **constant zero** |
+| var_iat, max_iat | 0 | 3.2e13, 1.2e7 | **constant zero** |
+| mean_iat (median) | 11.7 | 34,760 | **~3,000x low** |
+
+The `mean_iat` gap is a unit bug: the adapter's own comment notes `Sintpkt`/`Dintpkt` are in
+**milliseconds**, but no conversion to the **microseconds** the CIC features use is applied.
+
+The six flag ratios are precisely the features the problem statement singles out ("TCP flag
+bitmask (SYN, ACK, FIN, RST, PSH, URG)", "the pattern in which SYN flags precede ACK floods"). A
+CIC-trained model that relied on them is handed constant zeros. **AUROC 0.443 is therefore not
+clean evidence about generalisation** — it confounds domain shift with adapter defects. Fix the
+millisecond-to-microsecond conversion, and either derive flag counts from UNSW's `state` field
+where possible or exclude the flag features from the transfer comparison and say so. The same
+zero-fill convention is inherited from the CTU-13 adapter, so G1's CTU-13 numbers carry a similar
+caveat.
+
+### G5 (High, NEW): the new PCAP-only path reports IAT in seconds where the model expects microseconds
+
+`pipeline/packet_features.py::build_flow_records` (new in this branch, the S4 feature) computes
+`iat_mean`/`iat_std`/`iat_max` via `.dt.total_seconds()` — seconds. The CSV path carries CIC's
+`Flow IAT Mean/Std/Max` straight through in **microseconds** (`clean_and_normalize` converts only
+`duration_us`). Demonstrated with a controlled 3-packet flow spaced exactly 1 second apart:
+
+```
+PCAP path                 : iat_mean = 1.0
+CSV/CIC path would report : iat_mean = 1000000
+```
+
+Every PCAP-only upload therefore presents `mean_iat`, `var_iat` and `max_iat` about **10^6 times
+too small** to a model trained on microseconds. The demo will run and produce confident-looking
+output on 3 of 41 features that are wrong by six orders of magnitude. `duration_s` is handled
+correctly; only the IAT family is affected. Multiply the three IAT fields by 1e6 in
+`build_flow_records`, and add a test asserting the CSV and PCAP paths agree on identical traffic —
+the existing `tests/test_packet_features.py` checks flow merging but never compares units against
+the CSV path, and `data/raw/pcap/synthetic_sample.pcap` cannot catch this because every flow in it
+is a single packet (0 multi-packet flows out of 944).
+
+### G6 (Medium, NEW): fabricated benign traffic is 27% of the v2 validation split
+
+The `2018-04-01` / `2018-04-02` "days" in the v2 split are not CIC-IDS-2018 captures. CIC-IDS-2018
+has no April data. They are `scripts/augment_benign_high_volume.py`'s synthetic hosts
+(`base_time = 2018-04-01`, hosts `10.90.0.x`), generated to teach the v1 model that high volume is
+not automatically an attack.
+
+| Split | Sequences | Synthetic share |
+|---|---|---|
+| train | 1,239,090 | **0%** |
+| val | 9,110 | **26.6%** (2,425) |
+| test | 8,731 | **17.6%** (1,540) |
+
+`docs/04-evaluation-real-v2.md` presents itself as a real-CIC-IDS-2018 evaluation while a sixth of
+its test set, and a quarter of the split its operating threshold is tuned on, are fabricated
+traffic. That must be disclosed in the report, and ideally the synthetic days should be spread
+across all three splits or dropped from v2 entirely and the numbers re-measured.
+
+**What this is not.** The day-disjoint split put all of the augmentation in val/test and none in
+train, so the obvious worry is that v2 never learned high-volume benign traffic and the v1
+robustness fix was undone. Tested, and it is not so: `scripts.check_robustness --config
+configs/real_data_v2.yaml` **passes** on v2, with the large legitimate transfer scoring 0.0000 at
+every step (v1 scores 0.0369). The distributional gap is real — v2 assigns synthetic benign
+windows a mean probability of 0.245 against 0.029 for real benign — but it does not translate into
+more false alarms: at the reported operating threshold v2 flags **27.5%** of synthetic benign
+windows versus **38.2%** of *real* benign ones, so the fabricated rows are the easier negatives,
+not the harder ones. The finding here is the disclosure gap, not a regression.
+
+### G7 (Medium, NEW): the stage override is not gated on infiltration probability
+
+`models/forecast.py::_heuristic_stage_override` promotes any window with volume z > 4 and low
+destination diversity to `impact`, regardless of what the model thinks the window is. Reproduced
+by the project's own robustness script, whose OOD case is explicitly a *legitimate* large transfer:
+
+```
+OOD-benign capture (large legitimate transfer, 10.0.0.201 -> 203.0.113.200):
+  peak: 0.0369 at step 0 (predicted stage: impact)
+  PASS - peak stays below 0.3 despite unusual volume
+```
+
+The same window is simultaneously "benign, 3.7% probability" and "stage: impact" (a DDoS in
+progress). A demo user backing up a database sees an Impact badge. Gate the override on the
+infiltration probability crossing an alert threshold, so stage annotations cannot contradict the
+score they sit beside. Note the override did *not* misfire on the v2 model's own synthetic benign
+windows (0 of 60), because v2's scaler std is inflated by its DDoS-heavy training day — the
+behaviour is scaler-dependent, which is itself a reason not to leave it ungated.
+
+Related: the training-time recon label requires a high port-scan score *preceding a real attack*,
+while the inference override drops that qualifier. On flow-only data neither fires, so nothing is
+currently wrong in production — but the two definitions should be stated as different.
+
+### G8 (Medium, NEW): the v2 operating threshold does not transfer across days
+
+The threshold tuned for a 5% false-positive budget on the v2 val split (0.0101) yields a
+false-positive rate of **35.9%** on the v2 test split ((424 + 2,180) / 7,249 benign windows).
+Fitting the threshold on real (non-synthetic) val rows only gives 0.016, and with it a test FPR of
+**33.8%** overall, or **35.6%** on real test rows alone — the instability is not an artefact of the
+synthetic rows. Every operating-point number in
+`docs/04-evaluation-real-v2.md` — including alarm precision 1.5% — rests on a threshold that is
+off by roughly 7x once the day changes. Report the achieved FPR next to every budgeted row (E5's
+fix does this for the budget tables; the lead-time section still needs it), and treat cross-day
+threshold instability as a finding in its own right: it is a deployment-relevant result, not a
+reporting nit.
+
+### G9 (Low, NEW): `BUILD_REPORT.md`'s own summary table contradicts the rest of the file
+
+The findings table near the top still reports E1/E8/S8 as "IN PROGRESS", the v2 model as "NOT yet
+retrained", and "E2–E7, E9–E11, S4–S7, S9–S12, D1, D2" as "NOT STARTED" — while later sections of
+the same file document E3–E6, S4–S7, S8, E9 and D1 as done with measured results. A reader who
+trusts the summary table gets the wrong picture in both directions. Regenerate the table from the
+sections below it.
+
+### G10 (Low, carried forward): unbatched inference in `eval/benchmark.py`
+
+The builder found and fixed an OOM caused by an unbatched forward pass in `eval/lofo.py`, and
+correctly reported that `eval/benchmark.py::_world_model_predictions` has the same pattern
+unfixed. Confirmed present. Harmless on today's test splits (<200k sequences), and it would fail
+the same way on a larger one. Left open, correctly scoped and disclosed.
+
+### G11 (High, NEW): a PCAP upload feeds the real model 9 features it was never trained on
+
+`app/streamlit_app.py::_process_uploads` computes packet-level features whenever a PCAP is
+supplied and merges them unconditionally:
+
+```python
+packet_windows = None
+if packet_df is not None:
+    packet_windows = compute_packet_window_features(packet_df, ...)
+windows = merge_packet_features(flow_windows, packet_windows, config)
+```
+
+There is no check on which model is selected. Before S5 this was harmless, because uploads only
+ever reached the synthetic-data model, which is trained *with* packet features. S5 deliberately
+removed that restriction, so a PCAP can now be scored by the real CIC-IDS-2018 checkpoint — which
+was trained flow-only (`data/processed_real/metadata.json`: `"flow_only": true`,
+`"packet_features_available": false`, and `mean_ttl`/`var_ttl`/`mean_window_size`/`frag_ratio`/
+`mean_payload_size`/`std_payload_size`/`port_scan_score`/`retransmit_ratio` all constant zero in
+its training data).
+
+A PCAP upload therefore hands that model non-zero values in all 8 packet features plus
+`has_packet_features = 1`, a combination it has never seen — 9 of 41 features out of distribution,
+compounding G5's 10^6 unit error on the 3 IAT features. This is on the demo path a judge is most
+likely to exercise. Either zero-fill packet features when the selected checkpoint was trained
+flow-only (detectable from its own metadata), or state in the UI that the real model ignores them.
+
+### G12 (Medium, NEW): checkpoints and baselines are loaded with arbitrary-code deserialization
+
+`models/forecast.py:123`, `models/lstm_model.py:57` and `models/train_joint.py:199` all call
+`torch.load(..., weights_only=False)`; `models/baseline_lr.py:88` calls `pickle.load` on a saved
+baseline. Both execute arbitrary code from the file being loaded. `models/dataset.py:57` uses
+`np.load(..., allow_pickle=True)` on the processed splits for the same reason.
+
+Practical risk today is low: every checkpoint and split is produced locally by this project and
+never downloaded. But the project's own engineering rules require "no unpickling untrusted files",
+this is a security product whose code will be read as one, and the fix is cheap — pass
+`weights_only=True` and store the config beside the tensors as JSON rather than pickling it into
+the checkpoint. Flagged because a reviewer grepping for unsafe deserialization will find it in
+under a minute, not because an exploit path exists in the current workflow.
+
+### Notes on items that are fine
+
+- **E8 (embargo).** "0 sequences dropped" is correct but vacuous: with one pseudo-host per calendar
+  day, a sequence cannot span two days, so the only hosts that could trip the embargo are the
+  real-IP ones (02-20 and the synthetic days). The protection comes from day-disjointness, not
+  from the embargo. Worth stating plainly rather than presenting the embargo as load-bearing.
+- **LOFO fold sizes are wildly uneven.** Measured from each fold's `train.npz`: `impact` trains on
+  **16,416** sequences, while `initial_access`, `lateral_movement` and `command_and_control` train
+  on **1,239,747 / 1,242,869 / 1,246,522** — a 75x difference, because holding out `impact` removes
+  02-20, which is 98% of the corpus. The four AUROC values are therefore not like-for-like, and the
+  ranking between families should not be read as one. Note also that the headline AUROC understates
+  the `initial_access` fold in one respect: at the 0.5 threshold it reaches precision 0.981 at
+  recall 0.374 (`docs/lofo_results_v2.json`), i.e. what it does flag on an unseen family is mostly
+  correct, even though its overall ranking is weak.
+
+### G.12 Recommended order
+
+1. **Correct the CTU-13 number everywhere it appears** (G1) — `README.md` first, then this audit's
+   E9 text and the project notes. This is the only finding that currently misinforms a reader.
+2. **Fix the demo's input correctness before the demo is shown** — G5 (PCAP IAT units) and G11
+   (packet features fed to a flow-only model) both corrupt the new PCAP path, and G4's millisecond
+   bug must be fixed before anyone cites the UNSW AUROC of 0.443.
+3. **Reword the E2 status row** (G2) and disclose the synthetic share of the v2 splits (G6).
+4. **Retrain v2 at v1's hyperparameters** (G3) so the leakage claim is clean, and redistribute or
+   drop the synthetic days (G6) in the same rebuild.
+5. **Gate the stage override on infiltration probability** (G7).
+6. Report achieved FPR in the lead-time section (G8); regenerate `BUILD_REPORT.md`'s table (G9).
