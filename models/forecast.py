@@ -8,15 +8,17 @@ produced it — so a caller gets a full K-step trajectory, not just a single sco
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import torch
 
+from common.config import feature_columns
 from models.dataset import FeatureScaler
 from models.world_model import WorldModel
+from pipeline.mitre_mapping import IMPACT, RECONNAISSANCE
 
 
 @dataclass
@@ -31,6 +33,7 @@ class ForecastResult:
     #  this measures the size of the model's own predicted transition, not its accuracy. For a
     #  genuine (ground-truth) anomaly signal on already-observed traffic, see one_step_reconstruction_error().
     state_deltas: np.ndarray          # (K, F) predicted feature deltas per step, in raw (unscaled) units
+    stage_is_heuristic: list[bool] = field(default_factory=list)  # (K,) see _heuristic_stage_override
 
 
 @dataclass
@@ -46,6 +49,7 @@ class BatchForecastResult:
     host_ids: list[str]
     infiltration_probs: np.ndarray   # (N, K)
     stage_predictions: list[list[str]]  # (N, K)
+    stage_is_heuristic: list[list[bool]] = field(default_factory=list)  # (N, K)
 
 
 @dataclass
@@ -59,6 +63,59 @@ class UncertaintyForecastResult:
     infiltration_p50: np.ndarray  # (K,)
     infiltration_p90: np.ndarray  # (K,)
     stage_predictions: list[str]  # (K,) argmax of the mean stage distribution across samples
+
+
+def _heuristic_stage_override(
+    raw_features: np.ndarray,
+    feature_index: dict[str, int],
+    scaler: FeatureScaler,
+    config: dict[str, Any],
+    predicted_stage: str,
+) -> tuple[str, bool]:
+    """Audit S6/S7: the trained stage classifier has never seen a single real Reconnaissance
+    example (no CIC-IDS-2018 label maps to it) and every DoS/DDoS ("impact") window is masked out
+    of the stage classification loss entirely (see pipeline/mitre_mapping.py, docs/03-mitre-mapping.md).
+    Its raw softmax over the 6 trained classes therefore has no informed answer for either case —
+    measured on real data, DoS/DDoS windows come out as command_and_control 570/684 times (S7).
+
+    This applies the SAME kind of feature-derived signal already used to build reconnaissance
+    TRAINING labels (pipeline/windowing.py::apply_reconnaissance_heuristic) at INFERENCE time
+    instead, so what's displayed matches an observable signal in the traffic rather than a class
+    the network was never taught. It is a heuristic, not a trained prediction, and the caller
+    (ForecastEngine) reports that distinction back via `stage_is_heuristic` rather than blending it
+    in silently — "never invent labels, say so wherever shown."
+
+    Thresholds are z-scores against the SAME scaler.mean/std already fit on this checkpoint's own
+    training data (no new calibration artifact, no arbitrary constant) — `impact_volume_zscore`
+    (default 4.0) and the existing `recon_port_scan_threshold` (already a per-window raw feature,
+    0-1, no z-score needed) are both configurable under `windowing:` like the recon threshold.
+    """
+    def z(name: str) -> float:
+        i = feature_index.get(name)
+        if i is None:
+            return 0.0
+        std = scaler.std[i] if scaler.std[i] > 1e-9 else 1.0
+        return float((raw_features[i] - scaler.mean[i]) / std)
+
+    # DoS/DDoS: extreme flow/packet/byte volume from one host concentrated on very few
+    # destinations -- a flood, not a scan. This is the flow-level signature the audit itself uses
+    # to describe DDoS throughout (S7, E7): one source, sustained high volume, low destination
+    # diversity (the opposite of a port scan, which is low volume per destination but many of them).
+    volume_z_threshold = config["windowing"].get("impact_volume_zscore", 4.0)
+    volume_z = max(z("flow_count"), z("total_packets"), z("total_bytes"))
+    if volume_z > volume_z_threshold and z("unique_dst_ips") < volume_z_threshold / 2:
+        return IMPACT, True
+
+    # Reconnaissance: same raw signal apply_reconnaissance_heuristic uses for training labels
+    # (port_scan_score >= recon_port_scan_threshold), applied here to the model's own prediction
+    # instead of a training target. Zero-filled (and so never fires) when no PCAP is available for
+    # this capture, same documented limitation as the training-time heuristic.
+    port_scan_threshold = config["windowing"].get("recon_port_scan_threshold", 0.5)
+    port_scan_idx = feature_index.get("port_scan_score")
+    if port_scan_idx is not None and raw_features[port_scan_idx] >= port_scan_threshold:
+        return RECONNAISSANCE, True
+
+    return predicted_stage, False
 
 
 def load_world_model(checkpoint_path: str | Path, device: torch.device | None = None) -> tuple[WorldModel, dict[str, Any]]:
@@ -78,6 +135,21 @@ class ForecastEngine:
         self.stage_labels = config["mitre_stages"]
         self.device = next(model.parameters()).device
 
+        # Audit S6/S7: feature-index lookup for _heuristic_stage_override, built once. None (and
+        # the heuristic silently skipped) for configs that don't define a `features` section at
+        # all -- keeps this engine usable with the minimal test configs already in
+        # tests/test_forecast_rollout.py, which predate this and only exercise generic tensor
+        # shapes, not real named features.
+        try:
+            self._feature_index = {name: i for i, name in enumerate(feature_columns(config))}
+        except KeyError:
+            self._feature_index = None
+
+    def _override_stage(self, raw_features_row: np.ndarray, predicted_stage: str) -> tuple[str, bool]:
+        if self._feature_index is None:
+            return predicted_stage, False
+        return _heuristic_stage_override(raw_features_row, self._feature_index, self.scaler, self.config, predicted_stage)
+
     def rollout(self, raw_sequence: np.ndarray) -> ForecastResult:
         """raw_sequence: (L, n_features) unscaled, most recent L windows in chronological order.
         Deterministic (dropout follows whatever mode the model is already in — eval by default
@@ -94,7 +166,7 @@ class ForecastEngine:
         seq_t = torch.tensor(seq, device=self.device).unsqueeze(0)  # (1, L, F)
 
         infiltration_probs, stage_predictions, stage_probs_list = [], [], []
-        attentions, transition_magnitude, state_deltas = [], [], []
+        attentions, transition_magnitude, state_deltas, stage_is_heuristic = [], [], [], []
 
         with torch.no_grad():
             for _ in range(horizon):
@@ -105,11 +177,15 @@ class ForecastEngine:
 
                 last_scaled = seq_t[:, -1, :]
                 jump = torch.linalg.norm(next_state - last_scaled).item()
-                delta_raw = self.scaler.inverse_transform(next_state.squeeze(0).cpu().numpy()) - \
-                    self.scaler.inverse_transform(last_scaled.squeeze(0).cpu().numpy())
+                next_state_raw = self.scaler.inverse_transform(next_state.squeeze(0).cpu().numpy())
+                delta_raw = next_state_raw - self.scaler.inverse_transform(last_scaled.squeeze(0).cpu().numpy())
+
+                raw_stage = self.stage_labels[int(stage_prob.argmax())]
+                final_stage, was_heuristic = self._override_stage(next_state_raw, raw_stage)
 
                 infiltration_probs.append(inf_prob)
-                stage_predictions.append(self.stage_labels[int(stage_prob.argmax())])
+                stage_predictions.append(final_stage)
+                stage_is_heuristic.append(was_heuristic)
                 stage_probs_list.append(stage_prob)
                 attentions.append(attn.squeeze(0).cpu().numpy())
                 transition_magnitude.append(jump)
@@ -124,6 +200,7 @@ class ForecastEngine:
             attentions=np.stack(attentions),
             transition_magnitude=np.array(transition_magnitude),
             state_deltas=np.stack(state_deltas),
+            stage_is_heuristic=stage_is_heuristic,
         )
 
     def rollout_batch(self, host_ids: list[str], raw_sequences: np.ndarray, batch_size: int = 2048) -> BatchForecastResult:
@@ -132,7 +209,7 @@ class ForecastEngine:
         each chunk is still a single batched forward pass per K step, not one per host."""
         horizon = self.config["windowing"]["forecast_horizon"]
         n = raw_sequences.shape[0]
-        all_probs, all_stage_preds = [], []
+        all_probs, all_stage_preds, all_heuristic_flags = [], [], []
 
         with torch.no_grad():
             for start in range(0, n, batch_size):
@@ -140,22 +217,45 @@ class ForecastEngine:
                 seq = self.scaler.transform(chunk).astype(np.float32)
                 seq_t = torch.tensor(seq, device=self.device)  # (b, L, F)
 
-                probs_steps, stage_steps = [], []
+                probs_steps, stage_steps, heuristic_steps = [], [], []
                 for _ in range(horizon):
                     next_state, stage_logits, infiltration_logit = self.model(seq_t)
                     probs_steps.append(torch.sigmoid(infiltration_logit).cpu().numpy())
-                    stage_steps.append(torch.softmax(stage_logits, dim=-1).argmax(dim=-1).cpu().numpy())
+                    raw_idx = torch.softmax(stage_logits, dim=-1).argmax(dim=-1).cpu().numpy()  # (b,)
+
+                    # Audit S6/S7: same per-window heuristic override as rollout(), applied over
+                    # the batch. A Python loop over the batch here is cheap relative to the
+                    # forward pass it follows; see _heuristic_stage_override's docstring.
+                    if self._feature_index is not None:
+                        next_state_raw = self.scaler.inverse_transform(next_state.cpu().numpy())  # (b, F)
+                        overridden, flags = [], []
+                        for i, idx in enumerate(raw_idx):
+                            stage, was_heuristic = self._override_stage(next_state_raw[i], self.stage_labels[int(idx)])
+                            overridden.append(stage)
+                            flags.append(was_heuristic)
+                        stage_steps.append(overridden)
+                        heuristic_steps.append(flags)
+                    else:
+                        stage_steps.append([self.stage_labels[int(i)] for i in raw_idx])
+                        heuristic_steps.append([False] * len(raw_idx))
+
                     seq_t = torch.cat([seq_t[:, 1:, :], next_state.unsqueeze(1)], dim=1)
 
                 all_probs.append(np.stack(probs_steps, axis=1))  # (b, K)
-                all_stage_preds.append(np.stack(stage_steps, axis=1))  # (b, K)
+                all_stage_preds.append(np.array(stage_steps, dtype=object).T)  # (b, K)
+                all_heuristic_flags.append(np.array(heuristic_steps, dtype=bool).T)  # (b, K)
 
         infiltration_probs = np.concatenate(all_probs, axis=0) if all_probs else np.zeros((0, horizon))
-        stage_idx = np.concatenate(all_stage_preds, axis=0) if all_stage_preds else np.zeros((0, horizon), dtype=int)
-        stage_predictions = [[self.stage_labels[i] for i in row] for row in stage_idx]
+        stage_predictions = (
+            np.concatenate(all_stage_preds, axis=0).tolist() if all_stage_preds else []
+        )
+        stage_is_heuristic = (
+            np.concatenate(all_heuristic_flags, axis=0).tolist() if all_heuristic_flags else []
+        )
 
         return BatchForecastResult(
             host_ids=host_ids, infiltration_probs=infiltration_probs, stage_predictions=stage_predictions,
+            stage_is_heuristic=stage_is_heuristic,
         )
 
     def rollout_with_uncertainty(self, raw_sequence: np.ndarray, n_samples: int = 20) -> UncertaintyForecastResult:

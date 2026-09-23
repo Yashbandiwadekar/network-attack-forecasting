@@ -41,7 +41,8 @@ def _build_model(arch: str, n_features: int, n_stage_classes: int, config: dict)
 
 
 def _step_loss(model: nn.Module, batch, device: torch.device) -> tuple[torch.Tensor, dict[str, float]]:
-    X, next_state, future_stages, infiltration = [t.to(device) for t in batch]
+    non_blocking = device.type == "cuda"
+    X, next_state, future_stages, infiltration = [t.to(device, non_blocking=non_blocking) for t in batch]
     pred_next_state, stage_logits, infiltration_logit = model(X)
 
     mse = nn.functional.mse_loss(pred_next_state, next_state)
@@ -68,8 +69,16 @@ def train(config_path: str = "configs/default.yaml", arch: str = "transformer") 
     n_features = train_ds.X.shape[-1]
     n_stage_classes = len(config["mitre_stages"])
 
-    train_loader = DataLoader(train_ds, batch_size=config["model"]["batch_size"], shuffle=True)
-    val_loader = DataLoader(val_ds, batch_size=config["model"]["batch_size"], shuffle=False)
+    # pin_memory + non_blocking .to() (in _step_loss) overlap the host->device copy with the
+    # previous step's GPU compute instead of stalling on it -- num_workers is deliberately left at
+    # its default of 0: SequenceDataset already holds everything as in-memory tensors, so
+    # __getitem__ is pure indexing with no I/O for worker processes to parallelize, and spawning
+    # them would only add IPC overhead. See models/dataset.py::SequenceDataset.
+    pin_memory = device.type == "cuda"
+    train_loader = DataLoader(train_ds, batch_size=config["model"]["batch_size"], shuffle=True,
+                               pin_memory=pin_memory)
+    val_loader = DataLoader(val_ds, batch_size=config["model"]["batch_size"], shuffle=False,
+                             pin_memory=pin_memory)
 
     model = _build_model(arch, n_features, n_stage_classes, config).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=config["model"]["lr"])

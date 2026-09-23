@@ -50,6 +50,43 @@ model, and demo can exercise all five stages end-to-end before real training. **
 exists in the synthetic sample** — `pipeline/mitre_mapping.py` documents it as synthetic-only, and
 it must not be treated as validating real-world exfiltration detection.
 
+## Inference-time stage heuristic (audit S6/S7, 2026-09-23)
+
+The two gaps above aren't just labelling gaps — they're gaps in what the trained stage
+classifier could ever learn. `reconnaissance` has no real training examples in flow-only mode
+(S6), and `impact` windows are masked out of the stage classification loss entirely, so the
+classifier has never been taught to predict either. Measured on real data: DoS/DDoS ("impact")
+windows come out of the trained classifier as `command_and_control` 570 of 684 times (S7) — the
+network fills the gap with whatever spurious correlation the shared backbone happens to produce,
+not a considered answer.
+
+`models/forecast.py::_heuristic_stage_override` catches this at inference time, in
+`ForecastEngine.rollout`/`rollout_batch` — the same two functions that produce every stage
+annotation the Streamlit demo and the K-step lead-time metric show. It re-applies the same kind of
+feature-derived signal `apply_reconnaissance_heuristic` already uses to build *training* labels,
+but to the model's own *prediction* instead:
+
+- **Impact (DoS/DDoS):** one host's flow volume (`flow_count`/`total_packets`/`total_bytes`) far
+  above its training-data mean (z-score against the checkpoint's own `scaler.npz`, no new
+  calibration artifact), concentrated on very few destination IPs — a flood, not a scan.
+- **Reconnaissance:** `port_scan_score` at or above the existing `recon_port_scan_threshold` —
+  identical condition to the training-time heuristic, so it inherits the same limitation (zero in
+  flow-only mode, only meaningful when real PCAP packet features are available for that window —
+  including a PCAP-only upload, see S4).
+
+Every override is reported back via `stage_is_heuristic` and disclosed in the UI
+(`app/streamlit_app.py::_stage_disclosure_note`) as "heuristic override... not the trained
+classifier" — never silently blended in as if the network had learned it. `exfiltration` gets the
+same treatment for a different reason: it is never overridden *to* (nothing derives it), but
+whenever it IS shown (only ever on the synthetic sample, which is the only place
+`SYNTH-Exfiltration` exists), the UI adds "synthetic, demo-only label — not present in real
+CIC-IDS-2018 data."
+
+This is a heuristic layered on top of an honestly-limited classifier, not a fix to the classifier
+itself. The classifier's own weights still can't distinguish these stages; the thresholds above
+are tuned to catch the two failure modes the audit actually measured (a flood, a scan), not a
+general five-way understanding. See `tests/test_stage_heuristic.py`.
+
 ## Implication for evaluation
 
 `docs/04-evaluation.md`'s stage-classification metrics are macro-averaged over the classes actually

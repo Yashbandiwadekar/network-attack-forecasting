@@ -38,7 +38,7 @@ from pipeline.flow_features import clean_and_normalize, load_flow_csv, load_flow
 from pipeline.graph_embedding_features import build_graph_embedding_window_features
 from pipeline.graph_features import build_graph_window_features
 from pipeline.mitre_mapping import BENIGN
-from pipeline.packet_features import compute_packet_window_features, load_pcap
+from pipeline.packet_features import build_flow_records, compute_packet_window_features, load_pcap
 from pipeline.windowing import (
     apply_reconnaissance_heuristic, build_flow_windows, merge_graph_embedding_features,
     merge_graph_features, merge_packet_features,
@@ -50,6 +50,13 @@ DATA_SOURCES = {
     "Synthetic sample (fast demo)": "configs/default.yaml",
     "Real CIC-IDS-2018 (trained model)": "configs/real_data.yaml",
 }
+
+# Audit S4: input validation limits for the upload path -- generous enough for a genuine demo
+# capture, small enough that an accidental (or hostile) multi-GB file fails fast with a clear
+# message instead of hanging Streamlit or exhausting memory. The server-wide maxUploadSize in
+# .streamlit/config.toml (1024 MB) is a hard ceiling on top of this, not a replacement for it.
+MAX_CSV_UPLOAD_MB = 300
+MAX_PCAP_UPLOAD_MB = 300
 
 # Status palette (fixed roles — not themed, not reused for series identity). Severity thresholds
 # on the world model's own peak K-step infiltration probability. A host below WARNING never
@@ -168,12 +175,29 @@ def _sparkline_svg(values: np.ndarray, color: str, width: int = 110, height: int
     )
 
 
+def _stage_disclosure_note(stage: str, is_heuristic: bool) -> str:
+    """Audit S6/S7 ("never invent labels... say so wherever it is shown") and the exfiltration
+    caveat (S6, docs/03-mitre-mapping.md): a short, plain-language note attached to any rendered
+    stage that isn't a plain trained-classifier prediction. Empty string for an ordinary
+    classifier output -- most predictions still are one."""
+    if stage == "exfiltration":
+        return "synthetic, demo-only label — not present in real CIC-IDS-2018 data"
+    if is_heuristic and stage == "impact":
+        return "heuristic override on flow-volume signature, not the trained classifier"
+    if is_heuristic and stage == "reconnaissance":
+        return "heuristic override on port-scan signature, not the trained classifier"
+    return ""
+
+
 def _alert_card_html(
     host: str, severity_label: str, severity_bg: str, severity_fg: str,
     peak_prob: float, peak_step_seconds: int, stage: str, probs_curve: np.ndarray,
+    is_heuristic: bool = False,
 ) -> str:
     spark = _sparkline_svg(probs_curve, severity_bg)
     stage_readable = stage.replace("_", " ")
+    note = _stage_disclosure_note(stage, is_heuristic)
+    note_html = f'<div class="alert-stat-label">⚠ {note}</div>' if note else ""
     return f"""
     <div class="alert-card" style="border-left-color:{severity_bg};">
       <div class="alert-card-top">
@@ -184,6 +208,7 @@ def _alert_card_html(
         <div>
           <div class="alert-stat-value" style="color:{severity_bg};">{peak_prob:.0%}</div>
           <div class="alert-stat-label">peaks in {peak_step_seconds}s &middot; predicted {stage_readable}</div>
+          {note_html}
         </div>
         <div>{spark}</div>
       </div>
@@ -209,13 +234,25 @@ def _load_backend(config_path: str):
     return config, model, scaler, background
 
 
-def _process_uploads(flow_csv_path: Path, pcap_path: Path | None, config: dict) -> pd.DataFrame:
-    flow_df = clean_and_normalize(load_flow_csv(flow_csv_path, require_label=False))
+def _process_uploads(flow_csv_path: Path | None, pcap_path: Path | None, config: dict) -> pd.DataFrame:
+    """Audit S4: flow_csv_path is now optional -- a PCAP/PCAPNG capture alone is enough to derive
+    flow-level records (pipeline.packet_features.build_flow_records) and drive the whole pipeline,
+    matching the problem statement's "PCAP or CSV" requirement instead of treating PCAP as merely
+    a supplement to a mandatory CSV. At least one of the two must be given."""
+    packet_df = load_pcap(pcap_path) if pcap_path is not None else None
+
+    if flow_csv_path is not None:
+        flow_df = clean_and_normalize(load_flow_csv(flow_csv_path, require_label=False))
+    elif packet_df is not None:
+        flow_df = build_flow_records(packet_df)
+    else:
+        raise ValueError("Need at least a flow CSV or a PCAP/PCAPNG capture.")
+
     flow_windows = build_flow_windows(flow_df, config)
 
     packet_windows = None
-    if pcap_path is not None:
-        packet_windows = compute_packet_window_features(load_pcap(pcap_path), config["windowing"]["window_seconds"])
+    if packet_df is not None:
+        packet_windows = compute_packet_window_features(packet_df, config["windowing"]["window_seconds"])
 
     windows = merge_packet_features(flow_windows, packet_windows, config)
     graph_windows = build_graph_window_features(flow_df, config)
@@ -406,8 +443,26 @@ def main() -> None:
 
     is_real_data = config_path == DATA_SOURCES["Real CIC-IDS-2018 (trained model)"]
 
-    if is_real_data:
-        with st.sidebar:
+    # Audit S5: uploads were only ever wired up for the synthetic-data branch -- the real-data
+    # branch could only replay the bundled dataset. Both branches now share the same "bundled
+    # sample vs upload" toggle and the same upload-processing path, so an upload is scored by
+    # whichever model is selected in the sidebar (labelled below, and again on every result).
+    bundled_label = "Replay bundled real CIC-IDS-2018 dataset" if is_real_data else "Use bundled synthetic sample"
+    with st.sidebar:
+        st.header("Input")
+        use_bundled = st.checkbox(bundled_label, value=True)
+        flow_file, pcap_file = None, None
+        if not use_bundled:
+            flow_file = st.file_uploader(
+                "Flow CSV (CICFlowMeter) — optional if a PCAP/PCAPNG is given below", type="csv",
+            )
+            # Audit S4: .pcapng was previously rejected here even though pipeline.packet_features
+            # already parses it (scapy dispatches on magic bytes, not extension) -- see
+            # pipeline/packet_features.py's module docstring.
+            pcap_file = st.file_uploader(
+                "PCAP / PCAPNG — optional if a flow CSV is given above", type=["pcap", "pcapng"],
+            )
+        if use_bundled and is_real_data:
             st.info(
                 "Real CIC-IDS-2018 (10 days, 16M flows). No PCAP downloaded (37 GB/day) — flow-only, "
                 "same as training. 9 of 10 days lack real IPs and fall back to one network-wide "
@@ -415,41 +470,68 @@ def main() -> None:
                 "See docs/02-dataset-and-features.md.",
                 icon="📊",
             )
+        elif use_bundled:
+            st.info(
+                "This is a synthetic, hand-built traffic sample used to demonstrate the pipeline "
+                "end-to-end — NOT real CIC-IDS-2018 data. See docs/02-dataset-and-features.md.",
+                icon="⚠️",
+            )
+
+    if use_bundled and is_real_data:
         with st.spinner("Loading and windowing real CIC-IDS-2018 data (16M flows, 1-3 min on first load)..."):
             flow_df, windows = _load_real_data(config_path)
-    else:
-        with st.sidebar:
-            st.header("Input")
-            use_synthetic = st.checkbox("Use bundled synthetic sample", value=True)
-            flow_file = None if use_synthetic else st.file_uploader("Flow CSV (CICFlowMeter)", type="csv")
-            pcap_file = None if use_synthetic else st.file_uploader("PCAP (optional)", type="pcap")
-            if use_synthetic:
-                st.info(
-                    "This is a synthetic, hand-built traffic sample used to demonstrate the pipeline "
-                    "end-to-end — NOT real CIC-IDS-2018 data. See docs/02-dataset-and-features.md.",
-                    icon="⚠️",
-                )
-
-        if use_synthetic:
-            flow_path = resolve_path(config, "raw_flow_dir") / "synthetic_sample.csv"
-            pcap_path = resolve_path(config, "raw_pcap_dir") / "synthetic_sample.pcap"
-            if not flow_path.exists():
-                st.error("Synthetic sample not found. Run `python -m scripts.make_synthetic_sample` first.")
-                return
-        else:
-            if flow_file is None:
-                st.info("Upload a flow CSV to begin.")
-                return
-            tmp_dir = Path(tempfile.mkdtemp())
-            flow_path = tmp_dir / "upload_flows.csv"
-            flow_path.write_bytes(flow_file.getvalue())
-            pcap_path = None
-            if pcap_file is not None:
-                pcap_path = tmp_dir / "upload.pcap"
-                pcap_path.write_bytes(pcap_file.getvalue())
-
+    elif use_bundled:
+        flow_path = resolve_path(config, "raw_flow_dir") / "synthetic_sample.csv"
+        pcap_path = resolve_path(config, "raw_pcap_dir") / "synthetic_sample.pcap"
+        if not flow_path.exists():
+            st.error("Synthetic sample not found. Run `python -m scripts.make_synthetic_sample` first.")
+            return
         with st.spinner("Running feature pipeline..."):
             flow_df, windows = _process_uploads(flow_path, pcap_path, config)
+    else:
+        if flow_file is None and pcap_file is None:
+            st.info("Upload a flow CSV and/or a PCAP/PCAPNG capture to begin.")
+            return
+        # Audit S4/security review: explicit size limits on the upload path, checked before any
+        # parsing touches the file content.
+        for uploaded, kind, limit_mb in (
+            (flow_file, "flow CSV", MAX_CSV_UPLOAD_MB), (pcap_file, "PCAP/PCAPNG", MAX_PCAP_UPLOAD_MB),
+        ):
+            if uploaded is not None and uploaded.size > limit_mb * 1024 * 1024:
+                st.error(f"{kind} upload is {uploaded.size / (1024 * 1024):.0f} MB, over this demo's "
+                         f"{limit_mb} MB limit.")
+                return
+
+        # Filenames are fixed, never taken from the upload (no path traversal); only the PCAP's
+        # extension varies, and only between the two we explicitly allow above.
+        tmp_dir = Path(tempfile.mkdtemp())
+        flow_path = None
+        if flow_file is not None:
+            flow_path = tmp_dir / "upload_flows.csv"
+            flow_path.write_bytes(flow_file.getvalue())
+        pcap_path = None
+        if pcap_file is not None:
+            pcap_ext = ".pcapng" if Path(pcap_file.name).suffix.lower() == ".pcapng" else ".pcap"
+            pcap_path = tmp_dir / f"upload{pcap_ext}"
+            pcap_path.write_bytes(pcap_file.getvalue())
+
+        try:
+            with st.spinner("Running feature pipeline..."):
+                flow_df, windows = _process_uploads(flow_path, pcap_path, config)
+        except ValueError as exc:
+            st.error(f"Could not process the upload: {exc}")
+            return
+        except Exception:
+            # Rule: don't leak stack traces / internals to users.
+            st.error("Could not process the upload — the file may be corrupt or in an unsupported format.")
+            return
+
+    # Audit S5: which model actually produced the scores shown below, stated plainly rather than
+    # left implicit in the sidebar's radio selection.
+    st.caption(
+        f"📊 Scored by: **{source_label}** — "
+        + ("replaying the bundled dataset" if use_bundled else "scoring your uploaded capture")
+    )
 
     seq_len = config["windowing"]["sequence_length"]
     eligible_ips = _sort_ips_pseudo_hosts_first(windows.groupby("src_ip").size()[lambda s: s >= seq_len].index.tolist())
@@ -509,7 +591,8 @@ def main() -> None:
             if severity is None:
                 continue
             stage_at_peak = batch_result.stage_predictions[i][peak_step]
-            alerts.append((peak_prob, peak_step, host, stage_at_peak, probs_curve, severity))
+            is_heuristic = bool(batch_result.stage_is_heuristic[i][peak_step]) if batch_result.stage_is_heuristic else False
+            alerts.append((peak_prob, peak_step, host, stage_at_peak, probs_curve, severity, is_heuristic))
     alerts.sort(key=lambda a: a[0], reverse=True)
 
     n_critical = sum(1 for a in alerts if a[5][0] == "critical")
@@ -565,12 +648,13 @@ def main() -> None:
         )
     else:
         max_cards = 20
-        for peak_prob, peak_step, host, stage_at_peak, probs_curve, (label, bg, fg) in visible_alerts[:max_cards]:
+        for peak_prob, peak_step, host, stage_at_peak, probs_curve, (label, bg, fg), is_heuristic in visible_alerts[:max_cards]:
             card_col, btn_col = st.columns([5, 1])
             with card_col:
                 st.markdown(
                     _alert_card_html(
                         host, label, bg, fg, peak_prob, (peak_step + 1) * window_s, stage_at_peak, probs_curve,
+                        is_heuristic,
                     ),
                     unsafe_allow_html=True,
                 )
@@ -708,6 +792,19 @@ def main() -> None:
         _stage_stepper_html(config["mitre_stages"], peak_stage, stage_bg, stage_fg),
         unsafe_allow_html=True,
     )
+    if peak_stage not in config["mitre_stages"]:
+        # "impact" (DoS/DDoS) is deliberately excluded from the 5-way kill-chain progression the
+        # stepper above draws (see docs/03-mitre-mapping.md) -- shown as its own badge instead of
+        # silently having no pill lit up in the stepper.
+        st.markdown(
+            f'<span class="stage-pill active" style="background:{stage_bg}; color:{stage_fg}; '
+            f'display:inline-block; margin-top:6px;">{peak_stage.replace("_", " ")} (not part of the '
+            f'5-way kill-chain progression above)</span>',
+            unsafe_allow_html=True,
+        )
+    peak_stage_note = _stage_disclosure_note(peak_stage, bool(result.stage_is_heuristic[peak_step]))
+    if peak_stage_note:
+        st.caption(f"⚠ {peak_stage_note}")
 
     current_observed_stage = host_windows.loc[cursor_idx, "stage"]
     narrative_col, response_col = st.columns([3, 2])

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 
 from common.config import (
     load_config,
@@ -24,6 +25,61 @@ from pipeline.windowing import (
     apply_reconnaissance_heuristic,
     build_sequences,
 )
+
+
+def day_disjoint_split(
+    sequences: dict[str, np.ndarray],
+    split_config: dict[str, Any],
+    window_seconds: int,
+    forecast_horizon: int,
+) -> dict[str, dict[str, np.ndarray]]:
+    """
+    Split sequences by calendar day so no attack session appears in more than one split (E1).
+
+    ``split_config`` lists ``train_days`` / ``val_days`` / ``test_days`` as ``"MM-DD"`` strings. A
+    sequence belongs to the day of its last input window. Any sequence whose input-to-target span
+    (first input window through ``forecast_horizon + 1`` windows after the last input window)
+    reaches into a different calendar day is dropped, so no window is shared across splits (E8).
+    Sequences on days not listed in any split are dropped and counted in the printed summary.
+    """
+    day_lists = {
+        name: {str(d) for d in split_config.get(f"{name}_days", [])}
+        for name in ("train", "val", "test")
+    }
+    seen: dict[str, str] = {}
+    for name, days in day_lists.items():
+        for day in days:
+            if day in seen:
+                raise ValueError(f"Day {day} is listed in both {seen[day]} and {name}.")
+            seen[day] = name
+
+    end_times = pd.to_datetime(np.asarray(sequences["window_end_time"]))
+    start_times = pd.to_datetime(np.asarray(sequences["window_times"])[:, 0])
+    span_end = end_times + pd.Timedelta(seconds=window_seconds * (forecast_horizon + 1))
+
+    fmt = "%m-%d"
+    day_of = np.asarray(end_times.strftime(fmt))
+    same_day = (np.asarray(start_times.strftime(fmt)) == day_of) & (
+        np.asarray(span_end.strftime(fmt)) == day_of
+    )
+
+    result: dict[str, dict[str, np.ndarray]] = {}
+    kept = 0
+    for name, days in day_lists.items():
+        mask = np.isin(day_of, list(days)) & same_day
+        indices = np.flatnonzero(mask)
+        indices = indices[np.argsort(np.asarray(sequences["window_end_time"])[indices], kind="stable")]
+        kept += len(indices)
+        result[name] = {key: np.asarray(value)[indices] for key, value in sequences.items()}
+
+    total = len(day_of)
+    unassigned = int((~np.isin(day_of, list(seen))).sum())
+    print(
+        f"day_disjoint_split: {kept}/{total} sequences kept; "
+        f"{unassigned} on unassigned days; "
+        f"{int((np.isin(day_of, list(seen)) & ~same_day).sum())} dropped at day boundaries"
+    )
+    return result
 
 
 def chronological_split(
@@ -561,10 +617,18 @@ def build_dataset(config_path: str = "configs/default.yaml") -> dict[str, dict[s
         "\n=== STEP 6: Chronological split ==="
     )
 
-    splits = chronological_split(
-        sequences,
-        config["split"],
-    )
+    if config["split"].get("mode") == "by_day":
+        splits = day_disjoint_split(
+            sequences,
+            config["split"],
+            int(config["windowing"]["window_seconds"]),
+            int(config["windowing"]["forecast_horizon"]),
+        )
+    else:
+        splits = chronological_split(
+            sequences,
+            config["split"],
+        )
 
     # ---------------------------------------------------------
     # Split sizes
