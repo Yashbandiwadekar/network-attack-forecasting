@@ -698,3 +698,44 @@ Conclusion: W11 part 3 is not shown to help; only the second gate (part 2) helps
   `grep -rn "allow_pickle=True\|pickle\.load(" --include=*.py .` (excluding `.venv` and the two
   restricted unpicklers): **no matches**. Writers use `pickle.dump`, which is not a code-execution risk.
 - Not re-run: the CTU-13 builder and the four scripts themselves (compile-checked only).
+
+---
+
+# PACKET-AWARE PILOT ON UNSW-NB15 (started 2026-09-24; owner-approved pilot before the CIC/CICIoT downloads)
+
+## Step 1 -- fast streaming PCAP parser (DONE)
+
+`pipeline/fast_packet_windows.py` + `scripts/extract_packet_windows.py`. Reads raw frames with Scapy's
+`RawPcapReader` (no dissection), hand-parses IPv4/TCP/UDP with `struct`, aggregates in bounded chunks and
+runs one file per worker. No new dependency. Handles classic PCAP and PCAPNG (UNSW ships both, all named
+`.pcap`: 21 classic, 42 pcapng) and Ethernet + Linux-cooked (link type 113, what UNSW uses).
+
+**Parity with the existing Scapy path, on real UNSW packets** (first 150,000 packets of one classic and one
+pcapng file, all 8 packet features per (src_ip, window)):
+```
+[classic pcap] 1.pcap  | scapy 3,343 pkt/s | fast 259,637 pkt/s (78x)  | matched windows 575/575  | max|diff| = 0.0 for all 8 features
+[pcapng]      13.pcap  | scapy 3,277 pkt/s | fast 161,437 pkt/s (49x)  | matched windows 110/110  | max|diff| = 0.0 for all 8 features
+```
+Also `tests/test_fast_packet_windows.py` (5 tests: Ethernet + SLL parity with `load_pcap`, pcapng, chunk
+carry-over invariance, unsupported link type rejected). Full suite: 244 passed.
+
+**Full run** (`python -m scripts.extract_packet_windows --workers 12`), all of `V:\Datasets\UNSW NB15\pcap files`:
+```
+{"files": 63, "frames": 127230729, "seconds": 93.14, "gb": 72.46, "aggregate_frames_per_s": 1365959, "gb_per_hour": 2800}
+```
+-> 156,637 packet windows, 40 distinct src IPs (matches the 40 hosts in the UNSW flow CSVs), no NaN cells,
+windows on 2015-01-22 (104,466), 2015-01-23 (3,164), 2015-02-18 (49,007).
+
+**Consequence for the CIC-IDS-2018 / CICIoT2023 plan:** parsing is no longer the bottleneck. At this measured
+rate (local disk, 12 workers) 370 GB is roughly 8 minutes and 547 GB roughly 12 minutes of parsing. This
+assumes the captures sit on the same fast drive and have similar packet sizes; the download time and
+disk space (917 GB > the 749 GB free on V:) are the real constraints now.
+
+**Limits (in the module docstring):** IPv4 only; Ethernet / Linux-SLL only; first and last window of each
+file dropped (boundary windows are not additive for the unique-port / retransmit features).
+
+**Finding -- `retransmit_ratio` is not a retransmission count.** It is inherited from
+`compute_packet_window_features`: any repeated (src, dst, sport, dport, seq) inside a window counts. On a real
+UNSW slice 68.5% of TCP packets are flagged and about half of those are payload-free ACK-style packets, so the
+feature averages 0.63 over the dataset. The fast path reproduces it exactly on purpose (parity). Recommended
+follow-up (not done): count duplicates only among packets that carry L4 payload.
