@@ -57,6 +57,7 @@ import torch
 from common.config import feature_columns, load_config, resolve_path
 from eval.metrics import binary_metrics, lead_time_metrics, stage_metrics, threshold_at_fpr, threshold_free_metrics
 from models.baseline_lr import BaselineModel, PersistenceBaseline, PersistenceOnPredictedLabel
+from eval.lofo import _predict_infiltration
 from models.dataset import FeatureScaler, SequenceDataset, build_datasets, load_split
 from models.forecast import load_world_model
 from models.lstm_model import load_lstm_baseline
@@ -87,12 +88,10 @@ MARKOV_ORACLE_LABEL = "Baseline (Markov chain) [ORACLE -- reads true current lab
 # ---------------------------------------------------------------------------
 
 def _world_model_predictions(model: WorldModel, ds: SequenceDataset, device) -> tuple[np.ndarray, np.ndarray]:
-    with torch.no_grad():
-        X = ds.X.to(device)
-        _, stage_logits, infiltration_logit = model(X)
-        infiltration_prob = torch.sigmoid(infiltration_logit).cpu().numpy()
-        stage_pred = torch.softmax(stage_logits, dim=-1).argmax(dim=-1).cpu().numpy()
-    return infiltration_prob, stage_pred
+    """Audit G10: batched via eval.lofo._predict_infiltration (the same helper eval/lofo.py added
+    after an unbatched single forward pass OOM'd on a 1.23M-sequence fold) instead of pushing the
+    whole split through in one call -- harmless on today's splits but the same failure mode."""
+    return _predict_infiltration(model, ds.X, device, return_stage=True)
 
 
 def _joint_predictions(model, ds: SequenceDataset, graphs: dict, base_mask: np.ndarray, device,

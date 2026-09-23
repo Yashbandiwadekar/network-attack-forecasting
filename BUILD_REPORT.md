@@ -411,3 +411,18 @@ OOD-benign capture (large legitimate transfer, 10.0.0.201 -> 203.0.113.200):
 ```
 Before the fix this same capture was labelled `stage: impact` at step 0 despite PASSing (per the
 audit's finding); it is now `benign`. `pytest tests` still 211 passed.
+
+## W12 -- batch benchmark's inference call (G10) -- FIXED
+
+`eval/lofo.py::_predict_infiltration` extended with a `return_stage` flag (still batched at 8192,
+unchanged default behaviour for existing callers) instead of writing a second batching helper.
+`eval/benchmark.py::_world_model_predictions` now calls it instead of a single unbatched
+`model(ds.X)` forward pass over the whole split — the same OOM pattern that hit `eval/lofo.py` on
+the 1.23M-sequence `impact` fold (S8 section above), just not yet triggered here because every
+dataset `_world_model_predictions` is called on today is small.
+
+Acceptance: ran `eval.benchmark` against a throwaway copy of `configs/default.yaml` whose
+`eval_report` path was redirected to `docs/04-evaluation_W12_check.md` (deleted afterwards, never
+touching the real `docs/04-evaluation.md`) — once on the pre-change code (`git stash`) and once
+after. **The two generated reports are byte-identical** (`diff` -> no output). `pytest tests -q` ->
+`211 passed` both before and after.
