@@ -42,11 +42,13 @@ class _RestrictedUnpickler(pickle.Unpickler):
     """Audit G12: only sklearn/numpy/scipy/this-module classes may be reconstructed, so a tampered
     baseline file cannot import arbitrary callables (os.system etc.)."""
 
-    _ALLOWED_PREFIXES = ("sklearn.", "numpy.", "scipy.", "models.baseline_lr", "collections", "builtins")
-    _BLOCKED_BUILTINS = {"eval", "exec", "compile", "open", "__import__", "getattr", "setattr", "input"}
+    _ALLOWED_PREFIXES = ("sklearn.", "numpy", "scipy.", "models.baseline_lr", "collections.")
+    _ALLOWED_BUILTINS = {"set", "frozenset", "slice", "complex", "list", "dict", "tuple", "bytearray"}
 
     def find_class(self, module, name):
-        if module.startswith(self._ALLOWED_PREFIXES) and not (module == "builtins" and name in self._BLOCKED_BUILTINS):
+        if (module == "numpy" or module.startswith(self._ALLOWED_PREFIXES)) or (
+            module == "builtins" and name in self._ALLOWED_BUILTINS
+        ):
             return super().find_class(module, name)
         raise pickle.UnpicklingError(f"Blocked global {module}.{name} in baseline file")
 
