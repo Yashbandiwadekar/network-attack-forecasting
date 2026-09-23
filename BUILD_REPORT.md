@@ -312,7 +312,8 @@ specific failure modes the audit measured (a flood, a scan), not general five-wa
 | W-id | Finding | Status | Files changed |
 |---|---|---|---|
 | W1 | G1 | FIXED | `README.md`, `docs/05-related-work-and-competitive-landscape.md`, `docs/04-evaluation-ctu13_cross_from_real_data.md` (now the regenerated report), `docs/archive/04-evaluation-ctu13_cross_from_real_data_RETRACTED-2026-09-23.md` |
-| W2-W12 | | NOT STARTED | |
+| W2 | G5 | FIXED | `pipeline/packet_features.py`, `tests/test_packet_features.py` |
+| W3-W12 | | NOT STARTED | |
 
 ## W1 -- retracted CTU-13 number (FIXED)
 
@@ -331,3 +332,20 @@ Acceptance (`grep -rn "0\.534" --include=*.md .`, excluding the auditor's own AU
 ```
 Every remaining hit is either a retraction note or unrelated: `docs/04-evaluation-real.md:30` is the
 CIC-IDS-2018 LR-stacked-window baseline's F1 -- a coincidental match, not the CTU-13 figure.
+
+## W2 -- PCAP inter-arrival-time unit bug (FIXED)
+
+`pipeline/packet_features.py::build_flow_records` now scales `iat_mean/std/max` by 1e6 (CIC's
+microseconds; it was seconds, so PCAP uploads fed the model IAT 10^6x too small). Checked the other
+fields against the CSV path as asked: `duration_s` was already correct, and **byte counts also
+disagreed** -- `payload_size` was the whole IP payload (includes TCP/UDP header) while CIC's
+`TotLen Fwd/Bwd Pkts` is L4 payload only. Added `l4_payload_size` to `load_pcap` and use it in
+`build_flow_records` (`payload_size` left untouched for the packet-level features).
+
+Acceptance: `tests/test_packet_features.py::test_pcap_and_csv_paths_produce_matching_window_features`
+builds the same 2-flow, 10-packet traffic as a real PCAP and as a CIC-format CSV (expected values
+computed independently in the test), runs both through `build_flow_windows`, and asserts 13 window
+features agree (flow_count, total_packets, total_bytes, mean_duration, syn/ack/fin/psh ratio,
+mean/var/max_iat, bidir_ratio, tcp_ratio) plus mean_iat > 1e5 (microsecond scale). Passes; full
+suite passes. `data/raw/pcap/synthetic_sample.pcap` cannot exercise this (all 944 flows are
+single-packet), so the test generates its own capture.
