@@ -412,6 +412,14 @@ OOD-benign capture (large legitimate transfer, 10.0.0.201 -> 203.0.113.200):
 Before the fix this same capture was labelled `stage: impact` at step 0 despite PASSing (per the
 audit's finding); it is now `benign`. `pytest tests` still 211 passed.
 
+**Strengthened further:** the 0.3 gate is below the app's lowest "flagged" severity level
+(`SEVERITY_LEVELS` in `app/streamlit_app.py` starts at 0.15 "warning"), so the guarantee is strictly
+stronger than the acceptance check asked for: the override can never fire on a window the UI itself
+shows as unflagged (below 0.15), not just below the robustness script's own 0.3 pass line. Added two
+direct unit tests (`tests/test_stage_heuristic.py::test_override_gated_off_below_alert_threshold`,
+`::test_override_fires_above_alert_threshold`) confirming the same textbook flood signature is NOT
+overridden at infiltration_prob=0.1 and IS overridden at 0.9. 213 tests passing.
+
 ## W12 -- batch benchmark's inference call (G10) -- FIXED
 
 `eval/lofo.py::_predict_infiltration` extended with a `return_stage` flag (still batched at 8192,
@@ -426,3 +434,19 @@ Acceptance: ran `eval.benchmark` against a throwaway copy of `configs/default.ya
 touching the real `docs/04-evaluation.md`) — once on the pre-change code (`git stash`) and once
 after. **The two generated reports are byte-identical** (`diff` -> no output). `pytest tests -q` ->
 `211 passed` both before and after.
+
+**Correction/strengthening:** the first check above only exercised the synthetic split (72/68/72
+sequences), which is smaller than the 8192 default batch size -- both old and new code took a
+single batch, so it didn't actually prove batching correctness. Re-verified properly on the v2
+(day-disjoint) test split, **8,731 sequences, forced `batch_size=16` -> 546 batches**, comparing the
+old single-forward-pass code path directly against the new `_predict_infiltration(..., batch_size=16,
+return_stage=True)` path on `checkpoints_real_v2/world_model_best.pt`:
+```
+N = 8731 -> num batches at bs=16: 546
+probs allclose: True
+stage identical: True
+old (unbatched)      {'f1': 0.43050430504305043, 'precision': 0.54858934169279, 'recall': 0.354251012145749, 'false_positive_rate': 0.059594426817492066}
+new (batched bs=16)  {'f1': 0.43050430504305043, 'precision': 0.54858934169279, 'recall': 0.354251012145749, 'false_positive_rate': 0.059594426817492066}
+```
+Also confirmed the benchmark run's `build_datasets` call did not perturb the protected synthetic
+scaler: `git status --short data` shows no change to `data/processed/cicids2018/splits/scaler.npz`.
