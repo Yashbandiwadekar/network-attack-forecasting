@@ -71,6 +71,7 @@ def _heuristic_stage_override(
     scaler: FeatureScaler,
     config: dict[str, Any],
     predicted_stage: str,
+    infiltration_prob: float = 1.0,
 ) -> tuple[str, bool]:
     """Audit S6/S7: the trained stage classifier has never seen a single real Reconnaissance
     example (no CIC-IDS-2018 label maps to it) and every DoS/DDoS ("impact") window is masked out
@@ -89,7 +90,18 @@ def _heuristic_stage_override(
     training data (no new calibration artifact, no arbitrary constant) — `impact_volume_zscore`
     (default 4.0) and the existing `recon_port_scan_threshold` (already a per-window raw feature,
     0-1, no z-score needed) are both configurable under `windowing:` like the recon threshold.
+
+    Audit G7: the override used to fire regardless of the model's own infiltration score, so a
+    window the model itself scores as benign (e.g. 0.037, well under any alert threshold) could
+    still be labelled `impact` — a stage annotation contradicting the probability shown beside it.
+    It now only applies when `infiltration_prob` has crossed `alert_threshold` (config
+    `windowing.alert_threshold`, default 0.3 — the same value scripts/check_robustness.py already
+    uses as its pass/fail line), so a PASS-ing benign window can never be re-labelled `impact`.
     """
+    alert_threshold = config["windowing"].get("alert_threshold", 0.3)
+    if infiltration_prob < alert_threshold:
+        return predicted_stage, False
+
     def z(name: str) -> float:
         i = feature_index.get(name)
         if i is None:
@@ -148,10 +160,14 @@ class ForecastEngine:
         except KeyError:
             self._feature_index = None
 
-    def _override_stage(self, raw_features_row: np.ndarray, predicted_stage: str) -> tuple[str, bool]:
+    def _override_stage(
+        self, raw_features_row: np.ndarray, predicted_stage: str, infiltration_prob: float = 1.0,
+    ) -> tuple[str, bool]:
         if self._feature_index is None:
             return predicted_stage, False
-        return _heuristic_stage_override(raw_features_row, self._feature_index, self.scaler, self.config, predicted_stage)
+        return _heuristic_stage_override(
+            raw_features_row, self._feature_index, self.scaler, self.config, predicted_stage, infiltration_prob,
+        )
 
     def rollout(self, raw_sequence: np.ndarray) -> ForecastResult:
         """raw_sequence: (L, n_features) unscaled, most recent L windows in chronological order.
@@ -184,7 +200,7 @@ class ForecastEngine:
                 delta_raw = next_state_raw - self.scaler.inverse_transform(last_scaled.squeeze(0).cpu().numpy())
 
                 raw_stage = self.stage_labels[int(stage_prob.argmax())]
-                final_stage, was_heuristic = self._override_stage(next_state_raw, raw_stage)
+                final_stage, was_heuristic = self._override_stage(next_state_raw, raw_stage, inf_prob)
 
                 infiltration_probs.append(inf_prob)
                 stage_predictions.append(final_stage)
@@ -231,9 +247,12 @@ class ForecastEngine:
                     # forward pass it follows; see _heuristic_stage_override's docstring.
                     if self._feature_index is not None:
                         next_state_raw = self.scaler.inverse_transform(next_state.cpu().numpy())  # (b, F)
+                        inf_probs_np = probs_steps[-1]  # (b,) just computed above
                         overridden, flags = [], []
                         for i, idx in enumerate(raw_idx):
-                            stage, was_heuristic = self._override_stage(next_state_raw[i], self.stage_labels[int(idx)])
+                            stage, was_heuristic = self._override_stage(
+                                next_state_raw[i], self.stage_labels[int(idx)], float(inf_probs_np[i]),
+                            )
                             overridden.append(stage)
                             flags.append(was_heuristic)
                         stage_steps.append(overridden)
