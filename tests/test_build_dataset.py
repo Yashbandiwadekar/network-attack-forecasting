@@ -63,3 +63,49 @@ def test_tiny_group_does_not_crash():
     splits = chronological_split(seqs, SPLIT_CONFIG)
     total = sum(len(s["src_ip"]) for s in splits.values())
     assert total == 1
+
+
+def _day_sequences(days: list[str]) -> dict:
+    n = len(days)
+    ends = np.array([f"2018-{d}T12:00:00" for d in days], dtype="datetime64[us]")
+    times = np.stack([ends - np.timedelta64(110, "s") + np.timedelta64(10 * i, "s") for i in range(12)], axis=1)
+    return {
+        "src_ip": np.array(["h"] * n),
+        "window_end_time": ends,
+        "window_times": times,
+        "X": np.arange(n).reshape(n, 1, 1).astype(np.float32),
+    }
+
+
+def test_day_split_keeps_each_day_in_one_split():
+    from pipeline.build_dataset import day_disjoint_split
+
+    cfg = {"train_days": ["02-14"], "val_days": ["02-15"], "test_days": ["02-16"]}
+    seqs = _day_sequences(["02-14", "02-15", "02-16", "02-17"])
+    out = day_disjoint_split(seqs, cfg, 10, 6)
+    assert [len(out[k]["X"]) for k in ("train", "val", "test")] == [1, 1, 1]  # 02-17 unassigned
+
+
+def test_day_split_drops_sequences_crossing_midnight_and_rejects_overlap():
+    import pytest
+
+    from pipeline.build_dataset import day_disjoint_split
+
+    seqs = _day_sequences(["02-14"])
+    seqs["window_end_time"] = np.array(["2018-02-14T23:59:30"], dtype="datetime64[us]")
+    cfg = {"train_days": ["02-14"], "val_days": [], "test_days": []}
+    assert len(day_disjoint_split(seqs, cfg, 10, 6)["train"]["X"]) == 0
+    with pytest.raises(ValueError):
+        day_disjoint_split(seqs, {"train_days": ["02-14"], "test_days": ["02-14"]}, 10, 6)
+
+
+def test_lofo_folds_are_day_disjoint_and_hold_out_the_family():
+    from eval.lofo import FAMILY_DAYS, fold_days
+
+    for family, days in FAMILY_DAYS.items():
+        fold = fold_days(family)
+        assert set(days) <= set(fold["test"])
+        assert not set(days) & (set(fold["train"]) | set(fold["val"]))
+        assert not set(fold["train"]) & set(fold["val"])
+        assert not set(fold["train"]) & set(fold["test"])
+        assert not set(fold["val"]) & set(fold["test"])

@@ -55,17 +55,31 @@ import numpy as np
 import torch
 
 from common.config import feature_columns, load_config, resolve_path
-from eval.metrics import binary_metrics, lead_time_metrics, stage_metrics, threshold_at_fpr
-from models.baseline_lr import BaselineModel, PersistenceBaseline
+from eval.metrics import binary_metrics, lead_time_metrics, stage_metrics, threshold_at_fpr, threshold_free_metrics
+from models.baseline_lr import BaselineModel, PersistenceBaseline, PersistenceOnPredictedLabel
 from models.dataset import FeatureScaler, SequenceDataset, build_datasets, load_split
 from models.forecast import load_world_model
 from models.lstm_model import load_lstm_baseline
 from models.markov_baseline import MarkovBaseline
 from models.train_joint import _base_feature_mask, _build_graph_items, load_joint_world_model
 from pipeline.graph_builder import load_window_graphs
+from pipeline.mitre_mapping import STAGE_CLASSIFICATION_LABELS
 from models.world_model import WorldModel
 
 TARGET_FPR = 0.05
+
+# Audit E5: at CIC-IDS-2018's ~0.8% attack prevalence, a 5% FPR budget allows so many false
+# positives relative to the positive count that the threshold collapses toward "flag almost
+# everything," which understates the model badly (measured: F1 0.535 @ ~1.4% actual FPR vs 0.918
+# @ 0.1% FPR). These two additional, stricter budgets are reported alongside the original so a
+# reader sees the real low-FPR operating point instead of only the misleading one.
+ADDITIONAL_FPR_BUDGETS = {"budget_1pct": 0.01, "budget_0_1pct": 0.001}
+
+# Audit E6: both read the ground-truth label of the CURRENT window (models/baseline_lr.py,
+# models/markov_baseline.py) -- an oracle input no deployed system has. Labelled as such in every
+# report rather than presented as "no learning" baselines a defender could actually run.
+PERSISTENCE_ORACLE_LABEL = "Persistence [ORACLE -- reads true current label, not deployable]"
+MARKOV_ORACLE_LABEL = "Baseline (Markov chain) [ORACLE -- reads true current label, not deployable]"
 
 
 # ---------------------------------------------------------------------------
@@ -134,7 +148,15 @@ def _evaluate_model(
     fpr_threshold = threshold_at_fpr(val_target, val_prob, target_fpr=TARGET_FPR)
     budget_metrics = binary_metrics(infiltration_target, test_prob, threshold=fpr_threshold)
     stage = stage_metrics(stage_target, test_stage_pred, stage_valid_mask)
-    return {"name": name, "default": default_metrics, "budget": budget_metrics, "stage": stage}
+    result = {"name": name, "default": default_metrics, "budget": budget_metrics, "stage": stage}
+    # Audit E5: additional, stricter FPR budgets + threshold-free ranking metrics (AUROC/AUPRC),
+    # so the headline 5%-budget table (often unreachable near-verbatim at low prevalence) isn't
+    # the only operating point a reader sees.
+    for key, target_fpr in ADDITIONAL_FPR_BUDGETS.items():
+        thr = threshold_at_fpr(val_target, val_prob, target_fpr=target_fpr)
+        result[key] = binary_metrics(infiltration_target, test_prob, threshold=thr)
+    result["threshold_free"] = threshold_free_metrics(infiltration_target, test_prob)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +227,7 @@ def run(config_path: str = "configs/default.yaml") -> str:
     markov_val_prob, _ = markov.predict(val_ds)
     markov_test_prob, markov_test_stage_probs = markov.predict(test_ds)
     results.append(_evaluate_model(
-        "Baseline (Markov chain)", val_infiltration_target, markov_val_prob, markov_test_prob,
+        MARKOV_ORACLE_LABEL, val_infiltration_target, markov_val_prob, markov_test_prob,
         markov_test_stage_probs.argmax(axis=-1),
         test_infiltration_target, test_stage_target, stage_valid_mask,
     ))
@@ -214,7 +236,19 @@ def run(config_path: str = "configs/default.yaml") -> str:
     val_prob, _ = persistence.predict(val_ds)
     test_prob, test_stage_probs = persistence.predict(test_ds)
     results.append(_evaluate_model(
-        "Persistence (no learning)", val_infiltration_target, val_prob, test_prob, test_stage_probs.argmax(axis=-1),
+        PERSISTENCE_ORACLE_LABEL, val_infiltration_target, val_prob, test_prob, test_stage_probs.argmax(axis=-1),
+        test_infiltration_target, test_stage_target, stage_valid_mask,
+    ))
+
+    # Audit E6: the two baselines above read the ground-truth CURRENT label -- an oracle input no
+    # deployed system has. This is the fair, deployable comparison point: predict the current
+    # label from features first, then persist that prediction forward.
+    predicted_persistence = PersistenceOnPredictedLabel(config).fit(train_ds)
+    pp_val_prob, _ = predicted_persistence.predict(val_ds)
+    pp_test_prob, pp_test_stage_probs = predicted_persistence.predict(test_ds)
+    results.append(_evaluate_model(
+        "Persistence (on predicted label -- deployable)", val_infiltration_target, pp_val_prob, pp_test_prob,
+        pp_test_stage_probs.argmax(axis=-1),
         test_infiltration_target, test_stage_target, stage_valid_mask,
     ))
 
@@ -404,7 +438,7 @@ def run_cross_dataset(
     markov_val_prob, _ = markov.predict(val_ds_test_scaler)
     markov_test_prob, markov_test_stage_probs = markov.predict(test_ds_test_scaler)
     cross_results.append(_evaluate_model(
-        f"Baseline (Markov chain, native {test_label})",
+        f"{MARKOV_ORACLE_LABEL}, native {test_label}",
         val_target_ts, markov_val_prob, markov_test_prob, markov_test_stage_probs.argmax(axis=-1),
         test_infiltration_target, test_stage_target, stage_valid_mask,
     ))
@@ -413,8 +447,19 @@ def run_cross_dataset(
     val_prob_p, _ = persistence.predict(val_ds_test_scaler)
     test_prob_p, test_stage_probs_p = persistence.predict(test_ds_test_scaler)
     cross_results.append(_evaluate_model(
-        f"Persistence (no learning, {test_label})",
+        f"{PERSISTENCE_ORACLE_LABEL}, native {test_label}",
         val_target_ts, val_prob_p, test_prob_p, test_stage_probs_p.argmax(axis=-1),
+        test_infiltration_target, test_stage_target, stage_valid_mask,
+    ))
+
+    # Audit E6: the deployable comparison point, fitted on the *native* test-dataset train split
+    # (fair -- same data the oracle baselines above were fitted on, just without the oracle input).
+    predicted_persistence = PersistenceOnPredictedLabel(test_config).fit(train_ds_test)
+    pp_val_prob, _ = predicted_persistence.predict(val_ds_test_scaler)
+    pp_test_prob, pp_test_stage_probs = predicted_persistence.predict(test_ds_test_scaler)
+    cross_results.append(_evaluate_model(
+        f"Persistence (on predicted label -- deployable, native {test_label})",
+        val_target_ts, pp_val_prob, pp_test_prob, pp_test_stage_probs.argmax(axis=-1),
         test_infiltration_target, test_stage_target, stage_valid_mask,
     ))
 
@@ -476,6 +521,11 @@ def _format_lead_time_section(lead_time: dict | None, horizon: int, window_secon
     mean_str = f"{mean_s:+.1f}s" if mean_s is not None else "n/a (all missed)"
     median_str = f"{median_s:+.1f}s" if median_s is not None else "n/a (all missed)"
 
+    far = lead_time.get("false_alarm_rate")
+    ap = lead_time.get("alarm_precision")
+    far_str = f"{lead_time['n_false_alarms']} / {lead_time['n_false_alarm_eligible']} ({far:.2%})" if far is not None else "n/a"
+    ap_str = f"{ap:.1%}" if ap is not None else "n/a (no alarms raised at all)"
+
     return f"""
 ## K-step forecast lead time
 
@@ -494,12 +544,19 @@ rollout itself against the baselines).
 | Detected *before* the attack actually started | {lead_time['pct_detected_early']:.1%} |
 | Mean lead time (detected cases; + = early, - = late) | {mean_str} |
 | Median lead time (detected cases) | {median_str} |
+| False alarms / benign-for-whole-horizon sequences | {far_str} |
+| Alarm precision (true early alarms / all alarms raised) | {ap_str} |
 
 Lead time is `(actual attack-onset step) - (first step the alarm threshold is crossed)`, in
 seconds. A positive value is a genuine early warning — the alarm fired before the attack window
 it was warning about actually arrived. Missed transitions are excluded from the mean/median (there
 is no lead time to average when the model never alarmed at all) and reported separately as a miss
 rate instead, so a high miss rate can't silently inflate the mean by dropping out of it.
+
+**Audit E3**: the false-alarm rate and alarm precision rows above are the other half of this
+metric that the original version omitted — a threshold low enough to catch every transition early
+can do so by alarming on nearly everything, which the miss-rate/lead-time numbers alone can't
+reveal. A low alarm precision means most of what this threshold flags is noise, not warning.
 """
 
 
@@ -512,11 +569,31 @@ def _format_report(
 
     def stage_row(r):
         m = r["stage"]
-        return f"| {r['name']} | {m['f1_macro']:.3f} | {m['precision_macro']:.3f} | {m['recall_macro']:.3f} |"
+        attack_only = f"{m['f1_macro_attack_only']:.3f}" if m["f1_macro_attack_only"] is not None else "n/a"
+        return (
+            f"| {r['name']} | {m['f1_macro']:.3f} | {attack_only} | {m['precision_macro']:.3f} "
+            f"| {m['recall_macro']:.3f} |"
+        )
+
+    def threshold_free_row(r):
+        m = r["threshold_free"]
+        auroc = f"{m['auroc']:.4f}" if m["auroc"] is not None else "n/a (one class only)"
+        auprc = f"{m['auprc']:.4f}" if m["auprc"] is not None else "n/a (one class only)"
+        return f"| {r['name']} | {auroc} | {auprc} |"
 
     default_rows = "\n".join(row(r, "default") for r in results)
     budget_rows = "\n".join(row(r, "budget") for r in results)
+    budget_1pct_rows = "\n".join(row(r, "budget_1pct") for r in results)
+    budget_0_1pct_rows = "\n".join(row(r, "budget_0_1pct") for r in results)
+    threshold_free_rows = "\n".join(threshold_free_row(r) for r in results)
     stage_rows = "\n".join(stage_row(r) for r in results)
+    # Audit E4: the number of stage classes actually present is dataset/split-dependent, not
+    # always 5 -- read it off the world model's own stage_metrics rather than hard-coding "5-way".
+    stage_info = results[0]["stage"]
+    n_classes = stage_info["n_classes_present"]
+    support_str = ", ".join(
+        f"{STAGE_CLASSIFICATION_LABELS[c]}: {n}" for c, n in sorted(stage_info["support"].items())
+    )
     lead_time_section = _format_lead_time_section(
         lead_time, config["windowing"]["forecast_horizon"], config["windowing"]["window_seconds"],
     )
@@ -540,14 +617,45 @@ compare the rollout itself against fairly.
 Threshold selected on the validation split only (never test), then applied here — this is the
 operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
 
+**Audit E5**: at this dataset's attack prevalence, a {TARGET_FPR:.0%} FPR budget can force the
+threshold down near zero, which understates a model that is actually strong at a realistic,
+stricter operating point. The two stricter budgets and the threshold-free ranking metrics below
+are reported for exactly that reason — don't quote this table alone.
+
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
 {budget_rows}
 
-## MITRE stage classification (5-way, `impact`-mapped windows excluded)
+## Infiltration probability — fixed 1% false-positive-rate budget
 
-| Model | F1 (macro) | Precision (macro) | Recall (macro) |
-|---|---|---|---|
+| Model | F1 | Precision | Recall | False Positive Rate |
+|---|---|---|---|---|
+{budget_1pct_rows}
+
+## Infiltration probability — fixed 0.1% false-positive-rate budget
+
+| Model | F1 | Precision | Recall | False Positive Rate |
+|---|---|---|---|---|
+{budget_0_1pct_rows}
+
+## Infiltration probability — threshold-free ranking (AUROC / AUPRC)
+
+Summarizes ranking quality across every possible threshold, so no single operating-point choice
+above can make a genuinely strong (or weak) model look otherwise.
+
+| Model | AUROC | AUPRC |
+|---|---|---|
+{threshold_free_rows}
+
+## MITRE stage classification ({n_classes} classes present, `impact`-mapped windows excluded)
+
+**Audit E4**: the number of classes actually present in this split is {n_classes}, not always 5 —
+support by class: {support_str}. The all-class macro-F1 column is pulled toward the near-perfect
+benign class when benign is one of the classes present; the attack-only column macro-averages
+over the attack classes alone and is the more honest read of "can it tell attack stages apart."
+
+| Model | F1 (macro, all classes) | F1 (macro, attack classes only) | Precision (macro) | Recall (macro) |
+|---|---|---|---|---|
 {stage_rows}
 {lead_time_section}
 ## Interpretation
@@ -569,8 +677,10 @@ operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
 def _persistence_caveat(results: list[dict], attack_persistence_rate: float | None) -> str:
     """Computed, not hand-written — see _stacked_baseline_caveat's docstring for why."""
     by_name = {r["name"]: r for r in results}
+    if "World Model (Transformer)" not in by_name or PERSISTENCE_ORACLE_LABEL not in by_name:
+        return ""
     wm_f1 = by_name["World Model (Transformer)"]["default"]["f1"]
-    persistence_f1 = by_name["Persistence (no learning)"]["default"]["f1"]
+    persistence_f1 = by_name[PERSISTENCE_ORACLE_LABEL]["default"]["f1"]
     if persistence_f1 <= wm_f1:
         return ""
 
@@ -581,8 +691,9 @@ def _persistence_caveat(results: list[dict], attack_persistence_rate: float | No
         "no currently-attacked test windows to measure this on"
     )
     return (
-        "\n**Honest caveat**: persistence beats the world model on the immediate next-step (t+1) "
-        f"task ({rate_note}). This isn't the model failing to learn — at a 10-second window size, "
+        "\n**Honest caveat**: the label-persistence ORACLE beats the world model on the immediate "
+        f"next-step (t+1) task ({rate_note}). Note this is an oracle comparison, not a deployable "
+        "one — see the E6 note above. This isn't the model failing to learn — at a 10-second window size, "
         "attacks in this dataset are long, contiguous bursts rather than isolated blips, so 'assume "
         "nothing changes' is a genuinely strong predictor of the *very next* window specifically. "
         "It cannot, however, anticipate a transition — a benign window about to turn into an attack, "
@@ -599,8 +710,8 @@ def _markov_caveat(results: list[dict]) -> str:
     long contiguous attack bursts, "current stage persists" IS what the transition table learns
     (the diagonal dominates), so the two baselines converging is expected, not a bug in either."""
     by_name = {r["name"]: r for r in results}
-    markov_key = "Baseline (Markov chain)"
-    persistence_key = "Persistence (no learning)"
+    markov_key = MARKOV_ORACLE_LABEL
+    persistence_key = PERSISTENCE_ORACLE_LABEL
     if markov_key not in by_name or persistence_key not in by_name:
         return ""
     markov_f1 = by_name[markov_key]["default"]["f1"]
@@ -632,14 +743,29 @@ def _format_cross_dataset_report(
 
     def stage_row(r):
         m = r["stage"]
+        attack_only = f"{m['f1_macro_attack_only']:.3f}" if m["f1_macro_attack_only"] is not None else "n/a"
         return (
-            f"| {r['name']} | {m['f1_macro']:.3f} "
+            f"| {r['name']} | {m['f1_macro']:.3f} | {attack_only} "
             f"| {m['precision_macro']:.3f} | {m['recall_macro']:.3f} |"
         )
 
+    def threshold_free_row(r):
+        m = r["threshold_free"]
+        auroc = f"{m['auroc']:.4f}" if m["auroc"] is not None else "n/a (one class only)"
+        auprc = f"{m['auprc']:.4f}" if m["auprc"] is not None else "n/a (one class only)"
+        return f"| {r['name']} | {auroc} | {auprc} |"
+
     default_rows = "\n".join(row(r, "default") for r in results)
     budget_rows = "\n".join(row(r, "budget") for r in results)
+    budget_1pct_rows = "\n".join(row(r, "budget_1pct") for r in results)
+    budget_0_1pct_rows = "\n".join(row(r, "budget_0_1pct") for r in results)
+    threshold_free_rows = "\n".join(threshold_free_row(r) for r in results)
     stage_rows = "\n".join(stage_row(r) for r in results)
+    stage_info = results[0]["stage"]
+    n_classes = stage_info["n_classes_present"]
+    support_str = ", ".join(
+        f"{STAGE_CLASSIFICATION_LABELS[c]}: {n}" for c, n in sorted(stage_info["support"].items())
+    )
 
     seq_len = train_config["windowing"]["sequence_length"]
     lead_time_section = _format_lead_time_section(
@@ -673,10 +799,30 @@ Threshold selected on the **{test_label} val split** only (never test).
 |---|---|---|---|---|
 {budget_rows}
 
-## MITRE stage classification (5-way, `impact`-mapped windows excluded)
+## Infiltration probability — fixed 1% FPR budget
 
-| Model | F1 (macro) | Precision (macro) | Recall (macro) |
-|---|---|---|---|
+| Model | F1 | Precision | Recall | False Positive Rate |
+|---|---|---|---|---|
+{budget_1pct_rows}
+
+## Infiltration probability — fixed 0.1% FPR budget
+
+| Model | F1 | Precision | Recall | False Positive Rate |
+|---|---|---|---|---|
+{budget_0_1pct_rows}
+
+## Infiltration probability — threshold-free ranking (AUROC / AUPRC)
+
+| Model | AUROC | AUPRC |
+|---|---|---|
+{threshold_free_rows}
+
+## MITRE stage classification ({n_classes} classes present, `impact`-mapped windows excluded)
+
+Support by class: {support_str}.
+
+| Model | F1 (macro, all classes) | F1 (macro, attack classes only) | Precision (macro) | Recall (macro) |
+|---|---|---|---|---|
 {stage_rows}
 {lead_time_section}
 ## Interpretation

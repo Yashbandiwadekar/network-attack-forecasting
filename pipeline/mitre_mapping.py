@@ -175,8 +175,53 @@ def label_to_stage(raw_label: str) -> str:
     if normalized.startswith("flow="):
         return ctu13_label_to_stage(label)
 
+    # UNSW-NB15 labels start with "unsw=" (see pipeline/adapters/unsw_nb15.py).
+    if normalized.startswith("unsw="):
+        return unsw_label_to_stage(label)
+
     # Unknown labels are excluded from the five-stage classification.
     return IMPACT
+
+
+# ---------------------------------------------------------------------------
+# UNSW-NB15 label mapping (D1: second permitted dataset, adds real
+# Reconnaissance examples that CIC-IDS-2018 has none of)
+# ---------------------------------------------------------------------------
+
+UNSW_LABEL_TO_STAGE: dict[str, str] = {
+    "normal": BENIGN,
+    "reconnaissance": RECONNAISSANCE,
+    # Foothold / code-execution categories -- closest kill-chain analogue is
+    # gaining initial access to the host.
+    "backdoor": INITIAL_ACCESS,
+    "backdoors": INITIAL_ACCESS,
+    "exploits": INITIAL_ACCESS,
+    "shellcode": INITIAL_ACCESS,
+    # Self-propagating across hosts is literally lateral movement.
+    "worms": LATERAL_MOVEMENT,
+    # Deliberately NOT mapped to a kill-chain stage -- conservative default of
+    # IMPACT (excluded from the 5-way stage head), same treatment CIC-IDS-2018
+    # DoS/DDoS gets. "Generic" is a block-cipher-complexity attack unrelated
+    # to any single stage; "DoS" duplicates CIC's own impact category;
+    # "Fuzzers" and "Analysis" are diagnostic/mixed categories (protocol
+    # fuzzing, port scans, spam, html-file penetration) that don't cleanly
+    # match one stage -- forcing them into Reconnaissance or Initial Access
+    # would overstate what the label actually says.
+}
+
+
+def unsw_label_to_stage(raw_label: str) -> str:
+    """Map a UNSW-NB15 ``unsw=<attack_cat or 'Normal'>`` label to an internal stage."""
+
+    if raw_label is None:
+        return IMPACT
+
+    label = str(raw_label).strip().lower()
+    if not label.startswith("unsw="):
+        return IMPACT
+
+    attack_cat = label[len("unsw="):].strip()
+    return UNSW_LABEL_TO_STAGE.get(attack_cat, IMPACT)
 
 
 # ---------------------------------------------------------------------------

@@ -34,7 +34,10 @@ from models.dataset import FeatureScaler
 from models.forecast import ForecastEngine, latest_sequence, load_world_model
 from pipeline.flow_features import COLUMN_RENAME, clean_and_normalize
 from pipeline.graph_features import build_graph_window_features
-from pipeline.windowing import build_flow_windows, merge_graph_features, merge_packet_features
+from pipeline.graph_embedding_features import build_graph_embedding_window_features
+from pipeline.windowing import (
+    build_flow_windows, merge_graph_embedding_features, merge_graph_features, merge_packet_features,
+)
 
 RNG = np.random.default_rng(13)
 
@@ -148,6 +151,8 @@ def main(config_path: str = "configs/real_data.yaml") -> None:
     graph_windows = build_graph_window_features(flow_df, config)
     windows = merge_graph_features(windows, graph_windows, config)
     windows = merge_packet_features(windows, None, config)
+    embedding_windows = build_graph_embedding_window_features(flow_df, config)
+    windows = merge_graph_embedding_features(windows, embedding_windows, config)
 
     host_id = windows["src_ip"].iloc[0]
     feature_cols = feature_columns(config)

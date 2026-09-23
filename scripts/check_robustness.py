@@ -25,7 +25,10 @@ from models.dataset import FeatureScaler
 from models.forecast import ForecastEngine, latest_sequence, load_world_model
 from pipeline.flow_features import COLUMN_RENAME, clean_and_normalize
 from pipeline.graph_features import build_graph_window_features
-from pipeline.windowing import build_flow_windows, merge_graph_features, merge_packet_features
+from pipeline.graph_embedding_features import build_graph_embedding_window_features
+from pipeline.windowing import (
+    build_flow_windows, merge_graph_embedding_features, merge_graph_features, merge_packet_features,
+)
 
 OOD_IP = "10.0.0.201"
 BACKUP_SERVER_IP = "203.0.113.200"
@@ -81,6 +84,8 @@ def main(config_path: str = "configs/default.yaml") -> None:
     graph_windows = build_graph_window_features(flow_df, config)
     windows = merge_graph_features(windows, graph_windows, config)
     windows = merge_packet_features(windows, None, config)  # flow-only capture, no PCAP
+    embedding_windows = build_graph_embedding_window_features(flow_df, config)
+    windows = merge_graph_embedding_features(windows, embedding_windows, config)
 
     feature_cols = feature_columns(config)
     raw_sequence = latest_sequence(windows, feature_cols, OOD_IP, seq_len)

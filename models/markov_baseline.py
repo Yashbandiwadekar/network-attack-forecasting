@@ -25,6 +25,11 @@ class MarkovBaseline:
     training. `-1`-labeled (`impact`-mapped) windows are excluded from fitting the stage
     transition table, matching how BaselineModel/the world model itself mask this class out of
     the 5-way stage space (see pipeline/mitre_mapping.py).
+
+    ORACLE, not deployable (audit E6): predict() reads ds.current_stage, the ground-truth label of
+    the window the sequence ends on. A deployed system never has that label — only the raw
+    features. See models.baseline_lr.PersistenceOnPredictedLabel for the fair, deployable
+    comparison point.
     """
 
     def __init__(self, laplace_smoothing: float = 1.0):
