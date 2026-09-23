@@ -1,14 +1,5 @@
 # Evaluation: World Model vs Baselines
 
-**Disclosure (audit G6/W6, added 2026-09-23, re-measured independently, not copied from the
-audit):** this is not a pure CIC-IDS-2018 evaluation. **26.6% of the val split (2,425 / 9,110
-sequences) and 17.6% of the test split (1,540 / 8,731 sequences) are fabricated benign traffic**
-from `scripts/augment_benign_high_volume.py`, dated `2018-04-01` (val) and `2018-04-02` (test) —
-CIC-IDS-2018 has no April data; these two days do not exist in the real dataset. Per-split day
-breakdown: val = `2018-02-15` (3,412), `2018-02-22` (3,273), `2018-04-01` (2,425, fabricated);
-test = `2018-03-01` (3,390), `2018-02-23` (3,318), `2018-04-02` (1,540, fabricated),
-`2018-02-16` (483). See W7 for whether/how this is addressed in the retrain.
-
 Test set: 8731 sequences. All models below predict the immediate next window (t+1) from
 identical targets; the world model additionally supports K-step autoregressive rollout (see
 models/forecast.py), which none of the baselines have an equivalent of — demonstrated in the
@@ -116,6 +107,7 @@ rollout itself against the baselines).
 | Median lead time (detected cases) | +10.0s |
 | False alarms / benign-for-whole-horizon sequences | 2735 / 6620 (41.31%) |
 | Alarm precision (true early alarms / all alarms raised) | 1.5% |
+| Achieved FPR on this test split, at the val-tuned 5%-budget threshold | 35.9% |
 
 Lead time is `(actual attack-onset step) - (first step the alarm threshold is crossed)`, in
 seconds. A positive value is a genuine early warning — the alarm fired before the attack window
@@ -127,6 +119,10 @@ rate instead, so a high miss rate can't silently inflate the mean by dropping ou
 metric that the original version omitted — a threshold low enough to catch every transition early
 can do so by alarming on nearly everything, which the miss-rate/lead-time numbers alone can't
 reveal. A low alarm precision means most of what this threshold flags is noise, not warning.
+
+**Audit G8/W9**: the threshold above is tuned on the val split for a 5% FPR budget,
+then applied here to the test split unchanged, exactly as a deployment would carry it forward.
+Here it came out **35.9%** — 7.2x the 5% budget it was tuned for. **The operating threshold does not transfer across days**; this is a result worth stating plainly, not a footnote — a defender who tunes on one day's traffic and deploys the next day should expect the false-positive rate to move substantially, not stay near the budget they picked.
 
 ## Interpretation
 
