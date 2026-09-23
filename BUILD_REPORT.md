@@ -349,3 +349,23 @@ features agree (flow_count, total_packets, total_bytes, mean_duration, syn/ack/f
 mean/var/max_iat, bidir_ratio, tcp_ratio) plus mean_iat > 1e5 (microsecond scale). Passes; full
 suite passes. `data/raw/pcap/synthetic_sample.pcap` cannot exercise this (all 944 flows are
 single-packet), so the test generates its own capture.
+
+## W3 -- packet features into a flow-only model (G11) -- FIXED (with a premise correction)
+
+`app/streamlit_app.py::_is_flow_only_model` reads the checkpoint's own `processed_dir/metadata.json`
+(`flow_only` / `packet_features_available`); `_process_uploads` then skips the packet merge, so
+`merge_packet_features(..., None, ...)` zero-fills all packet features and sets `has_packet_features=0`.
+**Premise correction:** the work order expected the synthetic-data model to get populated packet features.
+It does not qualify: `data/processed/cicids2018/splits/metadata.json` (the synthetic-data model's dataset)
+is ALSO `flow_only: true`, because `pipeline/build_dataset.py` always zero-fills packet features. Both
+shipped checkpoints are flow-only, so both get zeros. The "populated" branch applies only to a model whose
+metadata lacks the flag; it is tested with a hypothetical packet-trained config.
+Evidence (`pytest tests/test_streamlit_uploads.py -s`, PCAP upload of a real generated SYN scan):
+```
+configs/real_data.yaml max packet features: {mean_ttl 0.0, var_ttl 0.0, mean_window_size 0.0, frag_ratio 0.0, mean_payload_size 0.0, std_payload_size 0.0, port_scan_score 0.0, retransmit_ratio 0.0, has_packet_features 0.0}
+configs/default.yaml max packet features:   (identical, all 0.0)
+packet-trained (hypothetical): {mean_ttl 64.0, ..., port_scan_score 1.0, has_packet_features 1.0}
+3 passed
+```
+Side effect: the port-scan reconnaissance heuristic (uses `port_scan_score`) is now also inert for PCAP
+uploads to these models, consistent with how they were trained.

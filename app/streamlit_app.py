@@ -234,6 +234,17 @@ def _load_backend(config_path: str):
     return config, model, scaler, background
 
 
+def _is_flow_only_model(config: dict) -> bool:
+    """Audit G11: True when the checkpoint's own processed dataset was built flow-only (read from
+    its metadata.json, never from a config name). Such a model has never seen packet features."""
+    import json
+    try:
+        meta = json.loads((resolve_path(config, "processed_dir") / "metadata.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return bool(meta.get("flow_only")) or meta.get("packet_features_available") is False
+
+
 def _process_uploads(flow_csv_path: Path | None, pcap_path: Path | None, config: dict) -> pd.DataFrame:
     """Audit S4: flow_csv_path is now optional -- a PCAP/PCAPNG capture alone is enough to derive
     flow-level records (pipeline.packet_features.build_flow_records) and drive the whole pipeline,
@@ -251,7 +262,7 @@ def _process_uploads(flow_csv_path: Path | None, pcap_path: Path | None, config:
     flow_windows = build_flow_windows(flow_df, config)
 
     packet_windows = None
-    if packet_df is not None:
+    if packet_df is not None and not _is_flow_only_model(config):
         packet_windows = compute_packet_window_features(packet_df, config["windowing"]["window_seconds"])
 
     windows = merge_packet_features(flow_windows, packet_windows, config)
