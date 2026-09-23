@@ -79,12 +79,11 @@ RL-side terminology if this becomes a direction worth pursuing.
     depending on the source/target pair.
   - **Why this matters for this project specifically**: this project ran the *same experiment*
     (train on CIC-IDS-2018, zero-shot test on CTU-13, see `04-evaluation-ctu13_cross_from_real_data.md`)
-    and got a **partial transfer**, not collapse — binary infiltration detection held up at a
-    properly calibrated threshold (F1 0.534 vs. native-trained baselines' 0.045), while MITRE stage
-    classification did degrade (macro-F1 0.328 vs ~0.52 for native baselines). Against this paper's
-    baseline of "usually total collapse," a result of "binary signal transfers, fine-grained
-    labels don't" is meaningfully above the field's typical outcome and worth stating explicitly
-    against this citation in the submission rather than just reporting the raw numbers alone.
+    and got **no transfer**: the regenerated report shows F1 0.009 and AUROC 0.517 (chance level) on
+    CTU-13, with attack-class stage F1 of 0.000. (An earlier version of this note claimed a partial
+    transfer, F1 0.534; that number is withdrawn -- see `docs/AUDIT.md` G1.) This is consistent with
+    the paper's baseline of "usually total collapse", not an exception to it, and should be stated
+    plainly against this citation in the submission rather than presented as a strength.
   - **A second, separate finding buried in this paper's related-work section is a real risk for
     this project**: cited studies on CIC dataset integrity found **labeling error rates of
     6.67% (CIC-IDS2017) and 7.53% (CSE-CIC-IDS2018)**, with label corruption **exceeding 75% for

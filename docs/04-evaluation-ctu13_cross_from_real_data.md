@@ -1,3 +1,8 @@
+> **Regenerated 2026-09-23** (replaces a withdrawn earlier version, archived at
+> `docs/archive/04-evaluation-ctu13_cross_from_real_data_RETRACTED-2026-09-23.md`). Trained on
+> `checkpoints_real/` (v1), tested on the current 41-feature CTU-13 build. **The model does not
+> transfer to CTU-13** (AUROC 0.517, chance level).
+
 # Cross-Dataset Evaluation: Train on CIC-IDS-2018 / Test on CTU-13
 
 Test set: 186520 sequences from **CTU-13** (never seen during training).
@@ -15,10 +20,13 @@ and serve as the comparison anchor.
 
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
-| World Model (Train: CIC-IDS-2018 / Test: CTU-13) | 0.001 | 0.057 | 0.001 | 0.000 |
-| Baseline (LR, last window, native CTU-13) | 0.014 | 0.362 | 0.007 | 0.000 |
-| Baseline (LR, stacked window, native CTU-13) | 0.002 | 0.207 | 0.001 | 0.000 |
-| Persistence (no learning, CTU-13) | 0.980 | 0.980 | 0.980 | 0.001 |
+| World Model (Train: CIC-IDS-2018 / Test: CTU-13) | 0.006 | 0.014 | 0.004 | 0.010 |
+| Baseline (LSTM, Train: CIC-IDS-2018 / Test: CTU-13) | 0.000 | 0.000 | 0.000 | 0.000 |
+| Baseline (LR, last window, native CTU-13) | 0.012 | 0.336 | 0.006 | 0.000 |
+| Baseline (LR, stacked window, native CTU-13) | 0.006 | 0.447 | 0.003 | 0.000 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native CTU-13 | 0.980 | 0.980 | 0.980 | 0.001 |
+| Persistence [ORACLE -- reads true current label, not deployable], native CTU-13 | 0.980 | 0.980 | 0.980 | 0.001 |
+| Persistence (on predicted label -- deployable, native CTU-13) | 0.012 | 0.302 | 0.006 | 0.000 |
 
 ## Infiltration probability — fixed 5% FPR budget
 
@@ -26,19 +34,94 @@ Threshold selected on the **CTU-13 val split** only (never test).
 
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
-| World Model (Train: CIC-IDS-2018 / Test: CTU-13) | 0.534 | 0.453 | 0.651 | 0.028 |
-| Baseline (LR, last window, native CTU-13) | 0.045 | 0.505 | 0.023 | 0.001 |
+| World Model (Train: CIC-IDS-2018 / Test: CTU-13) | 0.009 | 0.008 | 0.009 | 0.038 |
+| Baseline (LSTM, Train: CIC-IDS-2018 / Test: CTU-13) | 0.003 | 0.002 | 0.003 | 0.046 |
+| Baseline (LR, last window, native CTU-13) | 0.189 | 0.319 | 0.134 | 0.010 |
+| Baseline (LR, stacked window, native CTU-13) | 0.268 | 0.413 | 0.198 | 0.010 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native CTU-13 | 0.980 | 0.980 | 0.980 | 0.001 |
+| Persistence [ORACLE -- reads true current label, not deployable], native CTU-13 | 0.980 | 0.980 | 0.980 | 0.001 |
+| Persistence (on predicted label -- deployable, native CTU-13) | 0.179 | 0.345 | 0.121 | 0.008 |
+
+## Infiltration probability — fixed 1% FPR budget
+
+| Model | F1 | Precision | Recall | False Positive Rate |
+|---|---|---|---|---|
+| World Model (Train: CIC-IDS-2018 / Test: CTU-13) | 0.000 | 0.002 | 0.000 | 0.003 |
+| Baseline (LSTM, Train: CIC-IDS-2018 / Test: CTU-13) | 0.000 | 0.000 | 0.000 | 0.009 |
+| Baseline (LR, last window, native CTU-13) | 0.000 | 0.000 | 0.000 | 0.000 |
 | Baseline (LR, stacked window, native CTU-13) | 0.000 | 0.000 | 0.000 | 0.000 |
-| Persistence (no learning, CTU-13) | 0.980 | 0.980 | 0.980 | 0.001 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native CTU-13 | 0.980 | 0.980 | 0.980 | 0.001 |
+| Persistence [ORACLE -- reads true current label, not deployable], native CTU-13 | 0.980 | 0.980 | 0.980 | 0.001 |
+| Persistence (on predicted label -- deployable, native CTU-13) | 0.000 | 0.000 | 0.000 | 0.000 |
 
-## MITRE stage classification (5-way, `impact`-mapped windows excluded)
+## Infiltration probability — fixed 0.1% FPR budget
 
-| Model | F1 (macro) | Precision (macro) | Recall (macro) |
-|---|---|---|---|
-| World Model (Train: CIC-IDS-2018 / Test: CTU-13) | 0.328 | 0.323 | 0.333 |
-| Baseline (LR, last window, native CTU-13) | 0.520 | 0.831 | 0.514 |
-| Baseline (LR, stacked window, native CTU-13) | 0.529 | 0.976 | 0.519 |
-| Persistence (no learning, CTU-13) | 1.000 | 1.000 | 1.000 |
+| Model | F1 | Precision | Recall | False Positive Rate |
+|---|---|---|---|---|
+| World Model (Train: CIC-IDS-2018 / Test: CTU-13) | 0.000 | 0.000 | 0.000 | 0.000 |
+| Baseline (LSTM, Train: CIC-IDS-2018 / Test: CTU-13) | 0.000 | 0.000 | 0.000 | 0.000 |
+| Baseline (LR, last window, native CTU-13) | 0.000 | 0.000 | 0.000 | 0.000 |
+| Baseline (LR, stacked window, native CTU-13) | 0.000 | 0.000 | 0.000 | 0.000 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native CTU-13 | 0.980 | 0.980 | 0.980 | 0.001 |
+| Persistence [ORACLE -- reads true current label, not deployable], native CTU-13 | 0.980 | 0.980 | 0.980 | 0.001 |
+| Persistence (on predicted label -- deployable, native CTU-13) | 0.000 | 0.000 | 0.000 | 0.000 |
+
+## Infiltration probability — threshold-free ranking (AUROC / AUPRC)
+
+| Model | AUROC | AUPRC |
+|---|---|---|
+| World Model (Train: CIC-IDS-2018 / Test: CTU-13) | 0.5172 | 0.0322 |
+| Baseline (LSTM, Train: CIC-IDS-2018 / Test: CTU-13) | 0.8032 | 0.0897 |
+| Baseline (LR, last window, native CTU-13) | 0.6195 | 0.1096 |
+| Baseline (LR, stacked window, native CTU-13) | 0.6589 | 0.1757 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native CTU-13 | 0.9902 | 0.9800 |
+| Persistence [ORACLE -- reads true current label, not deployable], native CTU-13 | 0.9899 | 0.9619 |
+| Persistence (on predicted label -- deployable, native CTU-13) | 0.6187 | 0.1057 |
+
+## MITRE stage classification (2 classes present, `impact`-mapped windows excluded)
+
+Support by class: benign: 180082, command_and_control: 5944.
+
+| Model | F1 (macro, all classes) | F1 (macro, attack classes only) | Precision (macro) | Recall (macro) |
+|---|---|---|---|---|
+| World Model (Train: CIC-IDS-2018 / Test: CTU-13) | 0.328 | 0.000 | 0.323 | 0.333 |
+| Baseline (LSTM, Train: CIC-IDS-2018 / Test: CTU-13) | 0.492 | 0.000 | 0.484 | 0.500 |
+| Baseline (LR, last window, native CTU-13) | 0.509 | 0.035 | 0.727 | 0.509 |
+| Baseline (LR, stacked window, native CTU-13) | 0.536 | 0.089 | 0.957 | 0.523 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native CTU-13 | 1.000 | 1.000 | 1.000 | 1.000 |
+| Persistence [ORACLE -- reads true current label, not deployable], native CTU-13 | 1.000 | 1.000 | 1.000 | 1.000 |
+| Persistence (on predicted label -- deployable, native CTU-13) | 0.509 | 0.035 | 0.732 | 0.509 |
+
+## K-step forecast lead time
+
+The metric the problem statement actually asks for: of the hosts that are benign right now but
+cross into an attack state within the next 6 windows (60s), how much *advance*
+warning does the K-step rollout give, at the same fixed-5%-FPR threshold used above?
+This has no baseline column — a single-window classifier has no mechanism to imagine a future
+state and alarm on it before that state is actually observed, so there is nothing to compare
+against fairly (same reasoning the module docstring already gives for not benchmarking K-step
+rollout itself against the baselines).
+
+| Metric | Value |
+|---|---|
+| Benign-to-attack transitions in test set | 551 |
+| Missed entirely (never alarmed within horizon) | 436 (79.1%) |
+| Detected *before* the attack actually started | 11.8% |
+| Mean lead time (detected cases; + = early, - = late) | +10.1s |
+| Median lead time (detected cases) | +10.0s |
+| False alarms / benign-for-whole-horizon sequences | 19606 / 179531 (10.92%) |
+| Alarm precision (true early alarms / all alarms raised) | 0.6% |
+
+Lead time is `(actual attack-onset step) - (first step the alarm threshold is crossed)`, in
+seconds. A positive value is a genuine early warning — the alarm fired before the attack window
+it was warning about actually arrived. Missed transitions are excluded from the mean/median (there
+is no lead time to average when the model never alarmed at all) and reported separately as a miss
+rate instead, so a high miss rate can't silently inflate the mean by dropping out of it.
+
+**Audit E3**: the false-alarm rate and alarm precision rows above are the other half of this
+metric that the original version omitted — a threshold low enough to catch every transition early
+can do so by alarming on nearly everything, which the miss-rate/lead-time numbers alone can't
+reveal. A low alarm precision means most of what this threshold flags is noise, not warning.
 
 ## Interpretation
 

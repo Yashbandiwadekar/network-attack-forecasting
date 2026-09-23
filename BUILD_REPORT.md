@@ -304,3 +304,30 @@ specific failure modes the audit measured (a flood, a scan), not general five-wa
    whose span crosses into a different day) -- worth confirming this explicitly in the final report.
 2. E10 (multi-seed + CIs), E11 (report/README hygiene).
 3. D2 (CAPEC linkage) -- not yet started.
+
+---
+
+# WORK ORDER RESPONSE (started 2026-09-23, branch `builder/audit-fixes-2026-09-23`)
+
+| W-id | Finding | Status | Files changed |
+|---|---|---|---|
+| W1 | G1 | FIXED | `README.md`, `docs/05-related-work-and-competitive-landscape.md`, `docs/04-evaluation-ctu13_cross_from_real_data.md` (now the regenerated report), `docs/archive/04-evaluation-ctu13_cross_from_real_data_RETRACTED-2026-09-23.md` |
+| W2-W12 | | NOT STARTED | |
+
+## W1 -- retracted CTU-13 number (FIXED)
+
+Owner approved swapping the regenerated report in and archiving the original (2026-09-23). The
+original is kept at `docs/archive/...RETRACTED-2026-09-23.md` with a dated retraction note on top;
+the regenerated report now sits at the original path with a header explaining the swap. README and
+`docs/05` now state the model does **not** transfer (F1 0.009, AUROC 0.517, attack-class stage F1
+0.000 -- all read from the regenerated report, not carried from memory).
+
+Acceptance (`grep -rn "0\.534" --include=*.md .`, excluding the auditor's own AUDIT.md/WORK_ORDER.md):
+```
+./docs/04-evaluation-real.md:30:| Baseline (LR, stacked window) | 0.534 | 0.364 | 1.000 | 0.014 |
+./docs/archive/04-evaluation-ctu13_cross_from_real_data_RETRACTED-2026-09-23.md:1:> **RETRACTED 2026-09-23.** The World Model figures below (including F1 0.534 at the 5% FPR budget)
+./docs/archive/04-evaluation-ctu13_cross_from_real_data_RETRACTED-2026-09-23.md:36:| World Model (Train: CIC-IDS-2018 / Test: CTU-13) | 0.534 | 0.453 | 0.651 | 0.028 |
+./README.md:111:version of this README quoted F1 0.534; that number came from a 33-feature checkpoint and dataset
+```
+Every remaining hit is either a retraction note or unrelated: `docs/04-evaluation-real.md:30` is the
+CIC-IDS-2018 LR-stacked-window baseline's F1 -- a coincidental match, not the CTU-13 figure.
