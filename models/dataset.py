@@ -94,6 +94,51 @@ class SequenceDataset(Dataset):
         return self.X[idx], self.next_state[idx], self.future_stages[idx], self.infiltration[idx]
 
 
+VOLUME_FEATURES = ("flow_count", "total_packets", "total_bytes")
+
+
+class ScaleInvariantSequenceDataset(SequenceDataset):
+    """Audit W11 part 3: on every __getitem__, rescales the volume-magnitude features
+    (flow_count, total_packets, total_bytes) of X and next_state by ONE shared random factor per
+    sequence -- the same factor across all L input windows and the next-state target, so the
+    transition stays internally consistent (a proportionally scaled history followed by a
+    proportionally scaled next window is still a plausible continuation). Everything else (ratios,
+    IAT, graph features) is left untouched, so shape signals like syn_ratio, bidir_ratio and
+    destination entropy carry the same information at any volume.
+
+    Implemented directly on the already-standardized tensors: scaling a raw value by k and then
+    re-standardizing is z' = k*z + (k-1)*mean/std, so no inverse/forward transform round trip is
+    needed per item. Forces the model to use shape rather than raw magnitude to predict
+    infiltration/stage, since magnitude now varies far more than any natural signal it could
+    carry -- targets the "volume = attack" shortcut behind the PGD evasion (G6/W11).
+
+    Train split only: val/test stay on the real, unaugmented distribution so evaluation is
+    unaffected. The scaler itself is still fit on the ORIGINAL, unaugmented train data.
+    """
+
+    def __init__(
+        self, split: dict[str, np.ndarray], scaler: FeatureScaler, feature_cols: list[str],
+        scale_range: tuple[float, float] = (0.3, 3.0), seed: int = 0,
+        volume_features: tuple[str, ...] = VOLUME_FEATURES,
+    ):
+        super().__init__(split, scaler)
+        self.volume_idx = [feature_cols.index(f) for f in volume_features if f in feature_cols]
+        self.scale_range = scale_range
+        self.rng = np.random.default_rng(seed)
+        self._mean_over_std = torch.tensor(scaler.mean / scaler.std, dtype=torch.float32)
+
+    def __getitem__(self, idx: int):
+        X, next_state, future_stages, infiltration = super().__getitem__(idx)
+        k = float(self.rng.uniform(*self.scale_range))
+        X = X.clone()
+        next_state = next_state.clone()
+        for i in self.volume_idx:
+            shift = (k - 1.0) * self._mean_over_std[i]
+            X[:, i] = k * X[:, i] + shift
+            next_state[i] = k * next_state[i] + shift
+        return X, next_state, future_stages, infiltration
+
+
 def build_datasets(config: dict[str, Any]) -> tuple[SequenceDataset, SequenceDataset, SequenceDataset, FeatureScaler]:
     processed_dir = resolve_path(config, "processed_dir")
     train_split = load_split(processed_dir, "train")
@@ -103,8 +148,18 @@ def build_datasets(config: dict[str, Any]) -> tuple[SequenceDataset, SequenceDat
     scaler = FeatureScaler().fit(train_split["X"])
     scaler.save(processed_dir / "scaler.npz")
 
+    aug = config.get("augmentation", {}) or {}
+    if aug.get("scale_invariance"):
+        from common.config import feature_columns
+        train_ds: SequenceDataset = ScaleInvariantSequenceDataset(
+            train_split, scaler, feature_columns(config),
+            scale_range=tuple(aug.get("scale_range", (0.3, 3.0))),
+        )
+    else:
+        train_ds = SequenceDataset(train_split, scaler)
+
     return (
-        SequenceDataset(train_split, scaler),
+        train_ds,
         SequenceDataset(val_split, scaler),
         SequenceDataset(test_split, scaler),
         scaler,
