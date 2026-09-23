@@ -641,3 +641,10 @@ stay near the budget they picked.
 ```
 35.9% matches the audit's own cited figure exactly (re-measured independently, not copied).
 `pytest tests -q` -> 229 passed.
+
+## W7 -- clean v2-vs-v1 comparison (G3, G6) -- FIXED (honest result: v2 does not converge)
+
+Findings: the existing `checkpoints_real_v2` was actually trained at batch 64 (log shows 19,361 steps/epoch); the 512 in `configs/real_data_v2.yaml` was edited afterwards and never used. Real differences were epochs (15 vs 30) and split.
+Retrain: `configs/real_data_v2_converged.yaml` (batch 64, 30 epochs, everything else identical), new dirs `data/processed_real_v2_converged`, `checkpoints_real_v2_converged`; existing v2 artefacts untouched. Fabricated April days **dropped** from val/test (chosen over spreading). Run WITHOUT W11 part 3 so the comparison stays attributable.
+Evidence (re-measured): v1 F1 0.9171 / AUROC 0.9995 (194,632 test seq); v2 converged F1 0.3697 / AUROC 0.7058 (7,191 test seq). Val loss stayed noisy (best 0.8011 at epoch 11; epoch 25 spiked to 2.04) while train loss fell; not converged in the sense of a stable val curve. Full table/curve: `docs/04-evaluation-real-v2.md` (regenerated, includes W9 achieved-FPR row: 2.8% on this test split, alarm precision 13.2%, 91.2% missed of 628 transitions). The earlier "35.9% FPR" (W9) was on the old undertrained/fabricated-day version; the threshold instability is much smaller here, so that claim should not be generalised.
+Caveat: test sets differ (v1 leaky split vs v2 3 days); no multi-seed CIs.
