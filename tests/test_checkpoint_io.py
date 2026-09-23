@@ -35,7 +35,33 @@ def test_baseline_unpickler_blocks_os_system(tmp_path):
         _RestrictedUnpickler(io.BytesIO(pickle.dumps(Evil()))).load()
 
 
-@pytest.mark.parametrize("path", sorted(glob.glob("checkpoints*/*.pt")))
+@pytest.mark.parametrize("path", sorted(glob.glob("checkpoints*/**/*.pt", recursive=True)))
 def test_existing_checkpoints_still_load(path):
     ck = load_checkpoint(path)
     assert "model_state" in ck and "config" in ck
+
+
+def test_baseline_model_fit_save_load_roundtrip(tmp_path):
+    """Audit G12 review: _RestrictedUnpickler had never actually loaded a real BaselineModel --
+    exercise the whole fit/save/load path so an allowlist gap would show up here, not at runtime."""
+    import types
+    import numpy as np
+    import torch as _torch
+    from models.baseline_lr import BaselineModel
+
+    n, seq_len, n_features = 40, 3, 5
+    rng = np.random.default_rng(0)
+    ds = types.SimpleNamespace(
+        X=_torch.tensor(rng.normal(size=(n, seq_len, n_features)).astype(np.float32)),
+        infiltration=_torch.tensor(rng.integers(0, 2, size=(n, 1)).astype(np.float32)),
+        future_stages=_torch.tensor(rng.integers(0, 3, size=(n, 1)).astype(np.int64)),
+    )
+    config = {"baseline": {"max_iter": 50}}
+
+    model = BaselineModel(config).fit(ds)
+    p = tmp_path / "baseline.pkl"
+    model.save(p)
+    loaded = BaselineModel.load(p)
+
+    inf_prob, stage_probs = loaded.predict(ds.X.numpy())
+    assert inf_prob.shape == (n,) and stage_probs.shape[0] == n

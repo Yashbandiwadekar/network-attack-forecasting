@@ -392,6 +392,30 @@ Acceptance evidence:
   (194,632 sequences): outputs from `weights_only=False` (old path) and `weights_only=True` (new
   path) are bit-identical (`torch.equal`), and infiltration F1@0.5 matches exactly: **0.917142**
   both ways.
+- Same check repeated for the other two checkpoint types the audit's acceptance line covers:
+  `checkpoints_real/lstm_baseline_best.pt` (4,000 test sequences, bit-identical outputs, F1@0.5
+  0.871 both ways) and `checkpoints_real_v2/world_model_best.pt` (8,731 test sequences,
+  bit-identical outputs, F1@0.5 0.4305 both ways -- matches the W12 re-measurement above).
+
+**Review tightening (post-advisor):**
+- `glob("checkpoints*/*.pt")` in `tests/test_checkpoint_io.py` was non-recursive and silently
+  missed the 8 checkpoints under `checkpoints_real_v2_lofo/<family>/`. Changed to
+  `glob("checkpoints*/**/*.pt", recursive=True)`; all 20 on-disk checkpoints (incl. the joint-GNN
+  ones) now load and are covered by the parametrized test. `checkpoints_ctu13/` has no `.pt` files
+  on disk, so it contributes 0 cases, not a gap.
+- `_RestrictedUnpickler` had never round-tripped a real `BaselineModel`; added
+  `test_baseline_model_fit_save_load_roundtrip` (fits on synthetic data, saves, reloads, predicts) --
+  this caught a real allowlist gap (`numpy.ndarray`'s pickle reconstructor lives at the bare
+  `numpy` module, not under an `numpy.*` submodule) which is now fixed.
+- Replaced the builtins **blocklist** with an **allowlist** (`set`, `frozenset`, `slice`, `complex`,
+  `list`, `dict`, `tuple`, `bytearray`) -- a blocklist can miss a dangerous builtin a reviewer
+  would flag; an allowlist can only be too strict, never too permissive.
+- **Not closed by this item, flagged for the record:** `np.load(..., allow_pickle=True)` in
+  `models/dataset.py:57` (loading `.npz` splits) and the `pickle.load` inside
+  `pipeline/graph_builder.py` for `window_graphs.pkl` are the same class of issue (arbitrary
+  deserialization) but are outside G12's literal scope (`models/`, `eval/`, `app/` were the named
+  directories, and `.npz`/graph-pickle loading of the project's OWN generated artefacts is lower
+  risk than loading an externally-supplied checkpoint) -- not fixed in this pass.
 
 ## W8 -- gate stage override on infiltration probability (G7) -- FIXED
 
