@@ -24,7 +24,7 @@ overwritten.
 | G4 (UNSW adapter) | W5 | FIXED | AUROC 0.4239 re-measured, negative |
 | G12 (deserialisation) | W4 | FIXED | `weights_only=True`; two allow_pickle loads remain, disclosed |
 | G10 | W12 | FIXED | Batched benchmark inference |
-| Adversarial evasion | W11 | PARTIALLY FIXED | Threat model + OR-gate done; scale-invariance run: see W11 part 3 section |
+| Adversarial evasion | W11 | PARTIALLY FIXED | Threat model + OR-gate done (recovers evasion); scale-invariance run truncated at 25/30 and did not stop the evasion (0.605 to 0.0000) |
 | D1 | W5 | PARTIALLY FIXED | UNSW-NB15 added; no LANL/auth telemetry |
 | S9-S12, D2 | - | NOT STARTED | |
 
@@ -660,3 +660,21 @@ Findings: the existing `checkpoints_real_v2` was actually trained at batch 64 (l
 Retrain: `configs/real_data_v2_converged.yaml` (batch 64, 30 epochs, everything else identical), new dirs `data/processed_real_v2_converged`, `checkpoints_real_v2_converged`; existing v2 artefacts untouched. Fabricated April days **dropped** from val/test (chosen over spreading). Run WITHOUT W11 part 3 so the comparison stays attributable.
 Evidence (re-measured): v1 F1 0.9171 / AUROC 0.9995 (194,632 test seq); v2 converged F1 0.3697 / AUROC 0.7058 (7,191 test seq). Val loss stayed noisy (best 0.8011 at epoch 11; epoch 25 spiked to 2.04) while train loss fell; not converged in the sense of a stable val curve. Full table/curve: `docs/04-evaluation-real-v2.md` (regenerated, includes W9 achieved-FPR row: 2.8% on this test split, alarm precision 13.2%, 91.2% missed of 628 transitions). The earlier "35.9% FPR" (W9) was on the old undertrained/fabricated-day version; the threshold instability is much smaller here, so that claim should not be generalised.
 Caveat: test sets differ (v1 leaky split vs v2 3 days); no multi-seed CIs.
+
+## W11 part 3 -- scale-invariance augmentation (separately-named run) -- PARTIALLY FIXED (truncated run, evasion still succeeds)
+
+Run: `configs/real_data_v2_scaleinv.yaml` (identical to `real_data_v2_converged.yaml` plus `augmentation.scale_invariance: true`, factor range 0.3-3.0 on flow_count/total_packets/total_bytes, train split only). **The run was TRUNCATED at epoch 25 of 30** (usage limit; process died, no "Best val loss" line). I did not retrain; the results below use the `world_model_best.pt` saved through epoch 25, whose best val epoch is **epoch 2 (val 0.8136)**, so it is an early, barely-trained checkpoint. Val loss per epoch: 0.894, 0.814, 0.855, 0.891, 1.056, 0.976, 1.058, 0.915, 1.291, 1.156, 1.189, 1.164, 0.900, 1.013, 1.269, 0.832, 1.205, 0.869, 0.992, 1.102, 0.841, 0.921, 1.105, 0.893, 0.866 (train 0.336 to 0.282). Val loss is as unstable as in the clean run.
+
+(1) `python -m scripts.check_adversarial_robustness --config configs/real_data_v2_scaleinv.yaml` (own checkpoint and scaler; `checkpoints_real` untouched):
+```
+infiltration probability before attack (K-step): [0.605, 0.9376, 0.977, 0.9837, 0.9879, 0.9916]
+t+1 infiltration probability: 0.6050 -> 0.0000 (min reached: 0.0000)
+Top perturbed: flow_count -1.5, unique_dst_ports -1.5, unique_dst_ips -1.5, has_ip_data +1.5, total_bytes -1.5
+WARNING - evasion succeeded
+Reconstruction error 5.4775 -> 9.5661 vs threshold 6.2790 (ALARMS); added test FPR 1.42%; RECOVERED by OR-gate
+```
+**Honest negative: augmentation did not stop the evasion** (0.605 to 0.0000; the attack now leans on destination-diversity features as well as volume). The clean baseline before attack is also weaker (t+1 0.605 vs 0.9975 on `checkpoints_real`, which is a different model, so not a like-for-like comparison). The OR-gate still recovers it.
+
+(2) Same v2 test split (7,191 seq, days 02-16/02-23/03-01), t+1 infiltration @0.5, this checkpoint vs converged v2 (F1 0.370 / AUROC 0.706): F1 **0.203**, precision 0.934, recall 0.114, FPR 0.0021, AUROC **0.800**, AUPRC 0.583. Same test set, but different checkpoint epochs (epoch 2 here vs epoch 11), single seed, so F1 fell while AUROC rose; not a clean effect estimate.
+
+Conclusion: W11 part 3 is not shown to help; only the second gate (part 2) helps. Not re-run to completion.
