@@ -19,3 +19,5 @@ configs/_*.yaml
 certin_directions.txt
 # Generated submission report (rebuilt from docs/, not a source file)
 docs/CipherWraiths-Project-Report.pdf
+# Builder/Auditor agent role instructions dropped into the repo root — not a project source file
+Role.md
