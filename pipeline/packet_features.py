@@ -46,6 +46,7 @@ def load_pcap(path: str | Path) -> pd.DataFrame:
                 "ttl": ip.ttl,
                 "is_frag": bool(ip.flags.MF) or ip.frag > 0,
                 "payload_size": len(bytes(ip.payload)),
+                "l4_payload_size": 0,
                 "src_port": np.nan,
                 "dst_port": np.nan,
                 "window_size": np.nan,
@@ -58,11 +59,13 @@ def load_pcap(path: str | Path) -> pd.DataFrame:
                 row.update(
                     src_port=int(tcp.sport), dst_port=int(tcp.dport),
                     window_size=int(tcp.window), seq=int(tcp.seq), protocol="TCP",
+                    l4_payload_size=len(bytes(tcp.payload)),
                     **{f"flag_{name}": int(letter in tcp.flags) for name, letter in _TCP_FLAG_LETTERS.items()},
                 )
             elif UDP in pkt:
                 udp = pkt[UDP]
-                row.update(src_port=int(udp.sport), dst_port=int(udp.dport), protocol="UDP")
+                row.update(src_port=int(udp.sport), dst_port=int(udp.dport), protocol="UDP",
+                           l4_payload_size=len(bytes(udp.payload)))
             rows.append(row)
     if not rows:
         raise ValueError(f"No IP packets found in {path}")
@@ -97,8 +100,10 @@ def build_flow_records(packet_df: pd.DataFrame) -> pd.DataFrame:
         first = group.iloc[0]
         forward = (group["src_ip"] == first["src_ip"]) & (group["src_port"] == first["src_port"])
         fwd_pkts, bwd_pkts = int(forward.sum()), int((~forward).sum())
-        fwd_bytes = float(group.loc[forward, "payload_size"].sum())
-        bwd_bytes = float(group.loc[~forward, "payload_size"].sum())
+        # CICFlowMeter's TotLen Fwd/Bwd Pkts counts L4 payload bytes only (no TCP/UDP header) --
+        # `payload_size` above is the whole IP payload, so use l4_payload_size to match the CSV path.
+        fwd_bytes = float(group.loc[forward, "l4_payload_size"].sum())
+        bwd_bytes = float(group.loc[~forward, "l4_payload_size"].sum())
 
         iats = group["timestamp"].diff().dt.total_seconds().dropna()
         duration_s = (group["timestamp"].iloc[-1] - group["timestamp"].iloc[0]).total_seconds()
@@ -120,9 +125,14 @@ def build_flow_records(packet_df: pd.DataFrame) -> pd.DataFrame:
             "rst_cnt": float(group["flag_rst"].sum()),
             "psh_cnt": float(group["flag_psh"].sum()),
             "urg_cnt": float(group["flag_urg"].sum()),
-            "iat_mean": float(iats.mean()) if len(iats) else 0.0,
-            "iat_std": float(iats.std(ddof=0)) if len(iats) else 0.0,
-            "iat_max": float(iats.max()) if len(iats) else 0.0,
+            # CICFlowMeter's Flow IAT Mean/Std/Max are in MICROSECONDS (clean_and_normalize carries
+            # them through unchanged, and the model was trained on that scale). total_seconds()
+            # is seconds, so scale by 1e6 -- without this every PCAP-only upload fed the model
+            # IAT features 10^6x too small (audit G5). duration_s stays in seconds, matching
+            # clean_and_normalize's duration_us / 1e6.
+            "iat_mean": float(iats.mean()) * 1e6 if len(iats) else 0.0,
+            "iat_std": float(iats.std(ddof=0)) * 1e6 if len(iats) else 0.0,
+            "iat_max": float(iats.max()) * 1e6 if len(iats) else 0.0,
             "is_tcp": float(first["protocol"] == "TCP"),
             "is_udp": float(first["protocol"] == "UDP"),
             "bidir_ratio": (min(fwd_pkts, bwd_pkts) / (fwd_pkts + bwd_pkts)) if (fwd_pkts + bwd_pkts) else 0.0,
