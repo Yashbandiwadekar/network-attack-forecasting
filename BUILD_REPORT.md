@@ -678,3 +678,23 @@ Reconstruction error 5.4775 -> 9.5661 vs threshold 6.2790 (ALARMS); added test F
 (2) Same v2 test split (7,191 seq, days 02-16/02-23/03-01), t+1 infiltration @0.5, this checkpoint vs converged v2 (F1 0.370 / AUROC 0.706): F1 **0.203**, precision 0.934, recall 0.114, FPR 0.0021, AUROC **0.800**, AUPRC 0.583. Same test set, but different checkpoint epochs (epoch 2 here vs epoch 11), single seed, so F1 fell while AUROC rose; not a clean effect estimate.
 
 Conclusion: W11 part 3 is not shown to help; only the second gate (part 2) helps. Not re-run to completion.
+
+## Follow-up to W4 -- remaining pickle loads closed (owner approved 2026-09-24)
+
+- `models/dataset.py::load_split`: `np.load(..., allow_pickle=False)`. Checked first that all 45
+  processed `.npz` files across `data/` load without pickle (none contain object arrays).
+- `pipeline/graph_builder.py::load_window_graphs`: bare `pickle.load` replaced by a restricted
+  unpickler (only numpy, `WindowGraph`, pandas Timestamp types and a few builtins; anything else
+  raises `Blocked global`). All 7 real `window_graphs.pkl` files still load (processed_real,
+  v2, v2_converged, unsw, unsw_v2, ctu13, cicids2018).
+- Tests: `tests/test_safe_loading.py` (4) -- Timestamp-key round trip, a malicious `os.system` pickle
+  is blocked, an object-array `.npz` is refused, plain arrays load. Full suite: 239 passed.
+- Scores unchanged: new loader returns arrays identical to the old `allow_pickle=True` load, and
+  `checkpoints_real` still scores F1 0.917142 @0.5 on `data/processed_real` test (same as W4).
+- A first grep missed some: `pipeline/build_ctu13_dataset.py` and four analysis scripts
+  (`scripts/check_chronology.py`, `inspect_attack_distribution.py`, `inspect_attack_timing.py`,
+  `inspect_true_timeline.py`) also used `allow_pickle=True`. All flipped to `False` (safe: every
+  `.npz` under `data/` was verified pickle-free), and each file compiles. Final check,
+  `grep -rn "allow_pickle=True\|pickle\.load(" --include=*.py .` (excluding `.venv` and the two
+  restricted unpicklers): **no matches**. Writers use `pickle.dump`, which is not a code-execution risk.
+- Not re-run: the CTU-13 builder and the four scripts themselves (compile-checked only).

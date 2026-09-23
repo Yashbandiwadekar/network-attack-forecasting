@@ -215,7 +215,7 @@ def combine_scenarios(
 
         with np.load(
             path,
-            allow_pickle=True,
+            allow_pickle=False,
         ) as data:
 
             for key in arrays:

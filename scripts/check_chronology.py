@@ -15,7 +15,7 @@ for scenario in sorted(
     for split in ["train", "val", "test"]:
         path = scenario / f"{split}.npz"
 
-        with np.load(path, allow_pickle=True) as data:
+        with np.load(path, allow_pickle=False) as data:
             times = data["window_end_time"].astype(np.int64)
 
             if len(times) <= 1:
