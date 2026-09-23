@@ -369,3 +369,26 @@ packet-trained (hypothetical): {mean_ttl 64.0, ..., port_scan_score 1.0, has_pac
 ```
 Side effect: the port-scan reconnaissance heuristic (uses `port_scan_score`) is now also inert for PCAP
 uploads to these models, consistent with how they were trained.
+
+## W4 -- arbitrary-code deserialization (G12) -- FIXED
+
+New `models/checkpoint_io.py::load_checkpoint` loads with `torch.load(..., weights_only=True)`
+(with an explicit numpy-safe-globals allowlist, only needed for the joint-GNN checkpoint's numpy
+bool mask) and transparently reads either a JSON-string `config_json` (new saves) or the old
+pickled `config` dict (existing checkpoints), so nothing on disk needed migrating.
+`models/forecast.py`, `models/lstm_model.py`, `models/train_joint.py` now call it instead of
+`torch.load(weights_only=False)`. `models/train.py` and `models/train_joint.py` now save via
+`with_config_json(...)`, so future checkpoints carry a JSON config. `models/baseline_lr.py::BaselineModel.load`
+now uses a `_RestrictedUnpickler` allowing only `sklearn.*`/`numpy.*`/`scipy.*`/this module (and
+blocking dangerous builtins), instead of a bare `pickle.load`.
+
+Acceptance evidence:
+- `grep -rn "weights_only=False\|pickle.load(" models eval app --include=*.py` -> no matches.
+- New tests `tests/test_checkpoint_io.py`: new-style roundtrip, a malicious `__reduce__` checkpoint
+  is refused, `_RestrictedUnpickler` blocks `os.system`, and every existing `.pt` under
+  `checkpoints*/` (8 files, including `checkpoints/joint_gnn_world_model_*.pt`) still loads. 211
+  tests total passing (`.venv/Scripts/python -m pytest tests -q` -> `211 passed`).
+- Same-score check on `checkpoints_real/world_model_best.pt` against the real-data test split
+  (194,632 sequences): outputs from `weights_only=False` (old path) and `weights_only=True` (new
+  path) are bit-identical (`torch.equal`), and infiltration F1@0.5 matches exactly: **0.917142**
+  both ways.

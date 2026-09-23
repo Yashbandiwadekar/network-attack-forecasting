@@ -186,17 +186,20 @@ def train(config_path: str = "configs/real_data.yaml") -> None:
         }
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            torch.save(checkpoint, checkpoint_dir / "joint_gnn_world_model_best.pt")
+            torch.save(with_config_json(checkpoint), checkpoint_dir / "joint_gnn_world_model_best.pt")
 
-    torch.save(checkpoint, checkpoint_dir / "joint_gnn_world_model_final.pt")
+    torch.save(with_config_json(checkpoint), checkpoint_dir / "joint_gnn_world_model_final.pt")
     print(f"Best val loss: {best_val_loss:.4f}. Checkpoints saved to {checkpoint_dir}")
+
+
+from models.checkpoint_io import load_checkpoint, with_config_json  # noqa: E402
 
 
 def load_joint_world_model(
     checkpoint_path: str, device: torch.device | None = None,
 ) -> tuple[JointWorldModel, dict]:
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    checkpoint = load_checkpoint(checkpoint_path, device)
     model = JointWorldModel(
         checkpoint["n_base_features"], checkpoint["n_stage_classes"], checkpoint["config"],
         edge_dim=checkpoint["edge_dim"], embed_dim=checkpoint["embed_dim"],

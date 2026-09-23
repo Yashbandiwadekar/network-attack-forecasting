@@ -118,9 +118,12 @@ def _heuristic_stage_override(
     return predicted_stage, False
 
 
+from models.checkpoint_io import load_checkpoint  # noqa: E402
+
+
 def load_world_model(checkpoint_path: str | Path, device: torch.device | None = None) -> tuple[WorldModel, dict[str, Any]]:
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    checkpoint = load_checkpoint(checkpoint_path, device)
     model = WorldModel(checkpoint["n_features"], checkpoint["n_stage_classes"], checkpoint["config"])
     model.load_state_dict(checkpoint["model_state"])
     model.to(device).eval()

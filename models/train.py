@@ -22,6 +22,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from common.config import load_config, resolve_path
+from models.checkpoint_io import with_config_json
 from models.dataset import build_datasets
 from models.lstm_model import LSTMWorldModel
 from models.world_model import WorldModel
@@ -111,19 +112,19 @@ def train(config_path: str = "configs/default.yaml", arch: str = "transformer") 
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            torch.save({
+            torch.save(with_config_json({
                 "model_state": model.state_dict(),
                 "n_features": n_features,
                 "n_stage_classes": n_stage_classes,
                 "config": config,
-            }, checkpoint_dir / f"{checkpoint_stem}_best.pt")
+            }), checkpoint_dir / f"{checkpoint_stem}_best.pt")
 
-    torch.save({
+    torch.save(with_config_json({
         "model_state": model.state_dict(),
         "n_features": n_features,
         "n_stage_classes": n_stage_classes,
         "config": config,
-    }, checkpoint_dir / f"{checkpoint_stem}_final.pt")
+    }), checkpoint_dir / f"{checkpoint_stem}_final.pt")
     print(f"Best val loss: {best_val_loss:.4f}. Checkpoints saved to {checkpoint_dir}")
 
 
