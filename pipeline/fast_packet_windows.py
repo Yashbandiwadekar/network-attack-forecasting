@@ -46,7 +46,7 @@ _U32 = struct.Struct(">I")
 
 def _parse_chunk(frames: list[tuple[bytes, float]], link_off: int, ethertype_off: int) -> dict[str, np.ndarray]:
     """Hand-parse IPv4 + TCP/UDP header fields for a list of (raw_frame, timestamp)."""
-    ts, src, dst, ttl, frag, pay, sport, dport, win, seq, is_tcp = ([] for _ in range(11))
+    ts, src, dst, ttl, frag, pay, sport, dport, win, seq, is_tcp, flags, l4pay, proto_l = ([] for _ in range(14))
     u16, u32 = _U16.unpack_from, _U32.unpack_from
     for data, t in frames:
         if len(data) < link_off + 20 or u16(data, ethertype_off)[0] != 0x0800:
@@ -65,6 +65,8 @@ def _parse_chunk(frames: list[tuple[bytes, float]], link_off: int, ethertype_off
         pay.append(len(data) - l4)  # == len(bytes(ip.payload)) on the captured bytes
         sp = dp = w = sq = -1
         tcp = 0
+        fl = 0
+        lp = 0
         # Ports/flags exist only in the first fragment; later fragments carry no L4 header.
         if (flags_frag & 0x1FFF) == 0:
             if proto == 6 and len(data) >= l4 + 16:
@@ -72,9 +74,13 @@ def _parse_chunk(frames: list[tuple[bytes, float]], link_off: int, ethertype_off
                 sq = u32(data, l4 + 4)[0]
                 w = u16(data, l4 + 14)[0]
                 tcp = 1
+                fl = data[l4 + 13]
+                lp = max(len(data) - l4 - (data[l4 + 12] >> 4) * 4, 0)
             elif proto == 17 and len(data) >= l4 + 4:
                 sp, dp = struct.unpack_from(">HH", data, l4)
+                lp = max(len(data) - l4 - 8, 0)
         sport.append(sp); dport.append(dp); win.append(w); seq.append(sq); is_tcp.append(tcp)
+        flags.append(fl); l4pay.append(lp); proto_l.append(proto)
     return {
         "ts": np.asarray(ts, dtype=np.float64), "src": np.asarray(src, dtype=np.uint32),
         "dst": np.asarray(dst, dtype=np.uint32), "ttl": np.asarray(ttl, dtype=np.float64),
@@ -82,6 +88,8 @@ def _parse_chunk(frames: list[tuple[bytes, float]], link_off: int, ethertype_off
         "sport": np.asarray(sport, dtype=np.int64), "dport": np.asarray(dport, dtype=np.int64),
         "win": np.asarray(win, dtype=np.float64), "seq": np.asarray(seq, dtype=np.int64),
         "is_tcp": np.asarray(is_tcp, dtype=bool),
+        "flags": np.asarray(flags, dtype=np.uint8), "l4pay": np.asarray(l4pay, dtype=np.float64),
+        "proto": np.asarray(proto_l, dtype=np.uint8),
     }
 
 
@@ -226,3 +234,92 @@ def process_many(paths: list[str | Path], out_dir: str | Path, window_seconds: i
             print(f"{s['file']}: {s['frames']:,} frames, {s['windows']:,} windows, {s['frames_per_s']:,.0f} frames/s", flush=True)
             stats.append(s)
     return stats
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Flow records (CICFlowMeter-style) -- the fast counterpart of packet_features.build_flow_records
+# ---------------------------------------------------------------------------------------------------------------
+
+FLOW_TIMEOUT_S = 120.0  # CICFlowMeter's default flow timeout: a flow longer than this is cut and a new one starts
+_FLAG_BITS = {"fin_cnt": 0x01, "syn_cnt": 0x02, "rst_cnt": 0x04, "psh_cnt": 0x08, "ack_cnt": 0x10, "urg_cnt": 0x20}
+
+
+def assemble_flows(cols: dict[str, np.ndarray], captured_ips: np.ndarray | None = None, host_ip: int | None = None,
+                   timeout_s: float = FLOW_TIMEOUT_S) -> pd.DataFrame:
+    """Packets -> flow records in the schema pipeline.windowing.build_flow_windows expects.
+
+    Flow = bidirectional TCP/UDP 5-tuple, cut every `timeout_s` from the flow's first packet (CICFlowMeter's 120 s
+    timeout; its FIN-termination split is NOT emulated -- documented approximation). "Forward" = direction of the
+    first packet. Fields follow clean_and_normalize: flag counts are packets carrying the flag, IAT stats are over ALL
+    packet gaps in the flow in MICROSECONDS, byte counts are L4 payload only, duration in seconds.
+
+    Host-based captures: with `captured_ips`/`host_ip` a flow is kept only in the capture of its INITIATOR (or, if the
+    initiator has no capture of its own, wherever seen), so a flow between two captured machines is not counted twice.
+    Returned src_ip/dst_ip are integers (uint32); convert with ip_to_str."""
+    m = np.isin(cols["proto"], (6, 17)) & (cols["sport"] >= 0)
+    if not m.any():
+        return pd.DataFrame()
+    df = pd.DataFrame({k: v[m] for k, v in cols.items()}).sort_values("ts", kind="stable").reset_index(drop=True)
+    a = df["src"].astype(np.int64) * 65536 + df["sport"]
+    b = df["dst"].astype(np.int64) * 65536 + df["dport"]
+    df["lo"], df["hi"] = np.minimum(a, b), np.maximum(a, b)
+    key = ["lo", "hi", "proto"]
+    first_ts = df.groupby(key, sort=False)["ts"].transform("min")
+    df["bucket"] = np.floor((df["ts"] - first_ts) / timeout_s).astype(np.int64)
+    fk = key + ["bucket"]
+    g = df.groupby(fk, sort=False)
+    first = g[["src", "dst", "sport", "dport", "ts"]].first()
+    df = df.join(first.rename(columns=lambda c: "i_" + c), on=fk)
+    df["fwd"] = (df["src"] == df["i_src"]) & (df["sport"] == df["i_sport"])
+    df["iat_us"] = df.groupby(fk, sort=False)["ts"].diff() * 1e6
+    for name, bit in _FLAG_BITS.items():
+        df[name] = ((df["flags"] & bit) > 0) & df["is_tcp"]
+    g = df.groupby(fk, sort=False)
+    flows = pd.DataFrame({
+        "timestamp_s": g["ts"].min(),
+        "src_ip": g["i_src"].first(), "dst_ip": g["i_dst"].first(),
+        "src_port": g["i_sport"].first(), "dst_port": g["i_dport"].first(),
+        "total_pkts": g.size().astype(float),
+        "fwd_pkts": g["fwd"].sum().astype(float),
+        "total_bytes": g["l4pay"].sum(),
+        "duration_s": g["ts"].max() - g["ts"].min(),
+        **{n: g[n].sum().astype(float) for n in _FLAG_BITS},
+        "iat_mean": g["iat_us"].mean().fillna(0.0),
+        "iat_std": g["iat_us"].std(ddof=0).fillna(0.0),
+        "iat_max": g["iat_us"].max().fillna(0.0),
+        "is_tcp": g["is_tcp"].first().astype(float),
+    }).reset_index(drop=True)
+    flows["is_udp"] = 1.0 - flows["is_tcp"]
+    flows["bidir_ratio"] = np.minimum(flows["fwd_pkts"], flows["total_pkts"] - flows["fwd_pkts"]) / flows["total_pkts"]
+    flows["has_ip_data"] = 1.0
+    flows["src_ip"] = flows["src_ip"].astype(np.uint32)
+    flows["dst_ip"] = flows["dst_ip"].astype(np.uint32)
+    if captured_ips is not None and host_ip is not None:
+        flows = flows[(flows["src_ip"] == host_ip) | ~np.isin(flows["src_ip"], captured_ips)].reset_index(drop=True)
+    return flows.drop(columns=["fwd_pkts"])
+
+
+def read_all_frames(path: str | Path, max_frames: int | None = None) -> dict[str, np.ndarray]:
+    """Whole capture -> parsed packet arrays (one host capture is < 1 GB, so this fits in memory)."""
+    buf: list[tuple[bytes, float]] = []
+    with RawPcapReader(str(path)) as reader:
+        is_ng = type(reader).__name__ == "RawPcapNgReader"
+        linktype = None
+        for data, meta in reader:
+            if linktype is None:
+                linktype = meta.linktype if is_ng else reader.linktype
+                if linktype not in _LINK_HEADER:
+                    raise ValueError(f"{Path(path).name}: unsupported link type {linktype}")
+            buf.append((data, ((meta.tshigh << 32) | meta.tslow) / meta.tsresol if is_ng else meta.sec + meta.usec / 1e6))
+            if max_frames is not None and len(buf) >= max_frames:
+                break
+    if not buf:
+        return _parse_chunk([], 14, 12)
+    return _parse_chunk(buf, _LINK_HEADER[linktype], _ETHERTYPE_OFFSET[linktype])
+
+
+def ip_to_str(values: pd.Series) -> pd.Series:
+    """uint32 -> dotted quad, vectorised over the (few) unique values."""
+    uniq = values.unique()
+    table = {int(v): ".".join(str((int(v) >> s) & 255) for s in (24, 16, 8, 0)) for v in uniq}
+    return values.map(lambda v: table[int(v)])

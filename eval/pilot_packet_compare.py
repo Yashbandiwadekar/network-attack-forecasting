@@ -39,6 +39,12 @@ def score_one(config_path: str, seed: int) -> dict:
     for tag, fpr in (("fpr5pct", 0.05), ("fpr1pct", 0.01)):
         thr = threshold_at_fpr(yv, pv, fpr)
         out[tag] = {"threshold": float(thr), **{k: float(v) for k, v in binary_metrics(yt, pt, thr).items()}}
+    # Label-free operating point: a quantile of BENIGN val scores only (a defender can set this without any attack
+    # examples, so it does not depend on the validation attack looking like the test attack). Reported alongside, not
+    # instead of, the val-ROC thresholds above.
+    for tag, q in (("benign_q99", 99.0), ("benign_q99_9", 99.9)):
+        thr = float(np.percentile(pv[yv == 0], q))
+        out[tag] = {"threshold": thr, **{k: float(v) for k, v in binary_metrics(yt, pt, thr).items()}}
     out["f1_at_0.5"] = float(binary_metrics(yt, pt, 0.5)["f1"])
     return out
 
@@ -47,7 +53,10 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3])
     ap.add_argument("--out", default="docs/unsw_pkt_pilot_results.json")
+    ap.add_argument("--dataset", choices=["unsw", "cic"], default="unsw")
     args = ap.parse_args()
+    if args.dataset == "cic":
+        VARIANTS.update({"packet-aware": "configs/cic_pkt.yaml", "flow-only control": "configs/cic_pkt_flowonly.yaml"})
     res = {name: [score_one(path, s) for s in args.seeds] for name, path in VARIANTS.items()}
     summary = {}
     for name, runs in res.items():

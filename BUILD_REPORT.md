@@ -822,3 +822,26 @@ This is the labelling rule for this day: packets from those two sources to 172.3
    gets one partial row per victim capture. They cannot simply be stacked (unique-port and repeated-seq features are not
    additive); either merge from sufficient statistics or restrict to internal hosts plus the two attackers.
 3. Windowing/label assignment and a held-out split for a single day (no second day yet).
+
+---
+
+## CIC-IDS-2018 ONE-DAY PACKET-AWARE TRAINING (Wed 14-02-2018)
+
+**Fast flow-record path.** `pipeline/fast_packet_windows.py::assemble_flows` + `scripts/extract_flow_records.py` build CICFlowMeter-style flow records straight from the PCAPs (bidirectional 5-tuple, 120 s timeout, no FIN split, keep-at-initiator for host-based captures). 84.4 M packets -> 5,775,275 flows in 99 s (8 workers). `tests/test_fast_flows.py` (5 tests): independent expected values, agreement with the slow `build_flow_records` within classic-pcap microsecond tolerance, timeout cut, keep-at-initiator.
+
+**Dataset** (`pipeline/build_cic_pkt_dataset.py`, `configs/cic_pkt*.yaml`). Labels: BENIGN 5,487,748 / FTP-BruteForce 193,330 / SSH-Bruteforce 94,197 flows (CIC's CSV has 187,589 SSH rows because CICFlowMeter splits at FIN; ours does not -- approximation). 810,283 sequences; 99.9% of windows have packet features. Split by time: train = FTP-Patator period (352,493 seq, 418 positives), val carved inside it (24,243 seq, 131 pos), test = later, unseen SSH-Patator (371,915 seq, 529 pos). Flow-only control = identical data with the 9 packet columns zeroed. Batch 256 (UNSW pilot used 64), 30 epochs, 3 seeds; six runs, no errors.
+
+**Results** (`docs/cic_pkt_results.json`, from `python -m eval.pilot_packet_compare --dataset cic`), test = unseen SSH:
+
+| | AUROC | AUPRC |
+|---|---|---|
+| packet-aware | 1.000 | 1.000 |
+| flow-only control | 0.999997 | 0.992 +/- 0.013 |
+
+Paired AUROC diff 2.6e-6, bootstrap 95% CI [0, 7.9e-6] (3 seeds, rough). **Ceiling effect: this day cannot show whether packet features help.** Brute force is separable from flow features alone (same as the UNSW pilot).
+
+**Threshold failure under attack-type shift (finding).** Thresholds chosen on val (5% / 1% FPR) give recall 0 on test for every run. Cause (seed 1): on val (FTP) attacks score exactly 1.0 and benign ~0, so the chosen threshold is 0.9999988; on the unseen SSH attack the model scores 0.01-0.45, ranked above all benign (AUROC 1.0) but far below that threshold. A val block containing only the training attack type gives an extreme, non-transferable threshold. The evaluation code is correct.
+
+**Extra operating point (label-free).** Threshold = 99th / 99.9th percentile of BENIGN val scores (no attack labels needed). Test recall 1.00 in all six runs; FPR 0.9-1.7% / 0.07-0.21%; precision at q99.9: packet-aware 0.40-0.51, flow-only 0.49-0.66 (flow-only slightly better). Caveat: benign val scores are ~0, so the threshold is ~0 and works only because SSH attack scores are >=0.01; single day, same victim.
+
+**Other caveats.** One day, two attacks, positives ~0.1% of sequences; outside sources seen by several victims have averaged packet rows; `retransmit_ratio` still counts pure ACKs (recommended follow-up: count only packets with L4 payload). Harder days (DoS / web) or more days are needed to test the packet-feature claim.
