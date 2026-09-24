@@ -739,3 +739,44 @@ file dropped (boundary windows are not additive for the unique-port / retransmit
 UNSW slice 68.5% of TCP packets are flagged and about half of those are payload-free ACK-style packets, so the
 feature averages 0.63 over the dataset. The fast path reproduces it exactly on purpose (parity). Recommended
 follow-up (not done): count duplicates only among packets that carry L4 payload.
+
+## Steps 2-4 -- packet-aware dataset, matched training, comparison (DONE 2026-09-24)
+
+**Dataset** (`pipeline/build_unsw_pkt_dataset.py`, `configs/unsw_nb15_pkt.yaml`, output `data/processed_unsw_pkt/`):
+UNSW flow CSVs restricted to the time the PCAPs cover (1,524,983 of 2,486,033 flows, 61.3%), REAL packet features
+merged onto the flow windows (68,199 of 68,222 windows = 100.0% have them), then sequences:
+train 44,059 (1,896 positives), val 3,694 (601), test 18,853 (4,995). Held-out-day split: train/val from 2015-01-22,
+test = 2015-02-18. **Split detail worth knowing:** all 01-22 attacks fall in one ~3 h stretch and the rest of that day
+(and all of 01-23) is benign, so a time-tail or the 01-23 day gives a val set with **zero** positives. Val is therefore a
+block inside the attack period (from the 75th-percentile positive), each side kept clear of train (a sequence is in val
+only if its whole span is inside the block, in train only if its whole span is outside; 684 straddlers dropped).
+`tests/test_unsw_pkt_split.py`. The reconnaissance heuristic, now fed real `port_scan_score`, added 3 windows
+(1,200 -> 1,203) on top of UNSW's own labels.
+
+**Training**: the same Transformer and hyper-parameters for both variants (batch 64, 30 epochs, lr 3e-4), 3 seeds each
+(new opt-in `--seed`, seeded before model build; checkpoints under `seed<N>/`). Control = identical sequences with all 9
+packet-level columns zeroed (`data/processed_unsw_pkt_flowonly/`, `configs/unsw_nb15_pkt_flowonly.yaml`).
+
+**Result, held-out day 02-18 (`python -m eval.pilot_packet_compare`, output `docs/unsw_pkt_pilot_results.json`):**
+```
+packet-aware       AUROC 0.99816 +/- 0.00024   AUPRC 0.99139 +/- 0.00079
+flow-only control  AUROC 0.99809 +/- 0.00002   AUPRC 0.99027 +/- 0.00027
+paired AUROC diff (packet - flow): per seed [+0.00034, -0.00011, -0.00001], mean +0.00007, bootstrap 95% CI [-0.00011, +0.00034]
+threshold from val, test 1% FPR budget: packet-aware precision 0.975 recall 0.987 achieved FPR 0.0091 F1 0.981
+                                        flow-only     precision 0.983 recall 0.941 achieved FPR 0.0057 F1 0.962
+```
+**Reading it honestly:** there is **no measurable AUROC benefit** from packet features here (the CI spans zero). At the
+val-chosen 1% budget the packet-aware model has higher recall (0.987 vs 0.941) and F1 (0.981 vs 0.962), but that is 3 seeds,
+threshold-dependent, and F1 at a fixed 0.5 threshold is mixed per seed ([0.986, 0.956, 0.981] vs [0.981, 0.972, 0.977]) --
+suggestive, **not established**. The reason this pilot cannot show a real benefit is a **ceiling effect**: both models score
+AUROC ~0.998 because the held-out day uses the same four attacker hosts and the same attack generator as the training day, so
+it is close to in-distribution. That is a very different (much easier) test than CIC's held-out days (v2 F1 0.370, AUROC 0.706)
+and than any cross-dataset test, so **do not read this as "packets don't help" or as generalisation evidence.** Note the
+best val loss differs a lot (0.55 packet-aware vs 0.38 control): the val block is small and attack-only-ish, so val loss is a
+poor guide here. `retransmit_ratio` is the inherited "repeated seq" definition (see Step 1).
+
+**What the pilot did establish:** (1) real packet features can be extracted at scale and correctly (parity-checked); (2) the
+PCAP -> labelled window pipeline works end to end on a real dataset; (3) a packet-aware model can be trained and evaluated with
+matched controls and multiple seeds. Whether packets improve *generalisation* needs a harder test (CIC-IDS-2018 PCAPs).
+Not done: a flow-features-from-PCAP fast path (flow records still come from the CSVs here; `build_flow_records` is still the
+slow Scapy path, needed for CIC because its CSVs lack IPs on 9 of 10 days).
