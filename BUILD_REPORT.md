@@ -780,3 +780,45 @@ PCAP -> labelled window pipeline works end to end on a real dataset; (3) a packe
 matched controls and multiple seeds. Whether packets improve *generalisation* needs a harder test (CIC-IDS-2018 PCAPs).
 Not done: a flow-features-from-PCAP fast path (flow records still come from the CSVs here; `build_flow_records` is still the
 slow Scapy path, needed for CIC because its CSVs lack IPs on 9 of 10 days).
+
+---
+
+# CIC-IDS-2018 ONE-DAY PCAP TEST -- Wednesday 14-02-2018 (2026-09-24, owner-approved download)
+
+**Download:** `pcap.zip`, 39,913,353,098 bytes from the public CIC bucket
+(`cse-cic-ids2018.s3.ca-central-1.amazonaws.com/Original Network Traffic and Log data/Wednesday-14-02-2018/`), size
+matched the server's Content-Length exactly (one interruption, auto-resumed). Saved to
+`V:\Datasets\CIC-IDS-2018\Wednesday-14-02-2018\`. **Correction:** the official total for all 10 days of PCAP is ~477 GB
+(I had said 370 GB); a day is a ZIP, so unpacking needs extra space.
+
+**What is in it:** 449 capture files (+1 folder entry), 46 GB unpacked, all classic PCAP, Ethernet. **Each file is ONE
+machine's own capture** (e.g. `capPC1-172.31.64.37`, `UCAP172.31.69.25` = the Ubuntu server), not a network-wide capture, so
+a packet between two captured machines appears in both files. `extract_packet_windows --keep-at-sender` keeps each packet
+only in its sender's capture (senders with no capture of their own, e.g. the external attacker, are kept wherever seen);
+`tests/test_fast_packet_windows.py::test_sender_rule_...`.
+
+**Run:** 449 captures, 48.6 GB, 87,783,076 frames in 76 s (1.15M frames/s, 2,300 GB/h) -> 6,799,964 (src, 10 s window)
+rows, 75,261 distinct sources (74,803 are outside internet hosts), no NaN cells, span 2018-02-14 12:28 -> 2018-02-15 00:47 UTC.
+
+**Bug found and fixed:** the first run wrote only 18 output files for 449 captures, several corrupt: output names used
+`Path.stem`, which cuts at the last dot, and CIC captures have no extension but dots in the name
+(`capPC1-172.31.64.37` -> `capPC1-172.31.64`), so machines collided and overwrote each other in parallel. Now
+`output_name()` uses the full file name; regression test added; bad output deleted and regenerated (449 -> 449 files).
+UNSW's `N.pcap` names never triggered it.
+
+**Labels verified against the data (not assumed):** in the victim's capture `UCAP172.31.69.25`
+- FTP-Patator: **18.221.219.4 -> :21, 193,360 packets, 14:33:26-16:10:31 UTC**. The CIC label CSV has exactly **193,360**
+  `FTP-BruteForce` rows -- an exact match.
+- SSH-Patator: **13.58.98.64 -> :22, 2,208,736 packets, 18:01:50-19:32:30 UTC** (187,589 `SSH-Bruteforce` flows in the CSV;
+  many packets per flow, so no 1:1 match expected).
+- CIC's CSV clock is UTC-4: PCAP time = CSV time + 4 h (FTP 10:33:26-12:10:31 in the CSV). The CSV's SSH rows read
+  02:01-03:32 because its 12-hour timestamps are being parsed without the PM -- the same span, 14:01-15:32 local.
+This is the labelling rule for this day: packets from those two sources to 172.31.69.25 in those windows are attack.
+
+**Still open before a packet-aware CIC dataset can be built:**
+1. Flow-level records from PCAP: the CSV for this day has no IP columns, and `build_flow_records` is still the slow Scapy
+   path (~3,200 packets/s), so flow features need a fast path (the packet-feature path is fast, the flow one is not).
+2. Duplicate (src, window) rows: 3.4M of the 6.8M rows repeat across files because an outside source seen by several victims
+   gets one partial row per victim capture. They cannot simply be stacked (unique-port and repeated-seq features are not
+   additive); either merge from sufficient statistics or restrict to internal hosts plus the two attackers.
+3. Windowing/label assignment and a held-out split for a single day (no second day yet).

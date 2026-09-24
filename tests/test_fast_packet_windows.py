@@ -89,3 +89,38 @@ def test_unsupported_link_type_is_rejected(tmp_path):
     w.close()
     with pytest.raises(ValueError, match="unsupported link type"):
         process_pcap(path, 10)
+
+
+def test_sender_rule_keeps_each_packet_only_at_its_sender(tmp_path):
+    """Host-based captures: a packet between two captured machines is in both captures; the rule keeps it only
+    in the sender's. A sender with no capture of its own (external attacker) is kept wherever it was seen."""
+    def ip_int(s):
+        a, b, c, d = map(int, s.split("."))
+        return (a << 24) | (b << 16) | (c << 8) | d
+
+    link = Ether(src="00:00:00:00:00:01", dst="00:00:00:00:00:02")
+    pkts = []
+    for i in range(3):
+        for src in ("10.0.0.1", "10.0.0.2", "99.9.9.9"):  # .1 and .2 are captured hosts; 99.9.9.9 is not
+            p = link / IP(src=src, dst="10.0.0.1" if src != "10.0.0.1" else "10.0.0.2") / TCP(sport=1000 + i, dport=80)
+            p.time = BASE + 12 + i  # all in the middle window
+            pkts.append(p)
+    for extra in (0, 25):  # pad first/last windows (dropped by design)
+        p = link / IP(src="10.0.0.9", dst="10.0.0.1") / TCP(); p.time = BASE + extra; pkts.append(p)
+    path = tmp_path / "cap.pcap"
+    wrpcap(str(path), pkts)
+    captured = np.array([ip_int("10.0.0.1"), ip_int("10.0.0.2")], dtype=np.uint32)
+
+    at_host1, _ = process_pcap(path, 10, sender_rule=(ip_int("10.0.0.1"), captured))
+    srcs = set(at_host1["src"].tolist())
+
+    assert ip_int("10.0.0.1") in srcs          # host 1's own sent packets kept
+    assert ip_int("99.9.9.9") in srcs          # uncaptured external sender kept
+    assert ip_int("10.0.0.2") not in srcs      # host 2's packets belong to host 2's own capture
+
+
+def test_output_names_are_unique_for_extensionless_captures_with_dots():
+    from pipeline.fast_packet_windows import output_name
+
+    names = [output_name(f"/x/pcap/capPC1-172.31.64.{i}") for i in (37, 52, 23)] + [output_name("/x/pcap/UCAP172.31.69.25")]
+    assert len(set(names)) == len(names)  # Path.stem would have collapsed the first three to one name
