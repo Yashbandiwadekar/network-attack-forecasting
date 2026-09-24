@@ -114,7 +114,8 @@ def _aggregate(cols: dict[str, np.ndarray], window_seconds: int) -> pd.DataFrame
     return out[["src", "window_start_s", *PACKET_FEATURES]]
 
 
-def process_pcap(path: str | Path, window_seconds: int = 10, chunk_packets: int = 400_000, max_frames: int | None = None) -> tuple[pd.DataFrame, dict]:
+def process_pcap(path: str | Path, window_seconds: int = 10, chunk_packets: int = 400_000, max_frames: int | None = None,
+                 sender_rule: tuple[int, np.ndarray] | None = None) -> tuple[pd.DataFrame, dict]:
     """Stream one capture file -> (window features, stats). Time-ordered captures are assumed (checked:
     every UNSW-NB15 file is); the still-open final window of each chunk is carried into the next chunk so
     no window is split across chunks. First and last window of the file are dropped (see module docstring)."""
@@ -137,6 +138,13 @@ def process_pcap(path: str | Path, window_seconds: int = 10, chunk_packets: int 
             nonlocal buf, carry
             cols = _parse_chunk(buf, link_off or 14, eth_off or 12)
             buf = []
+            if sender_rule is not None and len(cols["ts"]):
+                # Host-based captures (CIC-IDS-2018): a packet between two captured machines shows up in BOTH
+                # captures. Keep it only in its sender's capture, or (for senders with no capture of their own,
+                # e.g. the external attacker) wherever it was seen -- so no packet is counted twice.
+                host_ip, captured_ips = sender_rule
+                keep = (cols["src"] == host_ip) | ~np.isin(cols["src"], captured_ips)
+                cols = {k: v[keep] for k, v in cols.items()}
             if carry is not None and len(carry["ts"]):
                 cols = {k: np.concatenate([carry[k], cols[k]]) for k in cols}
             carry = None
@@ -189,20 +197,29 @@ def to_window_frame(feats: pd.DataFrame) -> pd.DataFrame:
     return out[["src_ip", "window_start", *PACKET_FEATURES]]
 
 
-def _worker(args: tuple[str, int, str]) -> dict:
-    path, window_seconds, out_dir = args
-    feats, stats = process_pcap(path, window_seconds)
-    to_window_frame(feats).to_parquet(Path(out_dir) / (Path(path).parent.name.replace(" ", "_") + "__" + Path(path).stem + ".parquet"), index=False)
+def output_name(path: str | Path) -> str:
+    """Unique parquet name per capture: parent folder + the FULL file name. Never Path.stem -- CIC-IDS-2018
+    captures have no extension and dots inside the name (capPC1-172.31.64.37), so .stem would cut at the last
+    dot and collide across machines (found the hard way: 449 captures wrote only 18 files, some corrupt)."""
+    p = Path(path)
+    return f"{p.parent.name.replace(' ', '_')}__{p.name}.parquet"
+
+
+def _worker(args: tuple) -> dict:
+    path, window_seconds, out_dir, sender_rule = args
+    feats, stats = process_pcap(path, window_seconds, sender_rule=sender_rule)
+    to_window_frame(feats).to_parquet(Path(out_dir) / output_name(path), index=False)
     return stats
 
 
-def process_many(paths: list[str | Path], out_dir: str | Path, window_seconds: int = 10, workers: int = 16) -> list[dict]:
+def process_many(paths: list[str | Path], out_dir: str | Path, window_seconds: int = 10, workers: int = 16,
+                 sender_rules: dict[str, tuple[int, np.ndarray]] | None = None) -> list[dict]:
     """One file per worker process; writes one parquet per capture file into out_dir."""
     from multiprocessing import Pool
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    jobs = [(str(p), window_seconds, str(out_dir)) for p in paths]
+    jobs = [(str(p), window_seconds, str(out_dir), (sender_rules or {}).get(str(p))) for p in paths]
     stats = []
     with Pool(workers) as pool:
         for s in pool.imap_unordered(_worker, jobs):
