@@ -71,6 +71,7 @@ def _heuristic_stage_override(
     scaler: FeatureScaler,
     config: dict[str, Any],
     predicted_stage: str,
+    infiltration_prob: float,
 ) -> tuple[str, bool]:
     """Audit S6/S7: the trained stage classifier has never seen a single real Reconnaissance
     example (no CIC-IDS-2018 label maps to it) and every DoS/DDoS ("impact") window is masked out
@@ -90,6 +91,11 @@ def _heuristic_stage_override(
     (default 4.0) and the existing `recon_port_scan_threshold` (already a per-window raw feature,
     0-1, no z-score needed) are both configurable under `windowing:` like the recon threshold.
     """
+    # Only apply heuristic if the model believes an attack is happening
+    threshold = config.get("decision_threshold", 0.5)
+    if infiltration_prob < threshold:
+        return predicted_stage, False
+
     def z(name: str) -> float:
         i = feature_index.get(name)
         if i is None:
@@ -145,10 +151,10 @@ class ForecastEngine:
         except KeyError:
             self._feature_index = None
 
-    def _override_stage(self, raw_features_row: np.ndarray, predicted_stage: str) -> tuple[str, bool]:
+    def _override_stage(self, raw_features_row: np.ndarray, predicted_stage: str, infiltration_prob: float) -> tuple[str, bool]:
         if self._feature_index is None:
             return predicted_stage, False
-        return _heuristic_stage_override(raw_features_row, self._feature_index, self.scaler, self.config, predicted_stage)
+        return _heuristic_stage_override(raw_features_row, self._feature_index, self.scaler, self.config, predicted_stage, infiltration_prob)
 
     def rollout(self, raw_sequence: np.ndarray) -> ForecastResult:
         """raw_sequence: (L, n_features) unscaled, most recent L windows in chronological order.
@@ -181,7 +187,7 @@ class ForecastEngine:
                 delta_raw = next_state_raw - self.scaler.inverse_transform(last_scaled.squeeze(0).cpu().numpy())
 
                 raw_stage = self.stage_labels[int(stage_prob.argmax())]
-                final_stage, was_heuristic = self._override_stage(next_state_raw, raw_stage)
+                final_stage, was_heuristic = self._override_stage(next_state_raw, raw_stage, inf_prob)
 
                 infiltration_probs.append(inf_prob)
                 stage_predictions.append(final_stage)
@@ -230,7 +236,8 @@ class ForecastEngine:
                         next_state_raw = self.scaler.inverse_transform(next_state.cpu().numpy())  # (b, F)
                         overridden, flags = [], []
                         for i, idx in enumerate(raw_idx):
-                            stage, was_heuristic = self._override_stage(next_state_raw[i], self.stage_labels[int(idx)])
+                            inf_prob = float(probs_steps[-1][i])
+                            stage, was_heuristic = self._override_stage(next_state_raw[i], self.stage_labels[int(idx)], inf_prob)
                             overridden.append(stage)
                             flags.append(was_heuristic)
                         stage_steps.append(overridden)

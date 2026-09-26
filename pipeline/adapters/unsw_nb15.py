@@ -80,7 +80,7 @@ def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     df["iat_mean"] = (
         pd.to_numeric(df["sintpkt"], errors="coerce").fillna(0.0)
         + pd.to_numeric(df["dintpkt"], errors="coerce").fillna(0.0)
-    ) / 2.0
+    ) / 2.0 * 1000.0
     df["iat_std"] = 0.0
     df["iat_max"] = 0.0
 
