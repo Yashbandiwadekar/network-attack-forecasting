@@ -96,9 +96,9 @@ model:
   n_layers: 3
   d_ff: 128
   dropout: 0.1
-  batch_size: 512
+  batch_size: 64
   lr: 0.0003
-  epochs: 15
+  epochs: 30
   device: cuda
 
 mitre_stages:

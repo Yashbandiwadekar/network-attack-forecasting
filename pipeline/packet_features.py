@@ -100,7 +100,7 @@ def build_flow_records(packet_df: pd.DataFrame) -> pd.DataFrame:
         fwd_bytes = float(group.loc[forward, "payload_size"].sum())
         bwd_bytes = float(group.loc[~forward, "payload_size"].sum())
 
-        iats = group["timestamp"].diff().dt.total_seconds().dropna()
+        iats = group["timestamp"].diff().dt.total_seconds().dropna() * 1_000_000.0
         duration_s = (group["timestamp"].iloc[-1] - group["timestamp"].iloc[0]).total_seconds()
 
         records.append({

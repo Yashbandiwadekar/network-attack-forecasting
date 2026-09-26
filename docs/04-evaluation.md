@@ -11,39 +11,82 @@ compare the rollout itself against fairly.
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
 | World Model (Transformer) | 1.000 | 1.000 | 1.000 | 0.000 |
-| World Model (Transformer + jointly-trained GNN) | 0.846 | 1.000 | 0.733 | 0.000 |
-| Baseline (LSTM) | 1.000 | 1.000 | 1.000 | 0.000 |
 | Baseline (LR, last window) | 1.000 | 1.000 | 1.000 | 0.000 |
 | Baseline (LR, stacked window) | 1.000 | 1.000 | 1.000 | 0.000 |
-| Baseline (Markov chain) | 1.000 | 1.000 | 1.000 | 0.000 |
-| Persistence (no learning) | 1.000 | 1.000 | 1.000 | 0.000 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable] | 1.000 | 1.000 | 1.000 | 0.000 |
+| Persistence [ORACLE -- reads true current label, not deployable] | 1.000 | 1.000 | 1.000 | 0.000 |
+| Persistence (on predicted label -- deployable) | 0.984 | 0.968 | 1.000 | 0.024 |
 
 ## Infiltration probability — fixed 5% false-positive-rate budget
 
 Threshold selected on the validation split only (never test), then applied here — this is the
 operating point a defender would actually tune to, not an arbitrary 0.5 cutoff.
 
+**Audit E5**: at this dataset's attack prevalence, a 5% FPR budget can force the
+threshold down near zero, which understates a model that is actually strong at a realistic,
+stricter operating point. The two stricter budgets and the threshold-free ranking metrics below
+are reported for exactly that reason — don't quote this table alone.
+
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
 | World Model (Transformer) | 1.000 | 1.000 | 1.000 | 0.000 |
-| World Model (Transformer + jointly-trained GNN) | 0.846 | 1.000 | 0.733 | 0.000 |
-| Baseline (LSTM) | 1.000 | 1.000 | 1.000 | 0.000 |
 | Baseline (LR, last window) | 0.909 | 1.000 | 0.833 | 0.000 |
 | Baseline (LR, stacked window) | 1.000 | 1.000 | 1.000 | 0.000 |
-| Baseline (Markov chain) | 1.000 | 1.000 | 1.000 | 0.000 |
-| Persistence (no learning) | 1.000 | 1.000 | 1.000 | 0.000 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable] | 1.000 | 1.000 | 1.000 | 0.000 |
+| Persistence [ORACLE -- reads true current label, not deployable] | 1.000 | 1.000 | 1.000 | 0.000 |
+| Persistence (on predicted label -- deployable) | 0.909 | 1.000 | 0.833 | 0.000 |
 
-## MITRE stage classification (5-way, `impact`-mapped windows excluded)
+## Infiltration probability — fixed 1% false-positive-rate budget
 
-| Model | F1 (macro) | Precision (macro) | Recall (macro) |
-|---|---|---|---|
-| World Model (Transformer) | 0.891 | 0.965 | 0.858 |
-| World Model (Transformer + jointly-trained GNN) | 0.856 | 0.962 | 0.801 |
-| Baseline (LSTM) | 0.681 | 0.667 | 0.700 |
-| Baseline (LR, last window) | 0.891 | 0.965 | 0.858 |
-| Baseline (LR, stacked window) | 0.891 | 0.965 | 0.858 |
-| Baseline (Markov chain) | 0.891 | 0.965 | 0.858 |
-| Persistence (no learning) | 0.891 | 0.965 | 0.858 |
+| Model | F1 | Precision | Recall | False Positive Rate |
+|---|---|---|---|---|
+| World Model (Transformer) | 1.000 | 1.000 | 1.000 | 0.000 |
+| Baseline (LR, last window) | 0.065 | 1.000 | 0.033 | 0.000 |
+| Baseline (LR, stacked window) | 1.000 | 1.000 | 1.000 | 0.000 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable] | 0.983 | 1.000 | 0.967 | 0.000 |
+| Persistence [ORACLE -- reads true current label, not deployable] | 0.000 | 0.000 | 0.000 | 0.000 |
+| Persistence (on predicted label -- deployable) | 0.065 | 1.000 | 0.033 | 0.000 |
+
+## Infiltration probability — fixed 0.1% false-positive-rate budget
+
+| Model | F1 | Precision | Recall | False Positive Rate |
+|---|---|---|---|---|
+| World Model (Transformer) | 1.000 | 1.000 | 1.000 | 0.000 |
+| Baseline (LR, last window) | 0.065 | 1.000 | 0.033 | 0.000 |
+| Baseline (LR, stacked window) | 1.000 | 1.000 | 1.000 | 0.000 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable] | 0.983 | 1.000 | 0.967 | 0.000 |
+| Persistence [ORACLE -- reads true current label, not deployable] | 0.000 | 0.000 | 0.000 | 0.000 |
+| Persistence (on predicted label -- deployable) | 0.065 | 1.000 | 0.033 | 0.000 |
+
+## Infiltration probability — threshold-free ranking (AUROC / AUPRC)
+
+Summarizes ranking quality across every possible threshold, so no single operating-point choice
+above can make a genuinely strong (or weak) model look otherwise.
+
+| Model | AUROC | AUPRC |
+|---|---|---|
+| World Model (Transformer) | 1.0000 | 1.0000 |
+| Baseline (LR, last window) | 1.0000 | 1.0000 |
+| Baseline (LR, stacked window) | 1.0000 | 1.0000 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable] | 1.0000 | 1.0000 |
+| Persistence [ORACLE -- reads true current label, not deployable] | 1.0000 | 1.0000 |
+| Persistence (on predicted label -- deployable) | 1.0000 | 1.0000 |
+
+## MITRE stage classification (4 classes present, `impact`-mapped windows excluded)
+
+**Audit E4**: the number of classes actually present in this split is 4, not always 5 —
+support by class: benign: 42, lateral_movement: 13, command_and_control: 15, exfiltration: 2. The all-class macro-F1 column is pulled toward the near-perfect
+benign class when benign is one of the classes present; the attack-only column macro-averages
+over the attack classes alone and is the more honest read of "can it tell attack stages apart."
+
+| Model | F1 (macro, all classes) | F1 (macro, attack classes only) | Precision (macro) | Recall (macro) |
+|---|---|---|---|---|
+| World Model (Transformer) | 0.891 | 0.854 | 0.965 | 0.858 |
+| Baseline (LR, last window) | 0.891 | 0.854 | 0.965 | 0.858 |
+| Baseline (LR, stacked window) | 0.891 | 0.854 | 0.965 | 0.858 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable] | 0.891 | 0.854 | 0.965 | 0.858 |
+| Persistence [ORACLE -- reads true current label, not deployable] | 0.891 | 0.854 | 0.965 | 0.858 |
+| Persistence (on predicted label -- deployable) | 0.879 | 0.843 | 0.950 | 0.852 |
 
 ## K-step forecast lead time
 
