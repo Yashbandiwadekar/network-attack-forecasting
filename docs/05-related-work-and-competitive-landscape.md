@@ -382,10 +382,28 @@ attack-volume forecasting study on the public Loghub OpenSSH server log corpus, 
   quantification, leakage protection and tamper-evident provenance; `netsight` and
   `Radhika-coder46` cover audit ledgers; `axorarbxy` and `AegisTwin` cover the digital-twin framing;
   `TheRedKeep` and `AttackForecast` describe deeper latent (RSSM-style) world models than this
-  project's Transformer. Of the repos whose descriptions and READMEs were read in this pass, none
-  reports a *negative* result about its own generalisation, adversarial testing, or false-positive
-  behaviour — but only two READMEs were read in full, so treat that as unobserved rather than
-  established. See the revised "where this project still leads" note below.
+  project's Transformer.
+
+  **Correction, 2026-09-29 (ShadowCat re-examined).** An earlier version of this bullet said no
+  surveyed repo reports a negative result about itself. That is **false**, and the exception is the
+  strongest competitor in the field. `muthukkumaranb/ShadowCat` publishes: a 37-fold cross-validated
+  benchmark against a logistic-regression baseline; an explicit disclosure that its own baseline
+  scores **0.0 F1 on fold 16 (SSH-Bruteforce) — 0% recall, every attack window missed** — inside the
+  headline table rather than a footnote; a `gate0_leakage_report.md` and a "0 label leakage" claim
+  with a verification report behind it; a `ctu13_diagnostic_results.md`; a measured
+  `real_pipeline_latency_report.json`; and a README section titled **"Known Limitations & Scope
+  Disclosures"**. It also ships `SIH26153_Architecture_Final.md` and `Shadowcat_PPT_Final_Slide_Content.md`
+  — two of the graded deliverables — inside the repo, plus **Hyperledger Fabric** notarization, which
+  is a real distributed ledger rather than this project's single-writer hash chain. Repo is ~291 MB
+  and was pushed 2026-09-28.
+
+  Measurement honesty is therefore **no longer an unmatched axis**. What remains distinctive here,
+  on the evidence read so far, is narrower and should be claimed narrowly: a leave-one-attack-family-
+  out evaluation, adversarial evasion testing with a stated threat model, and an audit trail that
+  retracted the project's own headline number. ShadowCat's disclosed negative is about its
+  *baseline's* fold failure, not its own model's generalisation; no repo read in this survey has
+  published a negative result about its own model's transfer. That is a real but much smaller gap
+  than this document previously claimed.
 - **Stars are not activity**: `Argus`, still the most-starred entry at 4, has not been pushed to
   since 2026-09-08.
 - **Recurring differentiation axes across many teams**: (1) blockchain/hash-chain audit trails for
