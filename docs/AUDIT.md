@@ -765,3 +765,69 @@ Listed so their numbers cannot reach a slide on the strength of a commit message
 | `5d95cda` | UNSW packet-aware pilot, "matched 3-seed comparison" | **Not verified.** First seed-repeated result in the project (E10's gap); worth verifying before it is quoted. |
 | `1065ddd` | CIC-IDS-2018 one-day packet-aware dataset, training results, "threshold-shift finding" | **Not verified.** The threshold-shift claim plausibly bears on G8; treat as unconfirmed. |
 | `482352b` | Fast streaming PCAP parser, "49-78x, identical features to the Scapy path" | **Partially verified.** Its IAT output matches the scapy path exactly on the controlled input (H.0); the speed claim and full feature parity were not re-measured beyond the project's own `tests/test_fast_flows.py`. |
+
+---
+
+## Part I: W13–W20 verification and merge verdict
+
+**Date:** 2026-09-29. **Audited state:** `integration/all-branches-2026-09-29` at `e9e9efa`, in sync
+with its own remote, open as **PR #1 → master** (30 commits, MERGEABLE). **Method:** read-only;
+each item checked against the acceptance criterion written for it in `WORK_ORDER-2026-09-29.md`,
+not against `BUILD_REPORT.md`'s status column. Full suite: **290 passed**.
+
+| Item | Builder status | **Audit verdict** | Evidence |
+|---|---|---|---|
+| W13 | FIXED | **VERIFIED** | `tests/test_api_hardening.py` covers every case the criterion named, by name: disabled by default, unauthenticated rejected, wrong token rejected, webhook to `169.254.169.254` refused, non-allowlisted host refused, plain-HTTP scheme rejected, allowlisted HTTPS accepted. Implementation also resolves the host via `getaddrinfo` and rejects private/loopback/link-local/multicast, which closes DNS-rebinding as well as the literal IMDS address. |
+| W14 | FIXED | **VERIFIED (declaration only)** | `requirements.txt` now declares `fastapi>=0.110`, `pydantic>=2.6`, `uvicorn>=0.29`, `requests>=2.31`, `networkx>=3.2`. **Not** re-verified by building a clean venv from that file; the criterion asked for a fresh-install import check and that was not run. |
+| W15 | FIXED | **VERIFIED** | `tests/test_stream_consumer.py` asserts the assembled width equals the scaler's, that every `feature_columns` entry is present, and — the substantive part — that `graph_embed_0` is **not** all-zero, which is the exact defect H3 described. |
+| W16 | FIXED | **VERIFIED** | `docs/demo.mp4` and `docs/presentation.pdf` are gone from disk. |
+| W17 | FIXED | **VERIFIED** | Part A's S6 row now states reconnaissance is unreachable on every shipped checkpoint and explicitly withdraws the earlier "genuinely usable on PCAP-only uploads" claim. |
+| W18 | VERIFIED, no action | **VERIFIED** | Branch now tracks `origin/integration/all-branches-2026-09-29`; confirmed by the push that created it. |
+| W19 | FIXED | **PARTIALLY FIXED — see I1** | Guard is correct and raises on a mismatched list, but is inert on every checkpoint that exists. |
+| W20 | FIXED | **VERIFIED** | One summary table; S9 and D2 corrected to FIXED; only S10/S11 remain NOT STARTED, which is accurate. Config↔checkpoint mapping documented. |
+
+### I1 (High, NEW): the W19 schema guard is inert on all 47 existing checkpoints
+
+`models/checkpoint_io.py::validate_feature_names` compares the caller's feature list against a
+`feature_names` key stored in the checkpoint, **by name and order** — a genuinely better design than
+a width check, since the bugs behind S13, G11, H3 and the `a60c549` merge all produced a
+right-width/wrong-columns matrix. It raises correctly when the lists differ, and it deliberately
+passes through checkpoints that carry no `feature_names`, documented as backward compatibility.
+
+Measured across every checkpoint on disk:
+
+| | Count |
+|---|---|
+| Checkpoints carrying `feature_names` | **0** |
+| Checkpoints without it (guard skips silently) | **47** |
+| …including the two the demo loads (`checkpoints_real`, `checkpoints/`) | yes |
+
+So the guard protects nothing that currently exists, and `BUILD_REPORT.md`'s claim that W19 "closes
+the class behind S13/G11/H3/a60c549" is **not yet true in practice** — it will become true only for
+checkpoints trained after this change, and nothing has been retrained since.
+
+**The fix is cheap and needs no retraining:** a one-off script that opens each checkpoint, writes
+the `feature_names` list from the config that produced it, and re-saves. Then the guard is live on
+the shipped artefacts and the claim holds. Until then, W19 is PARTIALLY FIXED.
+
+Separately: 6 of the 47 checkpoints are LSTM-baseline or joint-GNN files that `load_world_model`
+cannot load. That is **not** a regression — they have their own loaders (`load_lstm_baseline`,
+`load_joint_world_model`), and all three load cleanly when called correctly. Noted so a future audit
+does not re-raise it.
+
+### Merge verdict
+
+**Do not merge yet.** The condition set for the merge was "if the work order is complete". Seven of
+eight items are verified; **W19 is partially fixed** (I1), and its remedy is a short backfill script.
+
+Two further things PR #1 carries that this audit has *not* cleared, which the owner should weigh
+before merging 30 commits onto `master`:
+
+- **Teammate work reviewed only at Part H depth**: `f1e432c` (SIEM/streaming/CAPEC/topology) plus
+  the `tahir`, `2026-09-26_tahir` and `abuzar-dev` branches. Part H reviewed the parts that
+  intersected the audit; none of it went through a full work-order cycle.
+- **Unverified results on the branch** (Part H, H.8): the packet-aware pilots `5d95cda` / `1065ddd`
+  and the truncated scale-invariance run. These are safe to merge as code, but their numbers must
+  not be quoted until measured.
+
+Once the W19 backfill lands, this audit's position is that PR #1 is ready to merge.
