@@ -845,3 +845,17 @@ Paired AUROC diff 2.6e-6, bootstrap 95% CI [0, 7.9e-6] (3 seeds, rough). **Ceili
 **Extra operating point (label-free).** Threshold = 99th / 99.9th percentile of BENIGN val scores (no attack labels needed). Test recall 1.00 in all six runs; FPR 0.9-1.7% / 0.07-0.21%; precision at q99.9: packet-aware 0.40-0.51, flow-only 0.49-0.66 (flow-only slightly better). Caveat: benign val scores are ~0, so the threshold is ~0 and works only because SSH attack scores are >=0.01; single day, same victim.
 
 **Other caveats.** One day, two attacks, positives ~0.1% of sequences; outside sources seen by several victims have averaged packet rows; `retransmit_ratio` still counts pure ACKs (recommended follow-up: count only packets with L4 payload). Harder days (DoS / web) or more days are needed to test the packet-feature claim.
+
+---
+
+## W13-W20 (2026-09-29 work order) — status
+
+### W18 — branch upstream (VERIFIED, no action needed)
+
+`git status -sb` at current HEAD:
+```
+## integration/all-branches-2026-09-29...origin/integration/all-branches-2026-09-29
+```
+Tracks its own remote branch, not `origin/master`. This was set by `git push -u origin
+integration/all-branches-2026-09-29` when the branch was first pushed (2026-09-29) -- H6's push
+hazard predates that push and no longer applies. A bare `git push` now updates only this branch.
