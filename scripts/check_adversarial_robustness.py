@@ -30,8 +30,11 @@ import pandas as pd
 import torch
 
 from common.config import feature_columns, load_config, resolve_path
-from models.dataset import FeatureScaler
-from models.forecast import ForecastEngine, latest_sequence, load_world_model
+from models.dataset import FeatureScaler, SequenceDataset, load_split
+from models.forecast import (
+    ForecastEngine, batched_reconstruction_errors, latest_sequence, load_world_model,
+    one_step_reconstruction_error, or_gate_alarm, previous_sequence_and_actual,
+)
 from pipeline.flow_features import COLUMN_RENAME, clean_and_normalize
 from pipeline.graph_features import build_graph_window_features
 from pipeline.graph_embedding_features import build_graph_embedding_window_features
@@ -45,6 +48,29 @@ EPSILON = 1.5   # max perturbation per feature, in standardized (scaler-output) 
 STEPS = 25
 STEP_SIZE = 0.15
 THRESHOLD = 0.5  # matches eval/benchmark.py's default operating point
+RECON_PERCENTILE = 99.0  # W11 part 2: calibrate the second gate on this percentile of val-benign error
+
+
+def _calibrate_reconstruction_threshold(model, scaler: FeatureScaler, processed_dir, percentile: float):
+    """W11 part 2: threshold = the given percentile of one-step reconstruction error over the
+    VAL split's currently-benign windows (never test -- same train/val/test discipline as the
+    probability threshold elsewhere in this project). Also returns the same statistic measured
+    on the TEST split, so the report states how the calibration actually generalises rather than
+    asserting it by construction."""
+    device = next(model.parameters()).device
+
+    def _benign_errors(split_name: str) -> np.ndarray:
+        split = load_split(processed_dir, split_name)
+        ds = SequenceDataset(split, scaler)
+        benign = ds.current_infiltration.numpy() == 0
+        errors = batched_reconstruction_errors(model, ds.X, ds.next_state, device)
+        return errors[benign]
+
+    val_errors = _benign_errors("val")
+    threshold = float(np.percentile(val_errors, percentile))
+    test_errors = _benign_errors("test")
+    added_test_fpr = float((test_errors >= threshold).mean()) if len(test_errors) else None
+    return threshold, added_test_fpr
 
 
 def _malicious_flows(n_windows: int, window_seconds: int) -> pd.DataFrame:
@@ -180,7 +206,8 @@ def main(config_path: str = "configs/real_data.yaml") -> None:
         print(f"    {feature_cols[i]}: {delta[i]:+.3f} std")
 
     print()
-    if history[-1] < THRESHOLD <= history[0]:
+    evaded = history[-1] < THRESHOLD <= history[0]
+    if evaded:
         print(f"  WARNING — evasion succeeded: probability dropped below the {THRESHOLD} operating "
               f"threshold within an epsilon={EPSILON}-std budget on the most recent window alone.")
     elif history[-1] < history[0] - 0.1:
@@ -189,6 +216,46 @@ def main(config_path: str = "configs/real_data.yaml") -> None:
     else:
         print(f"  PASS — the model held: probability barely moved ({history[0]:.4f} -> {history[-1]:.4f}) "
               f"despite an unconstrained, white-box gradient attack on the current window.")
+
+    # ------------------------------------------------------------------------------------------
+    # W11 part 2: second gate. Alarm on infiltration probability OR one-step reconstruction error
+    # -- traffic that fakes low volume while an attack proceeds should still fail to match the
+    # model's learned one-step dynamics, even when it fools the probability head.
+    # ------------------------------------------------------------------------------------------
+    prior_and_actual = previous_sequence_and_actual(windows, feature_cols, host_id, seq_len)
+    if prior_and_actual is None:
+        print("\n  (Not enough history for the reconstruction-error second gate -- skipping W11 part 2.)")
+    else:
+        prior_sequence, original_actual = prior_and_actual
+        recon_threshold, added_test_fpr = _calibrate_reconstruction_threshold(
+            model, scaler, processed_dir, RECON_PERCENTILE,
+        )
+        recon_before = one_step_reconstruction_error(model, scaler, prior_sequence, original_actual)
+        recon_after = one_step_reconstruction_error(model, scaler, prior_sequence, adv_raw[-1])
+
+        gate_before = or_gate_alarm(history[0], recon_before, THRESHOLD, recon_threshold)
+        gate_after = or_gate_alarm(history[-1], recon_after, THRESHOLD, recon_threshold)
+        added_fpr_str = f"{added_test_fpr:.2%}" if added_test_fpr is not None else "not measured"
+
+        print(f"\n  Second gate (W11 part 2): reconstruction-error threshold = {recon_threshold:.4f} "
+              f"(the {RECON_PERCENTILE:.0f}th percentile of val-split currently-benign one-step errors).")
+        print(f"    Reconstruction error before attack: {recon_before:.4f} "
+              f"({'ALARMS' if recon_before >= recon_threshold else 'quiet'})")
+        print(f"    Reconstruction error after attack:  {recon_after:.4f} "
+              f"({'ALARMS' if recon_after >= recon_threshold else 'quiet'})")
+        print(f"    Added false-positive rate this threshold costs on the TEST split's own "
+              f"currently-benign windows: {added_fpr_str} (measured, not assumed from the {RECON_PERCENTILE:.0f}th-"
+              "percentile calibration alone).")
+        if evaded and gate_after:
+            print("    RECOVERED — the OR-gate (probability >= threshold OR reconstruction error >= "
+                  "threshold) still alarms on this evasion case: the perturbed window doesn't match "
+                  "learned one-step dynamics even though it fooled the probability head alone.")
+        elif evaded and not gate_after:
+            print("    NOT RECOVERED — the OR-gate still misses this evasion case. Reported honestly: "
+                  "this specific PGD attack also perturbs the reconstruction signal, not just the "
+                  "probability head.")
+        else:
+            print("    (No evasion to recover in this run -- the probability head alone already held.)")
 
 
 if __name__ == "__main__":

@@ -74,16 +74,29 @@ def prepare_fold(family: str, epochs: int | None = None) -> str:
     return str(cfg_path.relative_to(PROJECT_ROOT))
 
 
-def _predict_infiltration(model, X: torch.Tensor, device, batch_size: int = 8192) -> np.ndarray:
+def _predict_infiltration(
+    model, X: torch.Tensor, device, batch_size: int = 8192, return_stage: bool = False,
+):
     """Batched inference -- the `impact` fold's held-out test set is ~1.2M sequences (it's the
     DDoS days, the largest slice of the dataset by far); pushing that through the model in one
-    forward pass OOM'd a 16GB GPU (7+ GiB single allocation for the FFN activations alone)."""
-    probs = []
+    forward pass OOM'd a 16GB GPU (7+ GiB single allocation for the FFN activations alone).
+
+    Audit G10: reused (not re-implemented) by eval/benchmark.py::_world_model_predictions, which
+    had the exact same unbatched-forward-pass pattern. `return_stage=True` also returns the
+    argmax stage prediction per window, batched the same way."""
+    probs, stages = [], []
     with torch.no_grad():
         for start in range(0, len(X), batch_size):
             batch = X[start:start + batch_size].to(device)
-            probs.append(torch.sigmoid(model(batch)[2]).cpu().numpy())
-    return np.concatenate(probs) if probs else np.zeros(0)
+            _, stage_logits, infiltration_logit = model(batch)
+            probs.append(torch.sigmoid(infiltration_logit).cpu().numpy())
+            if return_stage:
+                stages.append(torch.softmax(stage_logits, dim=-1).argmax(dim=-1).cpu().numpy())
+    probs_out = np.concatenate(probs) if probs else np.zeros(0)
+    if not return_stage:
+        return probs_out
+    stages_out = np.concatenate(stages) if stages else np.zeros(0, dtype=np.int64)
+    return probs_out, stages_out
 
 
 def evaluate_fold(cfg_path: str, family: str) -> dict:

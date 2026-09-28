@@ -52,6 +52,33 @@ def test_extreme_volume_low_destination_diversity_overrides_to_impact():
     assert was_heuristic is True
 
 
+def test_override_gated_off_below_alert_threshold():
+    # Audit G7: even a textbook flood signature must not override the stage when the model's own
+    # infiltration probability is below the alert threshold (default 0.3) -- a stage label can
+    # never contradict a "not flagged" score.
+    scaler = _zero_mean_unit_std_scaler(len(FEATURE_NAMES))
+    raw = _raw(flow_count=10.0, total_bytes=10.0, total_packets=10.0, unique_dst_ips=0.0)
+
+    stage, was_heuristic = _heuristic_stage_override(
+        raw, FEATURE_INDEX, scaler, FULL_CONFIG, "command_and_control", infiltration_prob=0.1,
+    )
+
+    assert was_heuristic is False
+    assert stage == "command_and_control"  # unchanged, not overridden
+
+
+def test_override_fires_above_alert_threshold():
+    scaler = _zero_mean_unit_std_scaler(len(FEATURE_NAMES))
+    raw = _raw(flow_count=10.0, total_bytes=10.0, total_packets=10.0, unique_dst_ips=0.0)
+
+    stage, was_heuristic = _heuristic_stage_override(
+        raw, FEATURE_INDEX, scaler, FULL_CONFIG, "command_and_control", infiltration_prob=0.9,
+    )
+
+    assert was_heuristic is True
+    assert stage == "impact"
+
+
 def test_high_volume_but_high_destination_diversity_is_not_impact():
     # High volume alone isn't enough -- a genuine flood also concentrates on very few destinations
     # (the opposite of a scan). Spread across many destinations looks more like a scan/legit burst.
