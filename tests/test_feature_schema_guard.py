@@ -47,7 +47,8 @@ def test_no_module_hand_picks_flow_level_only_as_a_model_input():
     `config["features"]["flow_level"]` may be read without going through feature_columns() is
     common/config.py itself, which defines feature_columns() in terms of it."""
     result = subprocess.run(
-        ["git", "grep", "-n", "--", r'features"\]\["flow_level"\]', "*.py"],
+        ["git", "grep", "-n", "--", r'features"\]\["flow_level"\]',
+         "*.py", ":!tests/test_feature_schema_guard.py"],
         cwd=REPO_ROOT, capture_output=True, text=True,
     )
     code_hits = [

@@ -26,7 +26,16 @@ overwritten.
 | G10 | W12 | FIXED | Batched benchmark inference |
 | Adversarial evasion | W11 | PARTIALLY FIXED | Threat model + OR-gate done (recovers evasion); scale-invariance run truncated at 25/30 and did not stop the evasion (0.605 to 0.0000) |
 | D1 | W5 | PARTIALLY FIXED | UNSW-NB15 added; no LANL/auth telemetry |
-| S9-S12, D2 | - | NOT STARTED | |
+| S9 | - | FIXED | `app/streamlit_app.py` caches a downsampled `shap_background.npy` instead of loading the full training file (added in `f1e432c`) |
+| D2 | - | FIXED | `models/cve_lookup.py` maps MITRE stages to curated CAPEC IDs, rendered in the UI (added in `f1e432c`) |
+| S10, S11 | - | NOT STARTED | |
+| W13 | H1 | FIXED | `app/api.py` hardened: off by default, bearer auth, webhook allowlist + SSRF address check |
+| W14 | H2 | FIXED | `requirements.txt` now declares fastapi/pydantic/uvicorn/requests/networkx |
+| W15 | H3 | FIXED | `scripts/stream_consumer.py` computes real graph/graph-embedding features per batch, uses `feature_columns(config)` |
+| W16 | H4 | FIXED | 0-byte `docs/demo.mp4`, `docs/presentation.pdf` removed; README checklist corrected |
+| W17 | H5 | FIXED | `docs/AUDIT.md` S6 row corrected -- reconnaissance unreachable on any shipped checkpoint |
+| W18 | H6 | VERIFIED, no action needed | Branch already tracks its own remote, not `origin/master` |
+| W19 | schema-drift class | FIXED | `models/checkpoint_io.py::validate_feature_names`, wired into `load_world_model` and `stream_consumer.py`, checked at load time by name and order |
 
 ## Measured today
 
@@ -321,18 +330,16 @@ specific failure modes the audit measured (a flood, a scan), not general five-wa
 
 1. E8 (split embargo) is already implemented as part of `day_disjoint_split` (drops sequences
    whose span crosses into a different day) -- worth confirming this explicitly in the final report.
-2. E10 (multi-seed + CIs), E11 (report/README hygiene).
-3. D2 (CAPEC linkage) -- not yet started.
+2. E10 (multi-seed + CIs), E11 (report/README hygiene), S10, S11.
 
 ---
 
 # WORK ORDER RESPONSE (started 2026-09-23, branch `builder/audit-fixes-2026-09-23`)
 
-| W-id | Finding | Status | Files changed |
-|---|---|---|---|
-| W1 | G1 | FIXED | `README.md`, `docs/05-related-work-and-competitive-landscape.md`, `docs/04-evaluation-ctu13_cross_from_real_data.md` (now the regenerated report), `docs/archive/04-evaluation-ctu13_cross_from_real_data_RETRACTED-2026-09-23.md` |
-| W2 | G5 | FIXED | `pipeline/packet_features.py`, `tests/test_packet_features.py` |
-| W3-W12 | | NOT STARTED | |
+**W20/H7 note (2026-09-29): this section used to carry its own summary table, which was never
+updated past W1/W2 and contradicted the body below it (audit finding H7). It's removed rather than
+re-synced a second time -- the "Findings status" table at the top of this file is now the one and
+only summary table; every row below documents its own status inline in its own section heading.**
 
 ## W1 -- retracted CTU-13 number (FIXED)
 
@@ -979,3 +986,27 @@ input.
 passes through, wrong column raises, wrong order at matching width/names raises, and a grep-based
 check that no `.py` file outside `common/config.py` hand-picks `flow_level` alone as a model input)
 + `tests/test_stream_consumer.py` -- **6 passed**. Full suite: **290 passed**.
+
+### W20 -- summary tables + one v2 config (FIXED)
+
+**Duplicate summary table removed.** `BUILD_REPORT.md` had two summary tables: the top
+"Findings status" one (kept, now the only one) and a second under "WORK ORDER RESPONSE" that
+stopped being updated after W2 and still said `W3-W12 | NOT STARTED` while every section beneath it
+documented them as done (H7). Replaced with a pointer to the top table. Also corrected the top
+table's `S9-S12, D2 | NOT STARTED` row: S9 (cached SHAP background) and D2 (CAPEC linkage) were
+both added by `f1e432c` and are FIXED; only S10/S11 remain NOT STARTED. New rows added for
+W13-W19.
+
+**v2 config/checkpoint mapping.** Investigated `configs/real_data_v2.yaml` vs
+`configs/real_data_v2_converged.yaml` vs the checkpoints on disk:
+
+| Checkpoint | Config that reproduces it | Notes |
+|---|---|---|
+| `checkpoints_real_v2/` | none | Trained at batch 64, 15 epochs (confirmed via `train_v2.log`, 15 `epoch` lines) with a split that includes the fabricated April benign days. `configs/real_data_v2.yaml`'s batch_size/epochs were later edited to 64/30 (matching the converged run) without updating its split, so it now reproduces neither checkpoint. Superseded by the converged run (`docs/04-evaluation-real-v2.md`); left untouched on disk (protected artefact). |
+| `checkpoints_real_v2_converged/` | `configs/real_data_v2_converged.yaml` | Canonical v2 result (W7): batch 64, 30 epochs, April days dropped from val/test. This is the config to use for a v2 result going forward. |
+| `checkpoints_real_v2_scaleinv/` | `configs/real_data_v2_scaleinv.yaml` | W11 part 3, truncated at epoch 25/30 (documented as an honest negative, not a completed experiment). |
+| `checkpoints_real_v2_lofo/<family>/` | `configs/real_data_v2.yaml` (via `eval/lofo.py::BASE_CONFIG`, paths overridden per fold) | **Not orphaned** -- `real_data_v2.yaml` is a live dependency of the LOFO eval script, not a standalone result config. Left in place with a header explaining both roles; deleting it would break `eval/lofo.py`. |
+
+`configs/real_data_v2.yaml` is kept (LOFO needs it) but given a header explaining it no longer
+represents a standalone, reproducible v2 checkpoint result and pointing to
+`real_data_v2_converged.yaml` for that purpose.
