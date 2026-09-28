@@ -144,6 +144,84 @@ harness that already exists.
 
 ---
 
+## Moving forward: what to re-train, and what data to process
+
+Added 2026-09-29, after verifying the packet-aware pilots that were already on disk.
+
+### First: the packet-aware pilots do not support a "packet features help" claim
+
+`docs/cic_pkt_results.json`, 3 seeds per arm, 371,915 test sequences with 529 positives:
+
+| Arm | AUROC | AUPRC | F1 @ 0.5, per seed |
+|---|---|---|---|
+| packet-aware | **1.0, 1.0, 1.0** | 1.0 | 0.0, 1.0, 0.004 |
+| flow-only control | 0.99999, 1.0, 1.0 | 0.977, 1.0, 1.0 | 0.32, 0.0, 1.0 |
+
+Paired difference, packet minus flow: **2.6e-06**. Three things follow.
+
+1. **A perfect AUROC on both arms means the benchmark is degenerate, not that the model is good.**
+   One day, one attack family, and the positives are separable by ranking alone. This says nothing
+   about forecasting.
+2. **Packet features add nothing measurable here**, so the pilot cannot be cited as evidence for the
+   PS's flow-plus-packet requirement.
+3. **The probabilities are uncalibrated.** F1 @ 0.5 swings 0.0 → 1.0 across seeds while AUROC stays
+   pinned at 1.0, and the chosen 1%-FPR thresholds sit at 0.9999988 and 7.5e-07 in different runs.
+   Perfect ordering, meaningless scale.
+
+`BUILD_REPORT.md` already frames these runs as infrastructure proof — that the PCAP → labelled-window
+pipeline works end to end — which is the right framing and should stay. **Do not promote them to a
+result.** The UNSW packet pilot (AUROC 0.998) has the same problem from a different direction: UNSW's
+split is per-host chronological, not day-disjoint, which is the E1 trap this project already measured
+once.
+
+### The root cause worth fixing: E7
+
+Almost every open weakness traces to one data fact: **9 of 10 CIC-IDS-2018 days ship without
+Src/Dst IP**, so they collapse into one network-wide pseudo-host per day, and the single day with
+real per-host IPs is a DDoS day. Consequences already measured:
+
+- LOFO is negative for every family except DDoS (AUROC 0.612 / 0.432 / 0.531 vs 0.872) — the three
+  failures are the families with no real per-host data.
+- Stage classification is close to "which day is this", since each attack class comes from one
+  pseudo-host.
+- Lead time rests on 3 pseudo-hosts, 96% of transitions from a single day (G2).
+- The one-day packet pilot above is degenerate because one day of one family is all there was.
+
+No amount of retraining on CIC-IDS-2018 fixes this. It is a property of the data.
+
+### Recommendation: process CIC-IDS-2017 next
+
+CIC-IDS-2017 is the sister dataset and is the cheapest route out of E7:
+
+- **It keeps the full 5-tuple on every day**, so every attack family gets real per-host sequences —
+  exactly what CIC-IDS-2018 denies this project.
+- **Five capture days with distinct families** (brute force, DoS, web attack, infiltration, botnet,
+  port scan, DDoS), which makes a day-disjoint split *and* a leave-one-family-out evaluation
+  meaningful rather than a formality.
+- **The existing loader already speaks its column naming.** `pipeline/flow_features.py::COLUMN_RENAME`
+  carries both conventions side by side — `"Tot Fwd Pkts"` (2018) and `"Total Fwd Packet"` (2017) —
+  so ingestion should need little or no adaptation. Verify with one day before committing to all five.
+- It is on the PS's own permitted dataset list.
+
+**Re-training order, cheapest first:**
+
+1. **Re-run the UNSW cross-dataset evaluation — no training required.** The AUROC of 0.443 was
+   measured *before* W5 fixed the adapter's millisecond/microsecond bug and its zero-filled TCP flag
+   ratios. That number is stale by construction, and re-measuring it is close to free. It is also
+   the cheapest chance of a genuinely better generalisation result.
+2. **Build CIC-IDS-2017, day-disjoint, and train there.** This is the retrain that could move LOFO
+   off chance, because it is the first time the model would see non-DDoS attacks with real per-host
+   structure. Expect the headline F1 to look *worse* than the leaky 0.917 and roughly comparable to
+   the honest 0.370 — that is the point.
+3. **Then re-run LOFO on CIC-IDS-2017.** With five families that each have per-host data, a negative
+   result becomes informative and a positive one becomes claimable.
+4. **Only then revisit packet features**, on a dataset where the flow-only control does not already
+   score 1.0.
+
+**What not to do:** do not retrain on the one-day packet-aware set, and do not tune against UNSW's
+non-day-disjoint split. Both will produce numbers in the high 0.99s that mean nothing, and this
+project has already spent one audit cycle retracting a number of exactly that kind.
+
 ## Tier 4 — Do not spend time here
 
 - **More architecture variants.** The GNN ablation showed no measurable benefit, and the field has

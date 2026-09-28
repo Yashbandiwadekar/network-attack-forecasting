@@ -111,6 +111,16 @@ false-positive-rate budget (threshold picked on **val**, applied to test) — ho
 tunes such a system. `docs/04-evaluation.md` includes a computed honesty check: if the stacked
 baseline ties or beats the world model, the report says so rather than only showing favourable numbers.
 
+**Evaluation pitfalls are treated as a design constraint.** Arp et al., *"Dos and Don'ts of Machine
+Learning in Computer Security"* (USENIX Security 2022), catalogues the failure modes that inflate
+published security-ML results. This project's own audit (`docs/AUDIT.md`) independently hit three of
+them and records the corrections: **data snooping** — a per-host chronological split shared attack
+sessions between train and test, so F1 fell from 0.917 to 0.370 once the split was made day-disjoint
+(E1, W7); **base-rate fallacy** — a 5%-FPR budget is meaningless at 0.8% prevalence, so 1% and 0.1%
+budgets and threshold-free AUPRC were added (E5); and **inappropriate baselines** — persistence and
+Markov read the current window's true label, and are now labelled oracles with a deployable
+counterpart added alongside (E6).
+
 ## 6. Known limitations
 
 - MITRE stage labels are a documented heuristic mapping (`docs/03-mitre-mapping.md`), not ground
