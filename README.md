@@ -179,4 +179,6 @@ These are documented rather than hidden. `docs/AUDIT.md` is the full list with m
 - [x] Adversarial evasion testing — `scripts/check_adversarial_robustness.py`
 - [x] Attack narrative, response playbook, tamper-evident audit ledger, CERT-In report, CVE enrichment — `models/`
 - [x] Architecture document (≤2 pages) — `docs/01-architecture.md`
-- [x] Demo video (≤2 min) and technical presentation (≤5 slides) — `docs/demo.mp4`, `docs/presentation.pdf` (Placeholders added)
+- [ ] Demo video (≤2 min) and technical presentation (≤5 slides) — **not produced yet.** A prior
+  commit added `docs/demo.mp4` and `docs/presentation.pdf` as 0-byte placeholders and checked this
+  item off; both were removed (audit H4/W16) since an empty file makes an open item look closed.

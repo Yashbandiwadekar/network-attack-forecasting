@@ -2,96 +2,135 @@
 Simulated Kafka consumer for real-time streaming ingestion.
 In a real deployment, this script would connect to a Kafka broker or socket,
 maintain a rolling window of flows, and push predictions to the SIEM/SOAR API.
+
+Audit H3/W15: this used to build its matrix from only `config["features"]["flow_level"]` (19
+columns) and zero-pad the remaining 22 -- including the 8 graph_embed_* columns, which are never
+zero during training, so every forecast was silently off-distribution. It now builds the full
+feature vector the same way pipeline/build_dataset.py does: real flow, graph, and graph-embedding
+features computed per batch (the batch already has the cross-host context a graph needs), with only
+the packet-level columns zero-filled -- which matches the documented, in-distribution convention
+flow-only checkpoints were trained under (see pipeline/windowing.py::merge_packet_features and
+audit W3). Column order and width now come from common.config.feature_columns(config), the same
+helper every other consumer uses, and are asserted against the loaded checkpoint's own
+`n_features` at startup so a schema mismatch fails loudly instead of silently (see W19).
 """
-import time
-import json
 import argparse
+import os
+import time
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import requests
-from pathlib import Path
 
-from common.config import load_config
-from pipeline.windowing import build_flow_windows
-from models.forecast import ForecastEngine, load_world_model
+from common.config import feature_columns, load_config
 from models.dataset import FeatureScaler
+from models.forecast import ForecastEngine, load_world_model
+from pipeline.flow_features import clean_and_normalize, load_flow_csv
+from pipeline.graph_builder import build_window_graphs
+from pipeline.graph_embedding_features import build_graph_embedding_window_features
+from pipeline.graph_features import build_graph_window_features
+from pipeline.windowing import (
+    build_flow_windows, merge_graph_embedding_features, merge_graph_features, merge_packet_features,
+)
+
 
 def simulate_stream(csv_path: str, batch_size: int = 100):
-    """Yields batches of flows from a CSV to simulate a real-time stream."""
-    df = pd.read_csv(csv_path)
-    # Ensure it's sorted by time
-    if "timestamp" in df.columns:
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
-        df = df.sort_values("timestamp")
-    
+    """Yields batches of flows from a CSV to simulate a real-time stream. Uses the same
+    load_flow_csv + clean_and_normalize path every other CSV consumer uses, so column names
+    (Src IP, Timestamp, ...) and derived fields (total_pkts, is_tcp, ...) match what
+    build_flow_windows expects -- a raw CICFlowMeter CSV was never in the internal schema."""
+    df = clean_and_normalize(load_flow_csv(csv_path, require_label=False))
+    df = df.sort_values("timestamp")
+
     for start in range(0, len(df), batch_size):
-        yield df.iloc[start:start+batch_size]
+        yield df.iloc[start:start + batch_size]
         time.sleep(0.5)  # Simulate network delay
 
-def run_consumer(config_path: str, data_path: str, api_url: str):
+
+def _build_batch_windows(batch: pd.DataFrame, config: dict) -> pd.DataFrame:
+    """Same feature-assembly steps as pipeline/build_dataset.py, run on one streaming batch.
+    Packet-level columns are zero-filled (no PCAP in this path) -- that is the same,
+    already-documented convention flow-only checkpoints were trained under. Graph and
+    graph-embedding columns are computed for real from the batch's own flows, since a graph
+    only needs the cross-host context already present in one batch."""
+    windows = build_flow_windows(batch, config)
+    windows = merge_graph_features(windows, build_graph_window_features(batch, config), config)
+    graphs = build_window_graphs(batch, config)
+    windows = merge_graph_embedding_features(
+        windows, build_graph_embedding_window_features(batch, config, graphs=graphs), config,
+    )
+    windows = merge_packet_features(windows, None, config)
+    return windows
+
+
+def run_consumer(config_path: str, data_path: str, api_url: str, api_token: str | None = None):
     config = load_config(config_path)
-    
-    # Load model and scaler
+
     print("Loading model and scaler...")
     ckpt_dir = Path(config["paths"]["checkpoint_dir"])
     model, _ = load_world_model(ckpt_dir / "world_model_best.pt")
     scaler = FeatureScaler.load(Path(config["paths"]["processed_dir"]) / "scaler.npz")
     engine = ForecastEngine(model, scaler, config)
-    
+
+    feature_cols = feature_columns(config)
+    n_features = len(scaler.mean)  # the checkpoint's own trained feature width
+    # Audit W19: fail loudly at startup, not with a silently-wrong forecast later.
+    if len(feature_cols) != n_features:
+        raise ValueError(
+            f"feature_columns(config) has {len(feature_cols)} columns but the loaded checkpoint "
+            f"expects {n_features}. Refusing to run rather than pad or truncate silently."
+        )
+
     sequence_length = config["windowing"]["sequence_length"]
-    feature_cols = config["features"]["flow_level"] # Simplified for demo, omitting packet/graph for speed
-    
-    # In-memory rolling window buffer
-    # Format: {src_ip: DataFrame of recent windows}
-    host_buffers = {}
-    
+    host_buffers: dict[str, pd.DataFrame] = {}  # {src_ip: DataFrame of recent windows}
+
+    headers = {"Authorization": f"Bearer {api_token}"} if api_token else {}
+
     print(f"Starting simulated stream from {data_path}...")
     for batch in simulate_stream(data_path):
-        # Process the new batch of flows into windows
-        windows = build_flow_windows(batch, config)
-        
+        windows = _build_batch_windows(batch, config)
+
         for host_ip, host_windows in windows.groupby("src_ip"):
             if host_ip not in host_buffers:
                 host_buffers[host_ip] = host_windows
             else:
                 host_buffers[host_ip] = pd.concat([host_buffers[host_ip], host_windows])
-            
-            # Keep only the latest sequence_length windows
+
             buffer_len = len(host_buffers[host_ip])
             if buffer_len > sequence_length:
                 host_buffers[host_ip] = host_buffers[host_ip].iloc[-sequence_length:]
-            
-            # If we have a full sequence, run forecast
+
             if len(host_buffers[host_ip]) == sequence_length:
                 raw_seq = host_buffers[host_ip][feature_cols].to_numpy(dtype=np.float32)
-                # Pad remaining features with 0s if we only used flow_level
-                total_features = len(scaler.mean)
-                if raw_seq.shape[1] < total_features:
-                    pad = np.zeros((sequence_length, total_features - raw_seq.shape[1]), dtype=np.float32)
-                    raw_seq = np.concatenate([raw_seq, pad], axis=1)
-                
+
                 result = engine.rollout(raw_seq)
-                
-                # Check peak infiltration probability
+
                 peak_prob = float(np.max(result.infiltration_probs))
+                print(f"[FORECAST] {host_ip} - peak infiltration prob: {peak_prob:.4f} - "
+                      f"stage: {result.stage_predictions[int(np.argmax(result.infiltration_probs))]}")
                 if peak_prob > 0.5:
                     alert = {
                         "host_ip": host_ip,
                         "infiltration_prob": peak_prob,
                         "predicted_stage": result.stage_predictions[int(np.argmax(result.infiltration_probs))],
-                        "timestamp": time.time()
+                        "timestamp": time.time(),
                     }
                     print(f"[ALERT] {host_ip} - Prob: {peak_prob:.2f} - Stage: {alert['predicted_stage']}")
                     try:
-                        requests.post(f"{api_url}/api/v1/alerts/ingest", json=alert)
+                        requests.post(f"{api_url}/api/v1/alerts/ingest", json=alert, headers=headers, timeout=5)
                     except Exception as e:
                         print(f"API Error: {e}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="configs/default.yaml")
     parser.add_argument("--data", default="data/raw/synthetic_sample.csv")
     parser.add_argument("--api-url", default="http://localhost:8000")
+    parser.add_argument("--api-token", default=os.environ.get("NAF_API_TOKEN"),
+                         help="Bearer token for app/api.py (audit H1/W13 requires auth on every "
+                              "endpoint). Defaults to the NAF_API_TOKEN environment variable.")
     args = parser.parse_args()
-    
-    run_consumer(args.config, args.data, args.api_url)
+
+    run_consumer(args.config, args.data, args.api_url, args.api_token)

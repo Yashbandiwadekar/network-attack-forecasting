@@ -10,3 +10,14 @@ matplotlib>=3.8
 pyarrow>=15.0
 pytest>=8.0
 tqdm>=4.66
+
+# app/api.py (optional, disabled-by-default SIEM webhook relay -- audit H1/W13) and
+# scripts/stream_consumer.py
+fastapi>=0.110
+pydantic>=2.6
+uvicorn>=0.29
+requests>=2.31
+
+# scripts/visualize_topology.py (pyvis is optional -- the script degrades gracefully without it,
+# see its own install message)
+networkx>=3.2
