@@ -859,3 +859,91 @@ Paired AUROC diff 2.6e-6, bootstrap 95% CI [0, 7.9e-6] (3 seeds, rough). **Ceili
 Tracks its own remote branch, not `origin/master`. This was set by `git push -u origin
 integration/all-branches-2026-09-29` when the branch was first pushed (2026-09-29) -- H6's push
 hazard predates that push and no longer applies. A bare `git push` now updates only this branch.
+
+### W13 -- harden app/api.py (FIXED, option b)
+
+Owner decision: harden rather than remove. `app/api.py` rewritten (audit H1):
+- Off by default: refuses to boot (`HTTP 503`) unless `NAF_API_ENABLED=1`.
+- Every endpoint requires `Authorization: Bearer <token>`, compared with `hmac.compare_digest`
+  against `NAF_API_TOKEN` (env only, never a request field or module global default).
+- Webhook URLs must be `https`, host must appear in `NAF_WEBHOOK_ALLOWLIST` (env), and are
+  re-resolved and checked against private/loopback/link-local/multicast/reserved ranges both at
+  registration and at every dispatch (closes the SSRF path to `169.254.169.254` and similar).
+
+`scripts/stream_consumer.py` (the only other caller) now sends `Authorization: Bearer` from
+`--api-token` / `NAF_API_TOKEN`.
+
+**Acceptance (`tests/test_api_hardening.py`, 8 tests):**
+```
+tests/test_api_hardening.py ........                                    [100%]
+8 passed, 1 warning in 0.49s
+```
+Covers: disabled by default; unauthenticated request to `/api/v1/alerts`,
+`/api/v1/alerts/ingest`, `/api/v1/webhooks` all rejected (401); wrong token rejected; correct
+token accepted; webhook to `169.254.169.254` refused (400) and nothing registered; webhook to a
+non-allowlisted host refused; webhook to an allowlisted `https` host accepted; `http://` scheme
+rejected.
+
+### W14 -- dependencies match imports (FIXED)
+
+Added `fastapi>=0.110`, `pydantic>=2.6`, `uvicorn>=0.29`, `requests>=2.31`, `networkx>=3.2` to
+`requirements.txt` (the true new hard imports from `app/api.py`, `scripts/stream_consumer.py`,
+`scripts/visualize_topology.py`; `pyvis` stays undeclared since that script already degrades
+gracefully without it via its own try/except).
+
+**Acceptance:**
+```
+OK app.api
+OK scripts.stream_consumer
+OK scripts.visualize_topology
+OK models.cve_lookup
+```
+(all four modules import cleanly after `pip install -r requirements.txt` in the project venv,
+which previously lacked fastapi/pydantic/uvicorn/networkx entirely.)
+
+### W15 -- streaming consumer feature schema (FIXED)
+
+`scripts/stream_consumer.py` rewritten: `_build_batch_windows` now runs the same flow -> graph ->
+graph-embedding -> packet-feature assembly `pipeline/build_dataset.py` uses, computing REAL graph
+and graph-embedding features per batch (a batch already has the cross-host context a graph needs)
+instead of zero-padding them. Only packet-level columns stay zero-filled, matching the documented,
+in-distribution flow-only convention (W3). Column order/width now come from
+`common.config.feature_columns(config)`, asserted against the checkpoint's own `scaler.mean` width
+at startup (raises `ValueError` on mismatch rather than silently padding -- see W19). Also fixed a
+pre-existing bug this exposed: `simulate_stream` read the raw CICFlowMeter CSV directly instead of
+through `load_flow_csv` + `clean_and_normalize`, so column names (`Timestamp` vs `timestamp`) never
+matched what `build_flow_windows` expects.
+
+**Acceptance:** ran against the bundled sample --
+```
+python -m scripts.stream_consumer --config configs/default.yaml --data data/raw/flows/synthetic_sample.csv --api-url http://localhost:1
+[FORECAST] 10.0.0.9 - peak infiltration prob: 0.9836 - stage: lateral_movement
+[ALERT] 10.0.0.9 - Prob: 0.98 - Stage: lateral_movement
+...
+[FORECAST] 10.0.0.9 - peak infiltration prob: 0.5557 - stage: exfiltration
+[ALERT] 10.0.0.9 - Prob: 0.56 - Stage: exfiltration
+```
+`tests/test_stream_consumer.py::test_assembled_matrix_width_matches_checkpoint_in_features` --
+asserts every `feature_columns(config)` name is present in the assembled window and that
+`graph_embed_0` is not all-zero (the specific H3 symptom): **1 passed**.
+
+### W16 -- 0-byte placeholders removed (FIXED)
+
+```
+$ ls -l docs/demo.mp4 docs/presentation.pdf
+ls: cannot access 'docs/demo.mp4': No such file or directory
+ls: cannot access 'docs/presentation.pdf': No such file or directory
+```
+Both deleted (`git rm`). README's deliverables checklist now shows this item as `[ ]` (open),
+with a note that a prior commit had checked it off against 0-byte placeholders.
+
+### W17 -- reconnaissance-unreachable claim corrected (FIXED, option 2)
+
+Chose to correct the claim rather than rebuild a processed dataset with PCAP, given the rest of
+this work order's size. `docs/AUDIT.md`'s S6 row corrected: withdraws "now genuinely usable on
+PCAP-only uploads (S4)" and states plainly that both shipped processed builds
+(`data/processed_real`, `data/processed/cicids2018/splits`) report `flow_only: true`, so W3's own
+zero-fill guard makes `port_scan_score` zero before the S6 override can ever read it -- reconnaissance
+is unreachable on every shipped checkpoint today, including the PCAP-only upload path. Checked
+`app/streamlit_app.py` and `README.md` for the same overclaim elsewhere: none found (the README's
+"3 of 5 MITRE stages" note already does not claim reconnaissance is reachable).
