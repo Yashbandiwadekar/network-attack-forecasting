@@ -308,6 +308,80 @@ description or README signals a specific technical approach.
 `satyamforge/SIH-26153` · `syednzaheer/SIH-P.S.-26153-Defender` ·
 `tariksk786/NetworkAttackForcasting`.
 
+### Deep dive, 2026-09-29: where Argus's and TheRedKeep's numbers actually come from
+
+The two most-cited competitors after ShadowCat were examined at source (README, repository tree,
+training code, results files) rather than from their descriptions. The conclusions differ sharply.
+
+#### ErenSnowh/Argus — the headline 99.97% is on self-generated synthetic data
+
+Argus's README table reports **accuracy 99.975%, macro-F1 99.97%, infiltration AUC 0.983** for its
+World Model Transformer against a Random Forest at 93.00% / 92.99%, under a row reading
+"Split Strategy: Temporal (no future leakage)".
+
+Read at source, the provenance is stated two lines above the table and is easy to miss:
+
+> Training Set: 1,600 sequences × 10 timesteps · Test Set: 400 sequences × 10 timesteps
+> "Trained with 2,000 temporal sequences (**8 attack scenarios + random kill-chain patterns**)"
+
+Corroborating evidence from the code:
+
+- `argus/ml/world_model/train.py` takes `--dataset` with **`default="synthetic"`**, `--sequences`
+  default 500; its docstring says "Trains on either synthetic temporal data or real
+  CIC-IDS-2018/CTU-13 datasets", and its usage example is `python -m ml.world_model.train  # synthetic data`.
+- The bundled CIC-IDS-2018 and CIC-IDS-2017 fixtures are **5 KB and 4 KB** — tens of rows, sample
+  fixtures for loader tests, not training corpora.
+- The README's own "Training Time: 57.9s, Convergence: 24 epochs" is consistent with ~2,000 short
+  synthetic sequences and not with a real CIC-IDS-2018 build.
+
+**So 99.97% is a model learning the rules of its authors' own scenario generator, measured on 400
+synthetic sequences.** It is not a real-traffic result and is not comparable to any number in this
+project's evaluation reports, which are measured on 194,632 (v1) and 7,191 (v2, day-disjoint) real
+CIC-IDS-2018 test sequences. Argus is not dishonest about this — the sequence counts are printed —
+but the number will read as a real-data benchmark to anyone skimming, and it should not be treated
+as a bar to clear. Argus's genuine strengths are elsewhere: breadth of dataset loaders (8 public
+datasets normalised to one 38-feature schema), the multi-agent SOC framing, and CERT-In/NCIIPC
+statutory reporting.
+
+#### mainpratyushhoon/TheRedKeep — no world-model results yet, but the best methodology writing in the field
+
+TheRedKeep's repository is 28 files. Its only results artefact is
+`results/xgboost_baseline_results.txt`: an **XGBoost baseline** on UNSW-NB15's official pre-split
+train/test files — accuracy 0.9004, ROC-AUC 0.9840, **PR-AUC 0.9882**, **FPR 0.1838**, on 82,332
+test rows. Trained `.pth` world models exist in `models/`, but **no world-model metrics are
+published**. So TheRedKeep currently has a baseline, not a result.
+
+What makes it worth studying anyway is `markdown/UNSW_NB15_RSSM_Data_Problems.md`, which lists, in
+advance of building, the same evaluation traps this project had to discover by measurement:
+
+| TheRedKeep's stated risk | This project's finding |
+|---|---|
+| #18 "Random train/test splitting can cause temporal leakage — nearly identical or adjacent network behavior can appear in both train and test, producing overly optimistic results" | **E1** (per-host split shared attack sessions; F1 0.917 → 0.370 once fixed) |
+| #19 "Sequence boundaries can cause leakage — if sliding windows overlap across train/test boundaries" | **E8** (no embargo between splits) |
+| #12 "Potential data leakage during preprocessing — if normalization statistics are calculated using test data" | **S3 / E9** (scaler fitted on the test split) |
+| #4 "Raw timestamps shouldn't be directly fed to the model — could memorize absolute time" | Not a finding here, but the same class of concern |
+
+Its README also prescribes a **rigid temporal boundary** ("train on Days 1–3, validate on Day 4,
+test on Day 5") — the day-disjoint split this project only adopted under W7 — and prioritises
+**PR-AUC over ROC-AUC** on the grounds that ROC-AUC is misleading under class imbalance, which is
+correct and is a reporting habit worth copying.
+
+#### What this means for positioning
+
+- **Do not benchmark against Argus's 99.97%.** It is synthetic. Stating that plainly, with the
+  sequence counts, is fair comment and is more useful than trying to match it.
+- **TheRedKeep shows the methodology bar is being set publicly by others.** The distinction this
+  project can still defend is that it *executed and published* the measurements — LOFO, adversarial
+  evasion, a retracted headline number — where TheRedKeep has so far listed the risks and shipped a
+  baseline.
+- **Free credibility win:** TheRedKeep cites **Arp et al., "Dos and Don'ts of Machine Learning in
+  Computer Security" (USENIX Security 2022)**, the standard reference for exactly these evaluation
+  flaws. This project's audit independently rediscovered several of its "don'ts" — data snooping via
+  session overlap (E1), base-rate fallacy in the 5%-FPR operating point (E5), and inappropriate
+  baselines (E6, the label oracles). Citing it in the architecture document and the deck reframes
+  those findings as textbook-recognised failure modes the team caught and fixed, rather than
+  idiosyncratic self-criticism.
+
 ### Contrast bucket — real projects, different task (excluded from the 123)
 
 Kept here so they are neither miscounted as competitors nor rediscovered and misclassified later.
