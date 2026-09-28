@@ -141,6 +141,9 @@ def train(config_path: str = "configs/real_data.yaml") -> None:
     train_ds, val_ds, _ = _load_datasets(config)
     base_mask = _base_feature_mask(config)
     n_base_features = int(base_mask.sum())
+    # Audit W19: the names actually fed to the model, i.e. feature_columns(config) with the
+    # graph_embed_* block masked out (see _base_feature_mask) -- not the full column list.
+    base_feature_names = [c for c, keep in zip(feature_columns(config), base_mask) if keep]
     n_stage_classes = len(config["mitre_stages"])
     edge_dim = len(EDGE_FEATURE_COLS)
 
@@ -182,6 +185,7 @@ def train(config_path: str = "configs/real_data.yaml") -> None:
             "edge_dim": edge_dim,
             "embed_dim": EMBED_DIM,
             "base_mask": base_mask,
+            "feature_names": base_feature_names,
             "config": config,
         }
         if val_loss < best_val_loss:

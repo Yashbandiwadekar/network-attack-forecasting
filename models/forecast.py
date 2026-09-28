@@ -136,6 +136,17 @@ from models.checkpoint_io import load_checkpoint  # noqa: E402
 def load_world_model(checkpoint_path: str | Path, device: torch.device | None = None) -> tuple[WorldModel, dict[str, Any]]:
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
     checkpoint = load_checkpoint(checkpoint_path, device)
+    # Audit W19: self-consistency check -- if the checkpoint carries feature_names (everything
+    # trained after this change does), it must still match what feature_columns(config) computes
+    # from the checkpoint's OWN stored config today. A mismatch means the config on disk was
+    # edited after training, or `common/config.py::feature_columns` changed its ordering, and the
+    # checkpoint should not be scored against silently.
+    if checkpoint.get("feature_names") is not None:
+        try:
+            from models.checkpoint_io import validate_feature_names
+            validate_feature_names(checkpoint, feature_columns(checkpoint["config"]))
+        except KeyError:
+            pass  # config predates a `features` section entirely -- nothing to check
     model = WorldModel(checkpoint["n_features"], checkpoint["n_stage_classes"], checkpoint["config"])
     model.load_state_dict(checkpoint["model_state"])
     model.to(device).eval()

@@ -3,7 +3,7 @@ Simulated Kafka consumer for real-time streaming ingestion.
 In a real deployment, this script would connect to a Kafka broker or socket,
 maintain a rolling window of flows, and push predictions to the SIEM/SOAR API.
 
-Audit H3/W15: this used to build its matrix from only `config["features"]["flow_level"]` (19
+Audit H3/W15: this used to build its matrix from only the flow-level feature list (19
 columns) and zero-pad the remaining 22 -- including the 8 graph_embed_* columns, which are never
 zero during training, so every forecast was silently off-distribution. It now builds the full
 feature vector the same way pipeline/build_dataset.py does: real flow, graph, and graph-embedding
@@ -24,6 +24,7 @@ import pandas as pd
 import requests
 
 from common.config import feature_columns, load_config
+from models.checkpoint_io import load_checkpoint, validate_feature_names
 from models.dataset import FeatureScaler
 from models.forecast import ForecastEngine, load_world_model
 from pipeline.flow_features import clean_and_normalize, load_flow_csv
@@ -69,18 +70,16 @@ def run_consumer(config_path: str, data_path: str, api_url: str, api_token: str 
 
     print("Loading model and scaler...")
     ckpt_dir = Path(config["paths"]["checkpoint_dir"])
-    model, _ = load_world_model(ckpt_dir / "world_model_best.pt")
+    ckpt_path = ckpt_dir / "world_model_best.pt"
+    model, _ = load_world_model(ckpt_path)
     scaler = FeatureScaler.load(Path(config["paths"]["processed_dir"]) / "scaler.npz")
     engine = ForecastEngine(model, scaler, config)
 
     feature_cols = feature_columns(config)
-    n_features = len(scaler.mean)  # the checkpoint's own trained feature width
-    # Audit W19: fail loudly at startup, not with a silently-wrong forecast later.
-    if len(feature_cols) != n_features:
-        raise ValueError(
-            f"feature_columns(config) has {len(feature_cols)} columns but the loaded checkpoint "
-            f"expects {n_features}. Refusing to run rather than pad or truncate silently."
-        )
+    # Audit W19: fail loudly at startup on a schema mismatch, not with a silently-wrong forecast
+    # later. Checks column NAMES and ORDER against what the checkpoint was trained on, not just
+    # count -- a right-width, wrong-column matrix (this file's own H3 bug) passes a width check.
+    validate_feature_names(load_checkpoint(ckpt_path), feature_cols)
 
     sequence_length = config["windowing"]["sequence_length"]
     host_buffers: dict[str, pd.DataFrame] = {}  # {src_ip: DataFrame of recent windows}

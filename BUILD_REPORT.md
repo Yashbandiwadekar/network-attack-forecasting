@@ -947,3 +947,35 @@ zero-fill guard makes `port_scan_score` zero before the S6 override can ever rea
 is unreachable on every shipped checkpoint today, including the PCAP-only upload path. Checked
 `app/streamlit_app.py` and `README.md` for the same overclaim elsewhere: none found (the README's
 "3 of 5 MITRE stages" note already does not claim reconnaissance is reachable).
+
+### W19 -- close the schema-drift class (FIXED)
+
+Four times now (S13, G11, H3, the `a60c549` merge bug) a module assembling its own feature matrix
+drifted from the trained 41-column schema, three of which shipped. Added the checked-at-load-time
+guard the finding asked for:
+
+- `models/checkpoint_io.py::validate_feature_names(checkpoint, feature_names)` -- compares by
+  NAME and ORDER, not count, since every prior instance of this bug produced the RIGHT WIDTH with
+  the WRONG columns (a shape check alone would have passed all four).
+- `models/train.py` and `models/train_joint.py` now save `feature_names` (`feature_columns(config)`,
+  masked appropriately for the joint model) into every checkpoint going forward. Older checkpoints
+  have no such key and are passed through unchecked (same backward-compatible pattern as G12's
+  `weights_only` fix) -- nothing on disk is invalidated.
+- `models/forecast.py::load_world_model` self-checks a checkpoint's stored `feature_names` against
+  `feature_columns()` of its own stored config at load time.
+- `scripts/stream_consumer.py` (the module H3 was raised against) now calls
+  `validate_feature_names` explicitly against the loaded checkpoint before starting the stream.
+
+**Acceptance -- deliberately-wrong feature list raises a clear error at load time:**
+```
+Feature schema mismatch (audit W19): this checkpoint was trained on 3 columns
+['flow_count', 'total_bytes', 'graph_embed_0'], but the caller assembled 3 columns
+['flow_count', 'total_bytes', 'wrong_column']. Refusing to score -- a matching width with
+mismatched columns produces silently wrong predictions, not a crash. Build the feature matrix
+with common.config.feature_columns(config), which is the only supported way to assemble a model
+input.
+```
+`tests/test_feature_schema_guard.py` (5 tests: matching passes, older-checkpoint-without-the-field
+passes through, wrong column raises, wrong order at matching width/names raises, and a grep-based
+check that no `.py` file outside `common/config.py` hand-picks `flow_level` alone as a model input)
++ `tests/test_stream_consumer.py` -- **6 passed**. Full suite: **290 passed**.

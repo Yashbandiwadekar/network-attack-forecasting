@@ -22,7 +22,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from common.config import load_config, resolve_path
+from common.config import feature_columns, load_config, resolve_path
 from models.checkpoint_io import with_config_json
 from models.dataset import build_datasets
 from models.lstm_model import LSTMWorldModel
@@ -75,6 +75,13 @@ def train(config_path: str = "configs/default.yaml", arch: str = "transformer", 
     train_ds, val_ds, _, scaler = build_datasets(config)
     n_features = train_ds.X.shape[-1]
     n_stage_classes = len(config["mitre_stages"])
+    # Audit W19: saved alongside n_features so a loader can check COLUMN IDENTITY, not just count
+    # -- see models/checkpoint_io.py::validate_feature_names. None for configs with no `features`
+    # section (the minimal test configs), same fallback ForecastEngine already uses.
+    try:
+        feature_names = feature_columns(config)
+    except KeyError:
+        feature_names = None
 
     # pin_memory + non_blocking .to() (in _step_loss) overlap the host->device copy with the
     # previous step's GPU compute instead of stalling on it -- num_workers is deliberately left at
@@ -124,6 +131,7 @@ def train(config_path: str = "configs/default.yaml", arch: str = "transformer", 
                 "model_state": model.state_dict(),
                 "n_features": n_features,
                 "n_stage_classes": n_stage_classes,
+                "feature_names": feature_names,
                 "config": config,
             }), checkpoint_dir / f"{checkpoint_stem}_best.pt")
 
@@ -131,6 +139,7 @@ def train(config_path: str = "configs/default.yaml", arch: str = "transformer", 
         "model_state": model.state_dict(),
         "n_features": n_features,
         "n_stage_classes": n_stage_classes,
+        "feature_names": feature_names,
         "config": config,
     }), checkpoint_dir / f"{checkpoint_stem}_final.pt")
     print(f"Best val loss: {best_val_loss:.4f}. Checkpoints saved to {checkpoint_dir}")
