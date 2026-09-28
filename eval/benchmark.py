@@ -790,7 +790,7 @@ def _format_cross_dataset_report(
     seq_len = train_config["windowing"]["sequence_length"]
     lead_time_section = _format_lead_time_section(
         lead_time, train_config["windowing"]["forecast_horizon"], test_config["windowing"]["window_seconds"],
-        achieved_test_fpr=cross_results[0]["budget"]["false_positive_rate"],
+        achieved_test_fpr=results[0]["budget"]["false_positive_rate"],
     )
 
     return f"""# Cross-Dataset Evaluation: Train on {train_label} / Test on {test_label}
