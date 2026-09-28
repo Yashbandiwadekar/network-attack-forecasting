@@ -15,7 +15,7 @@ for scenario in sorted(
     for split in ["train", "val", "test"]:
         with np.load(
             scenario / f"{split}.npz",
-            allow_pickle=True
+            allow_pickle=False
         ) as data:
             all_times.append(
                 data["window_end_time"].astype(np.int64)
@@ -43,7 +43,7 @@ for scenario in sorted(
     for split in ["train", "val", "test"]:
         with np.load(
             scenario / f"{split}.npz",
-            allow_pickle=True
+            allow_pickle=False
         ) as data:
 
             current = data["current_stage"]

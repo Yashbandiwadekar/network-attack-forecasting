@@ -16,12 +16,14 @@ from __future__ import annotations
 
 import argparse
 
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from common.config import load_config, resolve_path
+from models.checkpoint_io import with_config_json
 from models.dataset import build_datasets
 from models.lstm_model import LSTMWorldModel
 from models.world_model import WorldModel
@@ -60,10 +62,15 @@ def _step_loss(model: nn.Module, batch, device: torch.device) -> tuple[torch.Ten
     return total, {"mse": mse.item(), "ce": ce.item(), "bce": bce.item(), "total": total.item()}
 
 
-def train(config_path: str = "configs/default.yaml", arch: str = "transformer") -> None:
+def train(config_path: str = "configs/default.yaml", arch: str = "transformer", seed: int | None = None) -> None:
     config = load_config(config_path)
     device = _device(config)
     print(f"Training on device: {device} (arch: {arch})")
+    if seed is not None:
+        # Optional, opt-in (audit E10). Seeded BEFORE the model is built and the DataLoader created, so both
+        # weight init and shuffling are reproducible. Omitting --seed leaves the original unseeded behaviour.
+        torch.manual_seed(seed)
+        np.random.seed(seed)
 
     train_ds, val_ds, _, scaler = build_datasets(config)
     n_features = train_ds.X.shape[-1]
@@ -84,6 +91,8 @@ def train(config_path: str = "configs/default.yaml", arch: str = "transformer") 
     optimizer = torch.optim.Adam(model.parameters(), lr=config["model"]["lr"])
 
     checkpoint_dir = resolve_path(config, "checkpoint_dir")
+    if seed is not None:
+        checkpoint_dir = checkpoint_dir / f"seed{seed}"  # each seed keeps its own checkpoints
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     checkpoint_stem = ARCH_CHECKPOINT_STEM[arch]
     best_val_loss = float("inf")
@@ -111,19 +120,19 @@ def train(config_path: str = "configs/default.yaml", arch: str = "transformer") 
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            torch.save({
+            torch.save(with_config_json({
                 "model_state": model.state_dict(),
                 "n_features": n_features,
                 "n_stage_classes": n_stage_classes,
                 "config": config,
-            }, checkpoint_dir / f"{checkpoint_stem}_best.pt")
+            }), checkpoint_dir / f"{checkpoint_stem}_best.pt")
 
-    torch.save({
+    torch.save(with_config_json({
         "model_state": model.state_dict(),
         "n_features": n_features,
         "n_stage_classes": n_stage_classes,
         "config": config,
-    }, checkpoint_dir / f"{checkpoint_stem}_final.pt")
+    }), checkpoint_dir / f"{checkpoint_stem}_final.pt")
     print(f"Best val loss: {best_val_loss:.4f}. Checkpoints saved to {checkpoint_dir}")
 
 
@@ -133,5 +142,7 @@ if __name__ == "__main__":
     parser.add_argument("--arch", default="transformer", choices=["transformer", "lstm"],
                          help="Sequence encoder to train: the world model's Transformer (default) "
                               "or the LSTM baseline (see docs/05-related-work-and-competitive-landscape.md).")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Seed the RNGs and save checkpoints under checkpoint_dir/seed<N> (audit E10). Default: unseeded, as before.")
     args = parser.parse_args()
-    train(args.config, args.arch)
+    train(args.config, args.arch, args.seed)

@@ -1,6 +1,9 @@
 # Related Work & Competitive Landscape
 
-Research survey compiled 2026-09-17. Covers three questions: what does the open academic
+Research survey compiled 2026-09-17; **Section 4 (competing teams) re-surveyed 2026-09-27**, and
+the project's own self-assessment throughout corrected on the same date to match `docs/AUDIT.md`
+Part G (the cross-dataset generalisation claim this document previously leaned on is withdrawn).
+Covers three questions: what does the open academic
 literature say about this exact problem, what do commercial vendors already ship, and what stands
 between a prototype like this one and a real business deployment. A fourth section surveys every
 other SIH team building the identical problem statement (PS 26153) found on GitHub as of this
@@ -65,7 +68,7 @@ different name in the security literature) — worth a targeted follow-up search
 terminology ("latent dynamics network telemetry", "generative traffic model") rather than
 RL-side terminology if this becomes a direction worth pursuing.
 
-### Cross-dataset generalization — directly validates this project's own Feature #1 result
+### Cross-dataset generalization — this literature now *explains* this project's own negative result
 
 - **[On the Cross-Dataset Generalization of Machine Learning for Network Intrusion Detection](https://arxiv.org/pdf/2402.10974)**
   (Cantone, Marrocco, Bria — Univ. of Cassino and Southern Latium, Feb 2024). Read in full. 1,728
@@ -79,12 +82,11 @@ RL-side terminology if this becomes a direction worth pursuing.
     depending on the source/target pair.
   - **Why this matters for this project specifically**: this project ran the *same experiment*
     (train on CIC-IDS-2018, zero-shot test on CTU-13, see `04-evaluation-ctu13_cross_from_real_data.md`)
-    and got a **partial transfer**, not collapse — binary infiltration detection held up at a
-    properly calibrated threshold (F1 0.534 vs. native-trained baselines' 0.045), while MITRE stage
-    classification did degrade (macro-F1 0.328 vs ~0.52 for native baselines). Against this paper's
-    baseline of "usually total collapse," a result of "binary signal transfers, fine-grained
-    labels don't" is meaningfully above the field's typical outcome and worth stating explicitly
-    against this citation in the submission rather than just reporting the raw numbers alone.
+    and got **no transfer**: the regenerated report shows F1 0.009 and AUROC 0.517 (chance level) on
+    CTU-13, with attack-class stage F1 of 0.000. (An earlier version of this note claimed a partial
+    transfer, F1 0.534; that number is withdrawn -- see `docs/AUDIT.md` G1.) This is consistent with
+    the paper's baseline of "usually total collapse", not an exception to it, and should be stated
+    plainly against this citation in the submission rather than presented as a strength.
   - **A second, separate finding buried in this paper's related-work section is a real risk for
     this project**: cited studies on CIC dataset integrity found **labeling error rates of
     6.67% (CIC-IDS2017) and 7.53% (CSE-CIC-IDS2018)**, with label corruption **exceeding 75% for
@@ -137,10 +139,13 @@ product.
 1. **Cross-network generalization at customer-onboarding time.** Every per-customer vendor above
    (Darktrace, Vectra) baselines *per deployed network* rather than shipping one static model,
    because the Cantone et al. finding above is real: a model trained on one network's traffic does
-   not reliably transfer to another's out of the box. This project's CIC→CTU-13 result is
-   encouraging (partial transfer, not collapse) but a real product would need either a per-deployment
-   fine-tuning step or an explicit domain-adaptation mechanism — a single frozen checkpoint is not
-   commercially viable as-is.
+   not reliably transfer to another's out of the box. This project's own CIC→CTU-13 result (AUROC
+   0.517, chance level — re-measured 2026-09-23, see `docs/AUDIT.md` G1) is a textbook instance of
+   exactly that collapse, not an exception to it. An earlier version of this section called the
+   result "encouraging (partial transfer, not collapse)" on the strength of the withdrawn F1 0.534
+   figure; that reading is retracted. A real product would need a per-deployment fine-tuning step or
+   an explicit domain-adaptation mechanism — a single frozen checkpoint is not commercially viable
+   as-is, and this project's own numbers now demonstrate why rather than hint at an exception.
 2. **False-positive economics at enterprise scale.** At the ~9,150-host scale this project's own
    dashboard has already demonstrated live, even a small false-positive rate produces dozens of
    daily alerts an analyst must triage — Vectra's entire product philosophy ("signal over noise")
@@ -178,24 +183,79 @@ product.
 
 ## 4. Competing SIH teams building the same problem statement (PS 26153)
 
-GitHub search performed 2026-09-17 for repos matching "network attack forecasting", "SIH26153",
-"PS26153", "MITRE ATT&CK forecasting", and "world model" + "SIH". This surfaced roughly 80 distinct
-public repositories (plus this project's own, which is excluded below) — dramatically more than
-the 3 teams reviewed in the original Round 2 competitive pass. Most are early-stage or have no
-description at all (likely near-empty scaffolding); the subset below is filtered to repos whose
-own description signals a specific, non-generic technical approach worth knowing about.
+### Field size, re-measured 2026-09-27
 
-### Most differentiated approaches found
+Searched via the GitHub REST search API (`gh api search/repositories`), 10 queries:
+`SIH26153`, `PS26153`, `sih 26153`, `"network attack forecasting"`, `"attack forecasting"`,
+`"attack stage" prediction network`, `"world model" cybersecurity`, `"world model" network traffic`,
+`forecasting CICIDS`, `"attacker progression"`. 148 unique repositories returned. Excluded: this
+project's own repo; 6 off-topic keyword collisions (heart-attack prediction, a RuneScape overlay,
+two Global-Terrorism-Database dashboards, a steering-wheel monitor); 8 repos created before
+2026-06-01, outside the SIH 2026 team-formation window; and 5 real projects solving a *different*
+task (the contrast bucket at the end of this section). One repo documented on 2026-09-17 and still
+alive, `reginaroselin0223-spec/Peri-Tech-Titans`, was returned by none of the 10 queries and has
+been added back by hand.
+
+| Measure | Count |
+|---|---|
+| Repos in the field | **123** |
+| Distinct owners | **116** |
+| **Distinct projects** (the honest team-count proxy) | **115** |
+| — high confidence: name or description cites SIH / 26153 / NTRO | 52 repos |
+| — lower confidence: topic match only, may not be SIH submissions | 71 repos |
+| Pushed to since the last survey (2026-09-17) | 40 of 123 |
+| Created since the last survey | 27 |
+| New to this document | 55 |
+
+**Repos are not teams.** Four owners hold 2–3 repos each (`Manishdhangar0047` ×3, `madhavgorla` ×3,
+`GauravKrBhagat` ×2, `krishnashahane` ×2 — code plus a separate research-paper repo), and
+`verpejas` / `cyber-laboratory` publish the same Visual_Analytics_Tool under two accounts, which is
+why the project count (115) is lower than the owner count (116). The 71 lower-confidence entries
+match on topic alone; some are certainly not SIH submissions.
+
+**On the ~128 figure — this needs confirming, not assuming.** It depends entirely on what that
+number counts, and the two possibilities are not interchangeable:
+
+- *If it is the SIH portal's idea-submission count for PS 26153*, it is a **different population**
+  from public GitHub repos. Teams submit without ever publishing code, and several repos counted
+  here are not submissions. The two numbers landing near each other would then be coincidence, and
+  quoting them as one figure would be wrong.
+- *If it is a GitHub search count*, it is consistent with what this pass measured: 123 in-field
+  repos, plus the 5 contrast-bucket projects, equals 128 returned-and-plausible repositories.
+
+Ask before citing either reading in the submission.
+
+**Growth is partly a method artefact.** The 2026-09-17 pass used 5 queries and named 72 repos (its
+own text said "roughly 80"); this pass used 10 queries and found 123. Of the 72 named previously,
+68 still exist; 4 have been deleted or made private (`GAMERMADXDAT/CYBERBAT`,
+`Wahulaniket/AI-based-Network-Attack-Forecasting-from-Network-Traffic-Data`,
+`ghantaakashchowdary/AI-based-...` — the same owner now has an `Al-based-...` spelling variant, so
+probably a rename rather than an abandonment — and `venkatpavan8806/Network-attack-forecasting`).
+**27 of the 123 were created after 2026-09-17**, so genuine growth is roughly 27 repos in 10 days;
+the rest of the jump from 72 to 123 is the wider query set, not new competitors.
+
+Everything below is **self-described from repo metadata, plus two READMEs read directly
+(`ShadowCat`, `TheRedKeep`) — not independently verified**. Descriptions are paraphrased, and a
+claim in a README is a claim, not a working feature.
+
+### Most differentiated approaches found (assessed 2026-09-17)
+
+> **Stale-comparison warning.** The "why it stands out" column below was written on 2026-09-17 and
+> several rows contrast against a version of this project that no longer exists. Corrected
+> 2026-09-27: CVE/NVD enrichment and CERT-In reporting now exist (`models/cve_lookup.py`,
+> `models/compliance.py`), a hash-chained audit ledger exists (`models/audit_ledger.py`), a
+> lead-time metric exists (`eval/metrics.py::lead_time_metrics`), and the benchmark now includes
+> Markov, LSTM and Transformer arms. Individual rows are annotated where they are affected.
 
 | Repo | Stars | Created | Why it stands out |
 |---|---|---|---|
-| **[ErenSnowh/Argus](https://github.com/ErenSnowh/Argus)** | 4 (most-starred of the field) | 2026-06-23 | "Autonomous... Multi-Agent SOC Co-Pilot powered by Temporal World Models, MITRE ATT&CK, **CAPEC, CVE/NVD**, and **Dual Statutory Reporting (CERT-In + NCIIPC)**." The only team found integrating specific vulnerability databases (CVE/NVD) and, notably, actual **Indian regulatory compliance reporting** (CERT-In, NCIIPC) — a genuinely different differentiation axis (regulatory/statutory framing) than any of this project's own five differentiator features. Given the PS issuer is NTRO, this angle may resonate strongly with judges. |
-| **[raushankumarsah07](https://github.com/raushankumarsah07/aI-based-network-attack-forecasting-from-network-traffic-data)** | 0 | 2026-08-26 | GRU-based world model plus **counterfactual "what-if" rollout simulation** (this project independently built the same capability, see Feature #4) — AND **Solidity smart contracts on Ethereum for tamper-proof prediction auditing**. The blockchain-audit angle directly answers the PS's stated theme ("Blockchain & Cybersecurity") in a way this project currently does not. |
+| **[ErenSnowh/Argus](https://github.com/ErenSnowh/Argus)** | 4 (most-starred of the field) | 2026-06-23 | "Autonomous... Multi-Agent SOC Co-Pilot powered by Temporal World Models, MITRE ATT&CK, **CAPEC, CVE/NVD**, and **Dual Statutory Reporting (CERT-In + NCIIPC)**." The only team found integrating specific vulnerability databases (CVE/NVD) and, notably, actual **Indian regulatory compliance reporting** (CERT-In, NCIIPC) — a genuinely different differentiation axis (regulatory/statutory framing) than this project's five differentiator features as they stood in September. Given the PS issuer is NTRO, this angle may resonate with judges. **Stale as of 2026-09-27**: this project now has both CVE/NVD enrichment (`models/cve_lookup.py`) and CERT-In-style reporting (`models/compliance.py`), so the gap is narrower than this row implies. Argus remains the most-starred entry (4) but has not been pushed to since 2026-09-08. |
+| **[raushankumarsah07](https://github.com/raushankumarsah07/aI-based-network-attack-forecasting-from-network-traffic-data)** | 0 | 2026-08-26 | GRU-based world model plus **counterfactual "what-if" rollout simulation** (this project independently built the same capability, see Feature #4) — AND **Solidity smart contracts on Ethereum for tamper-proof prediction auditing**. The blockchain-audit angle answers the PS's stated theme ("Blockchain & Cybersecurity"). **Partly stale as of 2026-09-27**: this project now ships a hash-chained tamper-evident ledger (`models/audit_ledger.py`) — blockchain's core primitive without a distributed ledger — so the remaining difference is on-chain verifiability, not tamper evidence as such. |
 | **[ayushshandilya-dev/netsight](https://github.com/ayushshandilya-dev/netsight)** | 0 | 2026-09-06 | "Model-internal XAI, novelty callout, **SHA-256 audit ledger**. Runs 100% offline." Another tamper-evidence angle (hash-chained audit log rather than blockchain), combined with an explicit "novelty callout" signal — conceptually similar to this project's own reconstruction-error novelty metric. |
-| **[SuhithZ-dreambot/Precursor](https://github.com/SuhithZ-dreambot/Precursor)** | 0 | 2026-09-10 | Fuses a classical **EWMA/CUSUM statistical drift detector** with a GRU/LSTM sequence model, and reports an explicit **"lead-time" evaluation metric** — i.e., directly measures how many seconds/windows of advance warning the system provides, rather than only F1/precision/recall. This is a meaningfully different and arguably more PS-aligned evaluation methodology (the PS explicitly asks for forecasting *before* compromise, i.e., lead time is the point) than this project's current benchmark suite reports. |
+| **[SuhithZ-dreambot/Precursor](https://github.com/SuhithZ-dreambot/Precursor)** | 0 | 2026-09-10 | Fuses a classical **EWMA/CUSUM statistical drift detector** with a GRU/LSTM sequence model, and reports an explicit **"lead-time" evaluation metric** — i.e., directly measures how many seconds/windows of advance warning the system provides, rather than only F1/precision/recall. This is a meaningfully different and arguably more PS-aligned evaluation methodology (the PS explicitly asks for forecasting *before* compromise, i.e., lead time is the point). **Addressed as of 2026-09-27**: this project now reports lead time with false-alarm accounting (`eval/metrics.py::lead_time_metrics`), which is what prompted the change. Precursor was last pushed 2026-09-23. |
 | **[raghuraj72/Vanguard-GWM](https://github.com/raghuraj72/Vanguard-GWM)** | 0 | 2026-08-27 | "**Generative Graph World Model**" — a GNN-based world model. This project explicitly chose Transformer over GNN in Round 1 for timeline/complexity reasons (documented in `01-architecture.md`); this is a live example of a competing team taking the GNN path instead. |
 | **[mithun-afk/ST-WM-Cyber](https://github.com/mithun-afk/ST-WM-Cyber)** | 0 | 2026-09-09 | "Spatial-Temporal World Model" — another graph/spatial variant of the same core idea, independent confirmation that graph-augmented world models are a common alternative direction among competing teams. |
-| **[csxzor-devcs](https://github.com/csxzor-devcs/sih26153-network-attack-forecasting)** | 0 | 2026-09-15 | Explicitly benchmarks **Markov, LSTM, and Transformer** models against each other for stage prediction — a three-way architecture comparison this project's own benchmark suite doesn't currently include (it compares Transformer against non-sequential/persistence baselines, not against other sequence-model architectures). |
+| **[csxzor-devcs](https://github.com/csxzor-devcs/sih26153-network-attack-forecasting)** | 0 | 2026-09-15 | Explicitly benchmarks **Markov, LSTM, and Transformer** models against each other for stage prediction — a three-way architecture comparison this project's benchmark lacked in September. **Stale as of 2026-09-27**: the benchmark now carries Markov, LSTM and Transformer arms alongside the LR and persistence baselines (`models/markov_baseline.py`, `models/lstm_model.py`). |
 | **[ShipraSharma08](https://github.com/ShipraSharma08/AI-Network-Attack-Forecasting)** | 0 | 2026-09-03 | Temporal network state modeling plus **blockchain-based evidence integrity** — second team (after raushankumarsah07) independently landing on blockchain for evidence/audit purposes, suggesting this is a recognized way other teams are satisfying the PS's "Blockchain & Cybersecurity" theme requirement. |
 | **[Impala04/sih26153-attack-chain-detection](https://github.com/Impala04/sih26153-attack-chain-detection)** | 0 | 2026-08-31 | "Adaptive behavioural attack-chain detection for identifying **non-IoC** network compromises" — explicitly framed around detecting attacks that *don't* match known indicators of compromise, a different framing angle from this project's MITRE-stage-classification approach. |
 | **[NotVivek12/AegisTwin](https://github.com/NotVivek12/AegisTwin)** | 0 | 2026-09-06 | Framed explicitly as a "**digital twin**" of the network rather than a "world model" — same underlying concept, different vocabulary; worth noting since "digital twin" may be a more judge-legible term than "world model" depending on the panel's background. |
@@ -203,7 +263,64 @@ own description signals a specific, non-generic technical approach worth knowing
 | **[HowSuyash/AttackForecast](https://github.com/HowSuyash/AttackForecast)** | 0 | 2026-08-23 | Previously known (Round 2) as the most architecturally sophisticated competitor — true RSSM/Dreamer-style latent world model over CTU-13. Still the closest thing to an actual academic-style world-model implementation found anywhere in this search, including the broader literature search in Section 1. |
 | **[hasim2006/PhantomGrid-Predictive-Defense-SIH26153](https://github.com/hasim2006/PhantomGrid-Predictive-Defense-SIH26153)** | 0 | 2026-08-22 | Previously known (Round 2) — thin, suspicious identical-precision baseline-vs-model numbers noted at the time. Unchanged assessment. |
 
-### Full list of other repos found (lower signal from description alone — not independently verified)
+### New to this document (first recorded 2026-09-27)
+
+55 repos here were not in the 2026-09-17 pass; 27 of them were created after that date, and the
+rest existed but were missed by the narrower query set. Featured below are the 10 whose own
+description or README signals a specific technical approach.
+
+| Repo | Stars | Created / last push | Why it matters |
+|---|---|---|---|
+| **[muthukkumaranb/ShadowCat](https://github.com/muthukkumaranb/ShadowCat)** | 0 | 09-11 / **09-27** | **The most direct competitor found in either survey.** Its README claims the same three things this project treats as differentiators — "quantified lead time, empirical leakage protection, and tamper-evident cryptographic provenance" — plus LSTM + graph fusion, MITRE mapping, per-prediction explanations and fully offline operation. The repo is large and actively pushed (separate `ml1`, `ml2-full`, `backend`, `frontend`, `data-engineering`, `fabric-experiment` trees). "Empirical leakage protection" is the audit's own E1 concern claimed as a feature. README read directly; the claims are not verified. |
+| **[mainpratyushhoon/TheRedKeep](https://github.com/mainpratyushhoon/TheRedKeep)** | 0 | 08-30 / 09-04 | Describes a **latent world model (PyTorch RSSM)**, the second such claim after `HowSuyash/AttackForecast`. Its README is an unusually careful reading of the PS, arguing explicitly for model-based latent state tracking over conventional NIDS ML, and the file listing includes `baseline.py`, `baseline_xgb.py`, `evaluate.py`, `inspect_timeline.py` — a baseline-comparison habit most of the field's descriptions show no sign of. README and file list read; the RSSM implementation itself is not verified. |
+| **[axorarbxy/network-digital-twin](https://github.com/axorarbxy/network-digital-twin)** | 0 | 09-18 / 09-18 | "Offline-first" **digital-twin** framing with world modelling, MITRE mapping and explainability — the second team after `NotVivek12/AegisTwin` to prefer "digital twin" over "world model". |
+| **[Radhika-coder46/Blockchain-Cybersecurity](https://github.com/Radhika-coder46/Blockchain-Cybersecurity)** | 0 | 09-02 / 09-02 | Fourth independent team using **blockchain/ledger framing** for prediction integrity, and the only one to put the PS theme ("Blockchain & Cybersecurity") in the repo title. |
+| **[NAMAN-THAKUR-1944/SIH26-127364](https://github.com/NAMAN-THAKUR-1944/SIH26-127364)** | 0 | 09-21 / 09-21 | Temporal world model with **Input×Gradient explainability** — the same attribution family this project uses — and a claim to forecast **zero-day** attacks, a far stronger generalisation claim than any published evidence in this field supports. |
+| **[verpejas](https://github.com/verpejas/Visual_Analytics_Tool)** / **[cyber-laboratory](https://github.com/cyber-laboratory/Visual_Analytics_Tool)** | 0 | 07-30, 08-03 | One tool published under two accounts: **DTW sequence alignment + RNN** forecasting behind a visual-analytics front end. DTW alignment is a genuinely different temporal-modelling primitive from anything else in the field. |
+| **[clustercoder/nidra](https://github.com/clustercoder/nidra)** | 0 | 09-06 / 09-19 | "Network Infiltration & Dynamics Recurrent Analyzer" — recurrent dynamics model, actively developed. |
+| **[piyushkashyap160-spec/CyberForecaster](https://github.com/piyushkashyap160-spec/CyberForecaster)** | 0 | 08-25 / 09-07 | Restates the PS's own framing almost verbatim (temporal network-state dynamics, forecasting before compromise completes). |
+| **[sjeevitha2106/network-attack-forecasting](https://github.com/sjeevitha2106/network-attack-forecasting)** | 0 | 09-19 / 09-19 | **Random Forest** benign/attack classifier with a Streamlit dashboard — i.e. exactly the static per-flow classification the PS says to move beyond. A reminder that a sizeable share of the field is not attempting the forecasting task at all. |
+
+**Also new, with a real description but no distinguishing technical claim (20):**
+`71382502061harshana-dotcom/HARSHANA-K` · `Aditya-Coder477/NEXUS-Forecast` (actively pushed) ·
+`Gaurav123b/AI-based-...` (1 star) · `GauravKrBhagat/NETRA.AI` ·
+`Low-Level-Strivers/Network-Attack-Forecast-System` (LSTM world model) ·
+`SaarthakManocha/DRISHTI-...` · `Tkc12344/netanomaly` · `Tony274772/CYBER-PULSE-...` ·
+`Zam-za/HarpocratesEngine` (Java) · `adizyachamp/cybornix` · `anirudhmkdev/NetForeSight` ·
+`buildwithanish2/GuardianX-AI-Network-Attack-Forecasting` · `gokullaxman/AI-based-...` ·
+`manansheth296-tech/sentinel-net` (2 stars) · `prasanth-09/predictive-cyber-defence-sih26153`
+(temporal world model + risk scoring + asset analysis) · `reginaroselin0223-spec/NetGuard-AI` ·
+`sawantvinayak473-cyber/cyberworld-network-attack-forecasting` · `sejalpunwatkar/NetPulseWorld` ·
+`sivaharish-R/AI-Based-Network-Attack-Forecasting` · `yuvarani163/cyber-attack-forecasting-system`.
+
+**Also new, with no or near-empty description (25):**
+`Digitalspy12/AI-based-...` · `Fareedcoder/SIH26153-Network-Attack-Forecasting` ·
+`GauravKrBhagat/NETRA---AI-Network-Attack-Forecasting` ·
+`Manishdhangar0047/AI-Network-attack-forecasting` · `Manishdhangar0047/Network-attack-forecasting-` ·
+`Nikazuto/SIH-26153-Trikal` · `PrajaRavi/CyberPredict-...` ·
+`Prasad14-cyber/network_attack_forecasting` · `Pravin1419/INNOVIXUS-SIH26153` ·
+`RaghiniGK/network-attack-forecasting-my-work` · `Tarun-015/CyberCast` · `Team-M3OW/SIH-26153` ·
+`UmaraNoor/cyber-attack-forecasting-repo` · `adityaroman07-hue/SIH26153-NetVision-AI` ·
+`anshuman2810/Neural_StealthOps_SIH26153` · `bikram-341/AI-Based-...` ·
+`devanshkatkar246/AI-Based-Network-Attack-Forecasting` · `ghantaakashchowdary/Al-based-...` ·
+`hsh62804-droid/network-traffic-attack-forecasting` · `nehin17/network-attack-forecasting` ·
+`prakhar14-op/Cyber-Attack-Forecasting-SIH-2026` · `priyagautam18/network-attack-forecasting` ·
+`satyamforge/SIH-26153` · `syednzaheer/SIH-P.S.-26153-Defender` ·
+`tariksk786/NetworkAttackForcasting`.
+
+### Contrast bucket — real projects, different task (excluded from the 123)
+
+Kept here so they are neither miscounted as competitors nor rediscovered and misclassified later.
+
+| Repo | Why it is not in the field |
+|---|---|
+| [Mouliprasad2002/cyber-attack-forecasting-arima](https://github.com/Mouliprasad2002/cyber-attack-forecasting-arima) | ARIMA over CISA's Known Exploited Vulnerabilities catalogue — forecasts global exploitation activity, not network state. |
+| [metaordo/StarCore](https://github.com/metaordo/StarCore) | "Cyberspace World Model that learns from system state-chains" — host/system telemetry rather than flow records. |
+| [TraceHanami/AIVA-Ks](https://github.com/TraceHanami/AIVA-Ks) | Kernel-level attack simulation with behavioural graphs and attacker-intent prediction — the endpoint analogue of this problem. |
+| [sharmaronit/Defnet](https://github.com/sharmaronit/Defnet) | World Models + multi-agent RL whose output is a *patch recommendation*, not an alert. Created 2026-06-13 and untouched since; likely not an SIH submission. |
+| [cyberbeko/Cyber-Defense-Incident-Response-...](https://github.com/cyberbeko/Cyber-Defense-Incident-Response-Azure-Sentinel-KQL-Threat-Hunting-) | An Azure Sentinel KQL threat-hunting write-up, not a forecasting model. |
+
+### Full list of other repos found as of 2026-09-17 (lower signal from description alone - not independently verified)
 
 Grouped alphabetically by owner. Most have generic or empty descriptions and may be early-stage
 scaffolding rather than substantive prototypes; listed for completeness since the request was for
@@ -252,9 +369,25 @@ attack-volume forecasting study on the public Loghub OpenSSH server log corpus, 
 
 ### Takeaways for this project specifically
 
-- **Field size**: this is a much larger competitive field than previously assessed (roughly 80
-  teams found vs. 3 in the original Round 2 pass) — treat any single-competitor comparison as
-  necessarily incomplete going forward.
+- **Field size (re-measured 2026-09-27)**: **123 repos across 115 distinct projects**, of which 52
+  explicitly cite SIH / 26153 / NTRO. 27 were created in the 10 days since the previous pass, so the
+  field is still growing by roughly 3 repos a day this close to submission. Treat any
+  single-competitor comparison as necessarily incomplete, and re-run the survey rather than reusing
+  these counts.
+- **Most of the field is not a threat; a few are.** A large share is empty scaffolding, and at least
+  one entrant (`sjeevitha2106`) ships a Random Forest per-flow classifier - the very approach the PS
+  says to move beyond. The serious entries are few: `ShadowCat`, `TheRedKeep`, `Argus`,
+  `HowSuyash/AttackForecast`, `Precursor`, `csxzor-devcs`.
+- **The field has caught up on this project's differentiators.** `ShadowCat` alone claims lead-time
+  quantification, leakage protection and tamper-evident provenance; `netsight` and
+  `Radhika-coder46` cover audit ledgers; `axorarbxy` and `AegisTwin` cover the digital-twin framing;
+  `TheRedKeep` and `AttackForecast` describe deeper latent (RSSM-style) world models than this
+  project's Transformer. Of the repos whose descriptions and READMEs were read in this pass, none
+  reports a *negative* result about its own generalisation, adversarial testing, or false-positive
+  behaviour — but only two READMEs were read in full, so treat that as unobserved rather than
+  established. See the revised "where this project still leads" note below.
+- **Stars are not activity**: `Argus`, still the most-starred entry at 4, has not been pushed to
+  since 2026-09-08.
 - **Recurring differentiation axes across many teams**: (1) blockchain/hash-chain audit trails for
   tamper-evident predictions (at least 3 independent teams), (2) graph/spatial-temporal world-model
   variants instead of a plain Transformer (at least 2 teams), (3) explicit lead-time-focused
@@ -262,13 +395,24 @@ attack-volume forecasting study on the public Loghub OpenSSH server log corpus, 
   most PS-aligned metric choice found in this whole survey), (4) regulatory/statutory compliance
   framing tied to Indian cyber authorities specifically (1 team, but a strong, distinctive angle
   given NTRO is the PS issuer).
-- **Where this project still leads**: the combination of (a) validation on two independent
-  real-world datasets with an honestly-reported cross-dataset transfer result, (b) a documented and
-  fixed robustness bug plus a documented and *unfixed* adversarial vulnerability (most competing
-  repos' descriptions make no mention of adversarial testing or false-positive robustness work at
-  all), and (c) the response-playbook/attack-narrative pairing that closes the loop from forecast to
-  recommended action was not observed as a described feature in any other repo surveyed here.
-- **Worth considering as a result of this survey**: adding an explicit lead-time metric (à la
-  SuhithZ-dreambot/Precursor) to `eval/benchmark.py` alongside the existing F1/precision/recall
-  suite, since it's arguably a more direct measurement of what the PS is actually asking for
-  ("forecast before compromise completes") than classification metrics alone.
+- **Where this project still leads** (revised 2026-09-27, after the Part G audit): not on
+  generalisation — the CTU-13 transfer is chance-level, the UNSW-NB15 transfer is worse, and the
+  leave-one-family-out folds are negative for three of four attack families (`docs/AUDIT.md` G1,
+  S8). What remains genuinely differentiating is **measurement honesty**: a leave-one-attack-
+  family-out evaluation, a lead-time metric with false-alarm accounting, label-oracle baselines
+  named as oracles, a documented *and fixed* robustness bug, a documented and *unfixed* adversarial
+  vulnerability with its threat model stated, and an independent audit trail (`docs/AUDIT.md`) that
+  retracts the project's own headline number when it failed to reproduce. No surveyed repo describes
+  adversarial testing, false-positive robustness work, or a negative result of its own. The
+  response-playbook/attack-narrative pairing also remains unobserved elsewhere.
+- **Two differentiators have been matched by others since the last survey**: the hash-chained audit
+  ledger (ayushshandilya-dev/netsight describes a SHA-256 audit ledger; Radhika-coder46 and two
+  earlier teams use blockchain for the same purpose) and the digital-twin/world-model framing
+  (axorarbxy/network-digital-twin, NotVivek12/AegisTwin). Neither is a unique axis any more.
+- **The lead-time metric takeaway from the 2026-09-17 survey is now DONE** — implemented in
+  `eval/metrics.py::lead_time_metrics`, with the false-alarm accounting the first version lacked
+  (`docs/AUDIT.md` E3). On the day-disjoint split it reports 93.5% of transitions missed and 1.5%
+  alarm precision: the metric earned its place by contradicting the project's earlier optimism.
+  Quote those two figures with their caveats — the transitions behind them are 181 episodes on 3
+  day-level pseudo-hosts, 96% from one day (G2), and the operating threshold they use does not
+  transfer across days (G8, 5% budgeted FPR on val → ~36% achieved on test).

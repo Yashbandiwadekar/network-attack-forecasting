@@ -178,9 +178,29 @@ def save_window_graphs(graphs: dict[Any, WindowGraph], path: str | Path) -> None
         pickle.dump(graphs, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
+class _RestrictedUnpickler(pickle.Unpickler):
+    """Audit G12: window_graphs.pkl only ever holds WindowGraph objects, numpy arrays and pandas
+    Timestamp keys, so only those may be reconstructed -- a tampered file cannot import arbitrary
+    callables (os.system etc.). Same pattern as models/baseline_lr.py."""
+
+    _ALLOWED_PREFIXES = ("numpy", "pipeline.graph_builder", "pandas._libs.tslibs.", "collections.")
+    _ALLOWED_EXACT = {("datetime", "datetime"), ("datetime", "timedelta"), ("datetime", "timezone"),
+                      ("_codecs", "encode")}
+    _ALLOWED_BUILTINS = {"set", "frozenset", "slice", "complex", "list", "dict", "tuple", "bytearray"}
+
+    def find_class(self, module, name):
+        if (
+            module == "numpy" or module.startswith(self._ALLOWED_PREFIXES)
+            or (module, name) in self._ALLOWED_EXACT
+            or (module == "builtins" and name in self._ALLOWED_BUILTINS)
+        ):
+            return super().find_class(module, name)
+        raise pickle.UnpicklingError(f"Blocked global {module}.{name} in window-graphs file")
+
+
 def load_window_graphs(path: str | Path) -> dict[Any, WindowGraph]:
     with open(path, "rb") as f:
-        return pickle.load(f)
+        return _RestrictedUnpickler(f).load()
 
 
 def window_graph_key(window_time: Any, scenario_id: Any = None) -> Any:
