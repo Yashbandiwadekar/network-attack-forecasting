@@ -423,7 +423,11 @@ def predict_forecast(req: PredictRequest):
         "stage_probs": [[round(float(p), 4) for p in row] for row in result.stage_probs],
         "stage_labels": list(STAGE_CLASSIFICATION_LABELS),
         "transition_magnitude": [round(float(v), 5) for v in result.transition_magnitude],
-        "current_stage": _display(stages[0]),
+        # Observed, like _host_row -- stages[0] is already t+1, so using it here made the
+        # forecast panel report "Benign" for a host the table and narrative both showed as
+        # Command & Control.
+        "current_stage": _display(_observed_stage(req.host_ip) or stages[0]),
+        "current_stage_observed": _observed_stage(req.host_ip) is not None,
         "horizon_note": (
             f"Forecast covers {horizon['horizon_seconds']} seconds "
             f"({horizon['horizon_k']} steps x {horizon['window_seconds']}s)."

@@ -24,12 +24,21 @@ export const getAdaptiveParticleCount = () => {
   return DEFAULT_DESKTOP_PARTICLE_COUNT; // Desktop target (2,200)
 };
 
-// Global static topology state
+/* Topology cache, keyed by (particleCount, formationIndex).
+   This used to be a single set of module-level globals that every caller overwrote in place.
+   Two ParticleNetwork instances mount in this app (Hero on the landing page, and Login), so the
+   second one to build a topology would mutate `edgesList` underneath the first. The first
+   instance's line buffers had been allocated from the OLD edge count while its bufferAttribute
+   `count` was read from the NEW shared array's length -- a size mismatch that made three.js
+   throw "Resizing buffer attributes is not supported" on every rendered frame, thousands of
+   times per page view, from inside the render loop.
+   Caching per key keeps the original "don't rebuild identical topology" optimisation while
+   giving each distinct configuration its own immutable arrays. */
+const topologyCache = new Map();
+
 let basePositions = null;
 let nodeTypes = null; // 0=red_orange_base, 1=bright_orange_hub, 2=deep_maroon_anomaly, 3=crimson_red_threat
 let edgesList = []; // [[i, j, dist, edgeType], ...]
-let currentTopologyCount = 0;
-let currentFormationIdx = -1;
 
 function seededRandom(seed) {
   const x = Math.sin(seed++) * 10000;
@@ -40,12 +49,9 @@ function seededRandom(seed) {
  * Initializes an Open 3D Network Field floating in thin air across the screen.
  */
 export const buildNetworkTopology = (particleCount, formationIndex = 0) => {
-  if (currentTopologyCount === particleCount && currentFormationIdx === formationIndex && basePositions) {
-    return { basePositions, nodeTypes, edgesList };
-  }
-
-  currentTopologyCount = particleCount;
-  currentFormationIdx = formationIndex;
+  const cacheKey = `${particleCount}:${formationIndex}`;
+  const cached = topologyCache.get(cacheKey);
+  if (cached) return cached;
 
   basePositions = new Float32Array(particleCount * 3);
   nodeTypes = new Uint8Array(particleCount);
@@ -165,7 +171,9 @@ export const buildNetworkTopology = (particleCount, formationIndex = 0) => {
     }
   }
 
-  return { basePositions, nodeTypes, edgesList };
+  const topology = { basePositions, nodeTypes, edgesList };
+  topologyCache.set(cacheKey, topology);
+  return topology;
 };
 
 /**

@@ -108,6 +108,11 @@ def test_forecast_predict_contract_and_60_second_horizon(loaded: TestClient):
     # Stage honesty (audit S6/S7): callers must be able to tell rule overrides from predictions.
     assert len(body["stage_is_heuristic"]) == len(body["predicted_stages"])
     assert "Execution" not in body["predicted_stages"], "not a stage this project has"
+    # current_stage must be the observed stage, matching the host row and the narrative.
+    # Using the forecast's first step made this panel say "Benign" for a host the rest of the
+    # UI showed as Command & Control.
+    row = loaded.get("/api/v1/forecast/hosts").json()["hosts"][0]
+    assert body["current_stage"] == row["current_stage"]
 
 
 @needs_sample

@@ -1,19 +1,17 @@
 @import './variables.css';
 
-/* Local/Air-gap Font Fallbacks (Offline Ready - Zero External Requests) */
-@font-face {
-  font-family: 'Space Grotesk';
-  src: local('Space Grotesk'), local('SpaceGrotesk-Regular'), system-ui, -apple-system, sans-serif;
-  font-weight: 400 700;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'JetBrains Mono';
-  src: local('JetBrains Mono'), local('JetBrainsMono-Regular'), monospace;
-  font-weight: 400 700;
-  font-display: swap;
-}
+/* Self-hosted fonts. @fontsource ships the .woff2 files into the bundle at build time, so the
+   typography renders identically on an air-gapped demo machine with no network request and no
+   dependency on the font being installed locally. The previous @font-face used only local(),
+   which silently fell back to system fonts anywhere the fonts weren't already present. */
+@import '@fontsource/space-grotesk/300.css';
+@import '@fontsource/space-grotesk/400.css';
+@import '@fontsource/space-grotesk/500.css';
+@import '@fontsource/space-grotesk/600.css';
+@import '@fontsource/space-grotesk/700.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/700.css';
 
 html, body, #root {
   width: 100%;

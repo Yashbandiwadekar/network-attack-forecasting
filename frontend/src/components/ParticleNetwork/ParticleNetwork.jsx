@@ -192,14 +192,23 @@ const NetworkField = ({ particleCount, controlsConfig, isPaused, mode, clickPuls
     linesRef.current.geometry.setDrawRange(0, validLineCount * 2);
   });
 
+  /* `key={particleCount}` on both meshes is load-bearing, not cosmetic.
+     When the viewport crosses a breakpoint, getAdaptiveParticleCount() changes particleCount,
+     which changes edgesCount, which produces new Float32Arrays for the line buffers. Without a
+     key, React attaches those differently-sized arrays to the SAME bufferGeometry, and three.js
+     refuses to resize an allocated buffer attribute -- it threw
+     "THREE.WebGLAttributes: Resizing buffer attributes is not supported" on every frame
+     thereafter (thousands of errors per page view, from inside the render loop).
+     Keying the elements makes React mount fresh geometry instead of mutating the old one.
+     Visual output is unchanged. */
   return (
     <group>
-      <instancedMesh ref={meshRef} args={[null, null, particleCount]}>
+      <instancedMesh key={`mesh-${particleCount}`} ref={meshRef} args={[null, null, particleCount]}>
         <sphereGeometry args={[1, 8, 8]} />
         <meshBasicMaterial toneMapped={false} transparent={true} opacity={0.95} />
       </instancedMesh>
 
-      <lineSegments ref={linesRef}>
+      <lineSegments key={`lines-${particleCount}-${formationIndex}`} ref={linesRef}>
         <bufferGeometry>
           <bufferAttribute
             attach="attributes-position"
