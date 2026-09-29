@@ -292,28 +292,28 @@ const Dashboard = () => {
                   <>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', fontFamily: 'var(--font-mono)' }}>
                       {[
-                        { label: 'AUROC', stat: evalMetrics.auroc, color: '#ffaa00', note: 'Ranking quality' },
-                        { label: 'AUPRC', stat: evalMetrics.auprc, color: '#4caf50', note: 'Precision-recall area' },
-                        { label: 'PRECISION @ 0.5', stat: evalMetrics['precision_at_0.5'], color: '#ff7b00', note: 'Of what it flags' },
-                        { label: 'RECALL @ 0.5', stat: evalMetrics['recall_at_0.5'], color: '#e53935', note: 'Of attacks caught' },
-                        { label: 'F1 @ 0.5', stat: evalMetrics['f1_at_0.5'], color: '#2196f3', note: 'Harmonic mean' },
+                        { label: 'AUROC', stat: evalMetrics.auroc, color: 'var(--color-accent-amber)', note: 'Ranking quality' },
+                        { label: 'AUPRC', stat: evalMetrics.auprc, color: '#0ca30c', note: 'Precision-recall area' },
+                        { label: 'PRECISION @ 0.5', stat: evalMetrics['precision_at_0.5'], color: 'var(--color-accent-orange)', note: 'Of what it flags' },
+                        { label: 'RECALL @ 0.5', stat: evalMetrics['recall_at_0.5'], color: 'var(--color-accent-red)', note: 'Of attacks caught' },
+                        { label: 'F1 @ 0.5', stat: evalMetrics['f1_at_0.5'], color: '#ff6a00', note: 'Harmonic mean' },
                       ].map(({ label, stat, color, note }) => (
-                        <div key={label} style={{ background: '#101010', padding: '1rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div key={label} style={{ background: '#0a0a0a', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
                           <span style={{ fontSize: '0.7rem', color: '#888888', display: 'block' }}>{label}</span>
                           <strong style={{ fontSize: '1.25rem', color, display: 'block', marginTop: '0.2rem' }}>
                             {stat ? `${stat.mean.toFixed(3)} ± ${stat.sd.toFixed(3)}` : '—'}
                           </strong>
-                          <span style={{ fontSize: '0.65rem', color: '#666666' }}>{note}</span>
+                          <span style={{ fontSize: '0.65rem', color: '#888888' }}>{note}</span>
                         </div>
                       ))}
                     </div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: '#777777', marginTop: '0.9rem', lineHeight: 1.6 }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: '#888888', marginTop: '0.9rem', lineHeight: 1.6 }}>
                       {evalMetrics.n_test_sequences?.toLocaleString()} test sequences
                       ({evalMetrics.n_test_positive?.toLocaleString()} positive),
                       mean ± SD over {evalMetrics.n_seeds} independent training runs.
                       Source: {evalMetrics.source}
                       {evalMetrics.note && (
-                        <div style={{ marginTop: '0.4rem', color: '#8a8a8a' }}>{evalMetrics.note}</div>
+                        <div style={{ marginTop: '0.4rem', color: '#a0a0a0' }}>{evalMetrics.note}</div>
                       )}
                     </div>
                     {evalMetrics.generalisation_lofo && (
@@ -324,19 +324,19 @@ const Dashboard = () => {
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem', fontFamily: 'var(--font-mono)', fontSize: '0.72rem' }}>
                           {Object.entries(evalMetrics.generalisation_lofo).map(([family, v]) => (
-                            <div key={family} style={{ background: '#0d0d0d', padding: '0.7rem', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                            <div key={family} style={{ background: '#080808', padding: '0.7rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
                               <span style={{ color: '#888888', display: 'block' }}>{family.replace(/_/g, ' ').toUpperCase()}</span>
-                              <strong style={{ color: v.distinguishable_from_chance ? '#4caf50' : '#9e9e9e' }}>
+                              <strong style={{ color: v.distinguishable_from_chance ? '#0ca30c' : '#888888' }}>
                                 AUROC {v.auroc_mean.toFixed(3)} ± {v.auroc_sd.toFixed(3)}
                               </strong>
-                              <span style={{ display: 'block', color: '#666666' }}>
+                              <span style={{ display: 'block', color: '#888888' }}>
                                 {v.distinguishable_from_chance ? 'above chance' : 'not distinguishable from chance'}
                               </span>
                             </div>
                           ))}
                         </div>
                         {evalMetrics.generalisation_note && (
-                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: '#777777', marginTop: '0.6rem', lineHeight: 1.6 }}>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: '#888888', marginTop: '0.6rem', lineHeight: 1.6 }}>
                             {evalMetrics.generalisation_note}
                           </div>
                         )}

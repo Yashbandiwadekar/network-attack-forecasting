@@ -236,7 +236,7 @@ const ForecastProbabilityCurve = ({
                       y={padding.top + graphHeight + 38}
                       textAnchor="middle"
                       className="svg-stage-label font-mono"
-                      fill={pt.prob >= 0.65 ? '#ff8a5c' : '#7d7d7d'}
+                      fill={pt.prob >= 0.65 ? '#ff6a00' : '#888888'}
                     >
                       {String(pt.stage).length > 12 ? `${String(pt.stage).slice(0, 11)}…` : pt.stage}
                     </text>
@@ -246,7 +246,7 @@ const ForecastProbabilityCurve = ({
                         y={padding.top + graphHeight + 52}
                         textAnchor="middle"
                         className="svg-stage-label font-mono"
-                        fill="#fab219"
+                        fill="#ffaa00"
                       >
                         ⚠ rule
                       </text>
@@ -258,7 +258,7 @@ const ForecastProbabilityCurve = ({
           })}
 
           {!hasSeconds && (
-            <text x={width / 2} y={height - 6} textAnchor="middle" className="svg-label font-mono" fill="#666">
+            <text x={width / 2} y={height - 6} textAnchor="middle" className="svg-label font-mono" fill="#888888">
               forecast step
             </text>
           )}

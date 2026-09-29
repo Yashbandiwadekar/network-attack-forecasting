@@ -130,13 +130,13 @@
 
 /* --- 60-second horizon presentation --- */
 .forecast-meta-summary .horizon-seconds {
-  color: #ff7b00;
+  color: var(--color-accent-orange);
   font-weight: 700;
   letter-spacing: 0.06em;
 }
 
 .forecast-meta-summary .peak-at {
-  color: #8a8a8a;
+  color: #888888;
   font-weight: 400;
 }
 
@@ -150,9 +150,9 @@
 .forecast-disclosure {
   margin-top: 0.6rem;
   padding: 0.55rem 0.7rem;
-  border-left: 2px solid #fab219;
-  background: rgba(250, 178, 25, 0.06);
+  border-left: 2px solid var(--color-accent-amber);
+  background: rgba(255, 170, 0, 0.1);
   font-size: 0.66rem;
   line-height: 1.6;
-  color: #b9a06a;
+  color: var(--color-accent-amber);
 }
