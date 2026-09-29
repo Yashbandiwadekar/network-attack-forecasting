@@ -1,0 +1,44 @@
+.hero-hud-panel {
+  position: absolute;
+  top: 90px;
+  left: 2rem;
+  z-index: 10;
+  background: rgba(10, 10, 10, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 1.1rem 1.3rem;
+  max-width: 290px;
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+
+.hud-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: 0.6rem;
+}
+
+.hud-brand {
+  font-family: var(--font-main);
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.08em;
+  color: #ff6a00;
+}
+
+.hud-sub {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: #a0a0a0;
+  letter-spacing: 0.05em;
+}
+
+.hud-instructions {
+  font-family: var(--font-main);
+  font-size: 0.78rem;
+  color: #888888;
+  line-height: 1.45;
+  margin: 0;
+}

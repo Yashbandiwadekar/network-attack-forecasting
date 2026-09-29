@@ -1,0 +1,59 @@
+.dataset-table-container {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  overflow-x: auto;
+}
+
+.dataset-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #0a0a0a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  font-family: var(--font-main);
+  text-align: left;
+}
+
+.dataset-table th {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #888888;
+  letter-spacing: 0.08em;
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.dataset-table td {
+  padding: 1rem 1.2rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 0.88rem;
+  color: #a0a0a0;
+}
+
+.dataset-table tr:last-child td {
+  border-bottom: none;
+}
+
+.dataset-name {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: #ff6a00 !important;
+}
+
+.dataset-mono {
+  font-family: var(--font-mono);
+  color: #f5f5f5 !important;
+}
+
+.badge-role {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: #ffb000;
+  background: rgba(255, 176, 0, 0.1);
+  border: 1px solid rgba(255, 176, 0, 0.25);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
