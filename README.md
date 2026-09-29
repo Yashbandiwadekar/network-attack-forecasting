@@ -90,20 +90,54 @@ pytest tests/       # 157 tests
 
 ## Results (real CIC-IDS-2018)
 
-Full report: `docs/04-evaluation-real.md`. Cross-dataset: `docs/04-evaluation-ctu13_cross_from_real_data.md`.
+**Headline, on a leakage-free split, averaged over three seeds** — this is the number to quote
+(`docs/04-evaluation-real-v2-seeds.md`):
 
-| Model | F1 @ 0.5 | Precision | Recall | Stage macro-F1 |
-|---|---|---|---|---|
-| World model (Transformer) | 0.917 | 0.943 | 0.892 | 0.820 |
-| Baseline (LSTM) | 0.908 | 0.947 | 0.872 | 0.715 |
-| Baseline (LR, stacked window) | 0.866 | 0.926 | 0.814 | 0.506 |
-| Baseline (LR, last window) | 0.787 | 0.943 | 0.676 | 0.450 |
+| Metric | Value |
+|---|---|
+| F1 @ 0.5 | **0.481 ± 0.033** |
+| Precision @ 0.5 | 0.931 ± 0.024 |
+| Recall @ 0.5 | 0.325 ± 0.029 |
+| AUROC | **0.794 ± 0.043** |
+| AUPRC | 0.646 ± 0.035 |
 
-The world model beats both logistic-regression baselines, which is the comparison the problem
-statement asks for. Two label-oracle references (persistence and a Markov chain over the label
-sequence) score higher still at t+1 — they read the current window's ground-truth label, which a
-deployed system never has. See `docs/04-evaluation-real.md` for that discussion and
-`docs/AUDIT.md` for why the single-step comparison flatters them.
+Day-disjoint split (no attack session appears in both train and test), 7,191 test sequences,
+three independent training runs. The model is consistently *conservative*: precision holds at 0.93
+across seeds while recall sits at 0.33 — what it flags is almost always right, but it misses most
+attack windows on an honest split.
+
+### Why an earlier, higher number is not quoted
+
+| Split | F1 @ 0.5 | AUROC | Status |
+|---|---|---|---|
+| Per-host chronological (v1) | 0.917 | 0.9995 | **Not valid** — train and test shared attack sessions |
+| Day-disjoint, single unseeded run | 0.370 | 0.706 | Superseded — a low-tail draw |
+| **Day-disjoint, 3 seeds** | **0.481 ± 0.033** | **0.794 ± 0.043** | **Current** |
+
+The 0.917 came from a split that shared attack sessions between train and test — data snooping in
+the sense of Arp et al. (USENIX Security 2022). It was found by this project's own audit
+(`docs/AUDIT.md`, E1) and corrected. On the fixed split the baselines were re-measured too; full
+tables, including the label-oracle references (persistence and a Markov chain, which read the
+current window's true label and are therefore not deployable), are in
+`docs/04-evaluation-real-v2.md` and `docs/04-evaluation-real.md`.
+
+### Generalisation to unseen attacks
+
+Measured, and negative — see `docs/04-evaluation-lofo-seeds.md`. Leave-one-attack-family-out,
+three seeds per fold:
+
+| Held-out family | AUROC (mean ± SD) |
+|---|---|
+| initial_access | 0.685 ± 0.087 |
+| lateral_movement | 0.528 ± 0.129 |
+| command_and_control | 0.646 ± 0.131 |
+| impact (DDoS) | 0.819 ± 0.128 |
+
+Only `impact` is distinguishable from chance, and only marginally. With three seeds the test is
+low-powered, so the honest reading is *no statistically supported evidence of transfer to held-out
+families*, not *proven no transfer*. The three failing families are precisely those with no real
+per-host data in CIC-IDS-2018 (see E7) — the limitation is the dataset's structure, not a broken
+model.
 
 Zero-shot on CTU-13 (trained on CIC-IDS-2018, never fine-tuned): **the model does not transfer.**
 Recomputed against the shipped checkpoint and the current CTU-13 build: F1 0.009 at the 5% FPR
