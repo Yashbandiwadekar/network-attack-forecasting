@@ -16,8 +16,11 @@ const Landing = () => {
       {/* 1. Strictly Rebuilt Hero Network Canvas */}
       <Hero />
 
-      {/* 2. Live Telemetry Strip Readout */}
+      {/* 2. Telemetry strip -- illustrative sample values, see caption below */}
       <TelemetryStrip />
+      <p className="sample-data-note">
+        Illustrative sample readout. Live figures are computed from an uploaded capture in the dashboard.
+      </p>
 
       {/* 3. System Architecture & Workflow Pipeline */}
       <div id="platform" className="section-technical">
@@ -38,10 +41,14 @@ const Landing = () => {
           <span className="section-mono-tag">STATE TRANSITION MODELING</span>
           <h2>Observed Traffic vs. K-Step Threat Forecast</h2>
           <p className="section-desc">
-            Contrasting verified past flow evidence against predicted future attack stage transitions (Horizon K = 5).
+            Contrasting observed flow evidence against predicted future attack stage transitions
+            (horizon K = 6 steps of 10s — 60 seconds ahead).
           </p>
         </div>
         <ForecastTimeline />
+        <p className="sample-data-note">
+          Illustrative walk-through of a forecast, not a measured result.
+        </p>
       </div>
 
       {/* 5. Live Telemetry Risk Score & Evidence Chain */}
@@ -54,15 +61,21 @@ const Landing = () => {
           </p>
         </div>
         <ThreatScoreGauge />
+        <p className="sample-data-note">
+          Illustrative scoring example. Real scores and feature attributions are produced per host
+          from an uploaded PCAP or flow CSV.
+        </p>
       </div>
 
       {/* 6. Datasets Benchmark Evaluation */}
       <div id="datasets" className="section-technical alt-bg">
         <div className="section-header">
           <span className="section-mono-tag">RESEARCH BENCHMARK EVALUATION</span>
-          <h2>Cross-Dataset Validation Baselines</h2>
+          <h2>Datasets and Evaluation Status</h2>
           <p className="section-desc">
-            Model performance is evaluated across diverse real and synthetic flow benchmarks to guarantee cross-dataset generalization.
+            What the model is actually trained and evaluated on. Generalisation to unseen attack
+            families is measured rather than assumed — and on three of four families it is not yet
+            distinguishable from chance. The dashboard reports those figures with error bars.
           </p>
         </div>
         <DatasetTable />

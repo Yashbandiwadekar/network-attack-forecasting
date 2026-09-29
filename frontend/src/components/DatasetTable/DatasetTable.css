@@ -57,3 +57,31 @@
   padding: 0.2rem 0.5rem;
   border-radius: 4px;
 }
+
+/* Status variants: a dataset that is prepared-but-unevaluated, or whose result was withdrawn,
+   must not read the same as one the model was actually trained on. */
+.badge-role-pending {
+  background: rgba(250, 178, 25, 0.12);
+  border-color: rgba(250, 178, 25, 0.35);
+  color: #fab219;
+}
+
+.badge-role-withdrawn {
+  background: rgba(158, 158, 158, 0.12);
+  border-color: rgba(158, 158, 158, 0.32);
+  color: #9e9e9e;
+  text-decoration: line-through;
+}
+
+/* One-line provenance under each dataset name. */
+.dataset-note {
+  display: block;
+  margin-top: 0.35rem;
+  max-width: 34ch;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #6f6f6f;
+  white-space: normal;
+}
