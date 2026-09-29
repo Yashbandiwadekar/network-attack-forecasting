@@ -45,7 +45,7 @@ describe('PCAP File Ingestion Workflow', () => {
     );
 
     // Switch to Ingestion & Flows tab
-    const analysisTabBtn = screen.getByText(/INGESTION & FLOWS/i);
+    const analysisTabBtn = screen.getAllByText(/INGESTION & FLOWS/i)[0];
     fireEvent.click(analysisTabBtn);
 
     expect(screen.getByText(/TRAFFIC CAPTURE INGESTION WORKSPACE/i)).toBeInTheDocument();

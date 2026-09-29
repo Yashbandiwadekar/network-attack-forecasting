@@ -21,7 +21,7 @@ export const datasetApi = {
 
 export const forecastApi = {
   getHosts: () => apiFetch('/api/v1/forecast/hosts'),
-  predict: (hostIp, horizon = 5) => apiFetch('/api/v1/forecast/predict', {
+  predict: (hostIp, horizon = 6) => apiFetch('/api/v1/forecast/predict', {
     method: 'POST',
     body: JSON.stringify({ host_ip: hostIp, horizon }),
   }),
