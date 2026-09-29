@@ -5,6 +5,7 @@ import TelemetryStrip from '../components/TelemetryStrip/TelemetryStrip';
 import ForecastTimeline from '../components/ForecastTimeline/ForecastTimeline';
 import ThreatScoreGauge from '../components/ThreatScoreGauge/ThreatScoreGauge';
 import ForecastProbabilityCurve from '../components/ForecastProbabilityCurve/ForecastProbabilityCurve';
+import AuditLedger from '../components/AuditLedger/AuditLedger';
 import { systemApi, datasetApi, forecastApi, explainApi, analysisApi, reportApi, evalApi } from '../api';
 import { UploadCloud, CheckCircle, AlertTriangle, FileText, Activity, ShieldCheck, Database, RefreshCw } from 'lucide-react';
 import './Dashboard.css';
@@ -183,7 +184,7 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <TelemetryStrip />
+          <TelemetryStrip status={systemStatus} hostCount={hosts.length} />
 
           {/* OVERVIEW TAB */}
           {activeTab === 'overview' && (
@@ -247,9 +248,16 @@ const Dashboard = () => {
                   <span>RISK GAUGE & EVIDENCE</span>
                 </div>
                 <ThreatScoreGauge
-                  score={forecastData?.infiltration_probs ? Math.max(...forecastData.infiltration_probs) : 0.87}
+                  score={forecastData?.infiltration_probs ? Math.max(...forecastData.infiltration_probs) : 0}
                   horizon={forecastData?.horizon_k || 6}
-                  confidence={forecastData?.infiltration_probs ? Math.max(...forecastData.infiltration_probs) : 0.87}
+                  attackFamily={forecastData?.predicted_stages
+                    ? forecastData.predicted_stages[
+                        forecastData.infiltration_probs.indexOf(Math.max(...forecastData.infiltration_probs))
+                      ]
+                    : '—'}
+                  rationale={(attributionData?.feature_attributions || []).slice(0, 3).map(
+                    (a) => `${a.feature}: ${a.contribution >= 0 ? '+' : ''}${a.contribution.toFixed(4)} contribution to the infiltration score`
+                  )}
                 />
               </div>
 
@@ -380,8 +388,12 @@ const Dashboard = () => {
               <div className="gpf-panel">
                 <ForecastProbabilityCurve
                   probabilities={forecastData?.infiltration_probs}
-                  stage_is_heuristic={forecastData?.stage_is_heuristic}
-                  title={`60-SECOND FORECAST HORIZON (HORIZON K = 6, STEP = 10s) — TARGET: ${selectedHostIp || 'SELECT HOST'}`}
+                  stepSeconds={forecastData?.step_seconds}
+                  stages={forecastData?.predicted_stages}
+                  heuristicFlags={forecastData?.stage_is_heuristic}
+                  disclosureNotes={forecastData?.stage_disclosure_notes}
+                  horizonSeconds={forecastData?.horizon_seconds}
+                  title={`INFILTRATION FORECAST — ${selectedHostIp || 'SELECT HOST'}`}
                 />
 
                 {forecastData && forecastData.infiltration_probs && (
@@ -504,41 +516,30 @@ const Dashboard = () => {
                   Generate CERT-In Incident Report for {selectedHostIp || 'Target Host'}
                 </button>
 
+                {/* Report + ledger. The previous block read reportResult.category /
+                    .detected_at / .hours_remaining at the top level -- the API nests those under
+                    `compliance` -- so every field silently fell back to a hardcoded string
+                    ("5.8 hrs remaining"). AuditLedger reads the real shape, and the download
+                    link now calls the endpoint instead of alert()-ing. */}
                 {reportResult && (
-                  <div style={{ background: '#121212', border: '1px solid rgba(255, 176, 0, 0.4)', padding: '1.5rem', borderRadius: '6px', fontFamily: 'var(--font-mono)' }}>
-                    <div style={{ color: '#ffb000', fontWeight: 600, marginBottom: '0.8rem', fontSize: '1rem', display: 'flex', alignItems: 'center' }}>
-                      <ShieldCheck size={20} style={{ marginRight: '0.5rem' }} />
-                      CERT-In CYBER INCIDENT REPORT GENERATED
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.8rem', marginBottom: '1rem', fontSize: '0.82rem' }}>
-                      <div>
-                        <span style={{ color: '#888888' }}>INCIDENT CATEGORY:</span>
-                        <div style={{ color: '#ff7b00', fontWeight: 600 }}>{reportResult.category || 'Malicious Intrusion / C2'}</div>
-                      </div>
-                      <div>
-                        <span style={{ color: '#888888' }}>DETECTED AT:</span>
-                        <div style={{ color: '#f5f5f5' }}>{reportResult.detected_at || new Date().toISOString()}</div>
-                      </div>
-                      <div>
-                        <span style={{ color: '#888888' }}>REPORTING DEADLINE:</span>
-                        <div style={{ color: '#e53935', fontWeight: 600 }}>{reportResult.reporting_deadline || 'Within 6 hours of discovery'}</div>
-                      </div>
-                      <div>
-                        <span style={{ color: '#888888' }}>TIME REMAINING:</span>
-                        <div style={{ color: '#4caf50', fontWeight: 600 }}>{reportResult.hours_remaining ? `${reportResult.hours_remaining} hrs` : '5.8 hrs remaining'}</div>
-                      </div>
-                    </div>
-
-                    <div style={{ fontSize: '0.8rem', color: '#a0a0a0', marginBottom: '1rem', background: '#080808', padding: '0.6rem', borderRadius: '4px' }}>
-                      Cryptographic Audit Hash: <code style={{ color: '#ffaa00' }}>{reportResult.audit_hash}</code>
-                    </div>
-
-                    <a href="#" onClick={(e) => { e.preventDefault(); alert(`Downloaded certified CERT-In report bundle for ${selectedHostIp}`); }} className="btn-ghost" style={{ fontSize: '0.8rem' }}>
-                      <FileText size={14} style={{ marginRight: '0.4rem' }} />
-                      Download CERT-In Incident Summary Bundle
-                    </a>
-                  </div>
+                  <AuditLedger
+                    report={reportResult}
+                    status={systemStatus}
+                    onDownload={async () => {
+                      try {
+                        const doc = await reportApi.downloadReport(`${reportResult.host_ip}.json`);
+                        const blob = new Blob([JSON.stringify(doc, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${reportResult.host_ip}-ledger-record.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      } catch (err) {
+                        console.error('Ledger record download failed:', err);
+                      }
+                    }}
+                  />
                 )}
               </div>
             </div>

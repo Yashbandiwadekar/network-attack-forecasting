@@ -168,3 +168,16 @@
   color: #6f6f6f;
   text-align: center;
 }
+
+/* Recorded-run showcase blocks */
+.showcase-forecast,
+.showcase-ledger {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.showcase-forecast .forecast-curve-card,
+.showcase-ledger .ledger-panel {
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}

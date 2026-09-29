@@ -3,24 +3,32 @@ import { useNavigate } from 'react-router-dom';
 import Hero from '../components/Hero/Hero';
 import TelemetryStrip from '../components/TelemetryStrip/TelemetryStrip';
 import WorkflowPipeline from '../components/WorkflowPipeline/WorkflowPipeline';
-import ForecastTimeline from '../components/ForecastTimeline/ForecastTimeline';
 import DatasetTable from '../components/DatasetTable/DatasetTable';
 import ThreatScoreGauge from '../components/ThreatScoreGauge/ThreatScoreGauge';
+import ForecastProbabilityCurve from '../components/ForecastProbabilityCurve/ForecastProbabilityCurve';
+import AuditLedger from '../components/AuditLedger/AuditLedger';
+import showcase from '../data/showcase.json';
 import './Landing.css';
 
+/* The landing page is public and pre-login, so it has no capture loaded and cannot show live
+   telemetry. It used to fill that gap with invented figures. It now renders a *recorded* run
+   instead: src/data/showcase.json is produced by scripts/record_showcase.py against the running
+   API on real CIC-IDS-2018 traffic, so every number here came out of the actual model. */
 const Landing = () => {
   const navigate = useNavigate();
+
+  const { status, predict, hosts, report, capture, narrative } = showcase;
+  const topHost = hosts?.[0];
+  const provenance = `Recorded run · ${capture.dataset} · ${capture.day} · ${showcase.upload.extracted_flows.toLocaleString()} flows`;
 
   return (
     <div className="landing-page">
       {/* 1. Strictly Rebuilt Hero Network Canvas */}
       <Hero />
 
-      {/* 2. Telemetry strip -- illustrative sample values, see caption below */}
-      <TelemetryStrip />
-      <p className="sample-data-note">
-        Illustrative sample readout. Live figures are computed from an uploaded capture in the dashboard.
-      </p>
+      {/* 2. Telemetry from the recorded run */}
+      <TelemetryStrip status={status} hostCount={hosts?.length} />
+      <p className="sample-data-note">{provenance}</p>
 
       {/* 3. System Architecture & Workflow Pipeline */}
       <div id="platform" className="section-technical">
@@ -35,20 +43,31 @@ const Landing = () => {
         <WorkflowPipeline />
       </div>
 
-      {/* 4. Threat State Forecast Horizon & Timeline */}
+      {/* 4. The real 60-second forecast -- the project's headline capability */}
       <div id="how-it-works" className="section-technical alt-bg">
         <div className="section-header">
           <span className="section-mono-tag">STATE TRANSITION MODELING</span>
-          <h2>Observed Traffic vs. K-Step Threat Forecast</h2>
+          <h2>A 60-Second Forecast, From Real Traffic</h2>
           <p className="section-desc">
-            Contrasting observed flow evidence against predicted future attack stage transitions
-            (horizon K = 6 steps of 10s — 60 seconds ahead).
+            The world model rolls its own predicted state forward six times, ten seconds per step,
+            producing an infiltration probability and an attack stage for every step of the next
+            minute. Below is an actual forecast for the busiest host in a real CIC-IDS-2018 capture.
           </p>
         </div>
-        <ForecastTimeline />
-        <p className="sample-data-note">
-          Illustrative walk-through of a forecast, not a measured result.
-        </p>
+
+        <div className="showcase-forecast">
+          <ForecastProbabilityCurve
+            probabilities={predict.infiltration_probs}
+            stepSeconds={predict.step_seconds}
+            stages={predict.predicted_stages}
+            heuristicFlags={predict.stage_is_heuristic}
+            disclosureNotes={predict.stage_disclosure_notes}
+            horizonSeconds={predict.horizon_seconds}
+            title={`INFILTRATION FORECAST — ${predict.host_ip}`}
+          />
+          <p className="sample-data-note">{provenance}</p>
+        </div>
+
       </div>
 
       {/* 5. Live Telemetry Risk Score & Evidence Chain */}
@@ -60,11 +79,36 @@ const Landing = () => {
             Every predicted threat state links directly to observable flow-level feature contributions.
           </p>
         </div>
-        <ThreatScoreGauge />
+        <ThreatScoreGauge
+          score={topHost.peak_prob}
+          horizon={predict.horizon_k}
+          confidence={null}
+          attackFamily={topHost.predicted_stage}
+          rationale={showcase.attribution.feature_attributions.slice(0, 3).map(
+            (a) => `${a.feature}: ${a.contribution >= 0 ? '+' : ''}${a.contribution.toFixed(4)} contribution to the infiltration score`
+          )}
+        />
         <p className="sample-data-note">
-          Illustrative scoring example. Real scores and feature attributions are produced per host
-          from an uploaded PCAP or flow CSV.
+          {provenance} — feature contributions are gradient × input attributions over the model's
+          own 41-feature vector.
         </p>
+      </div>
+
+      {/* 5b. Tamper-evident audit trail + CERT-In reporting */}
+      <div className="section-technical">
+        <div className="section-header">
+          <span className="section-mono-tag">EVIDENTIARY INTEGRITY</span>
+          <h2>Every Alert Is Hash-Chained and Reportable</h2>
+          <p className="section-desc">
+            Each alert an analyst sees is appended to an append-only SHA-256 chain, so a record
+            cannot be quietly altered or deleted afterwards. Reportable incidents are drafted
+            against CERT-In's six-hour disclosure window, offline, with no external service.
+          </p>
+        </div>
+        <div className="showcase-ledger">
+          <AuditLedger report={report} status={status} />
+          <p className="sample-data-note">{provenance}</p>
+        </div>
       </div>
 
       {/* 6. Datasets Benchmark Evaluation */}

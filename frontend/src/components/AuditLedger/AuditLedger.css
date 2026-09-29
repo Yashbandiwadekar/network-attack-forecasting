@@ -1,0 +1,233 @@
+.ledger-panel {
+  background: #0c0c0c;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.ledger-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.85rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.ledger-title {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  color: #cfcfcf;
+}
+
+.ledger-badge {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  padding: 0.28rem 0.6rem;
+  border-radius: 4px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.ledger-badge.ok {
+  color: #4caf50;
+  border-color: rgba(76, 175, 80, 0.4);
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.ledger-badge.broken {
+  color: #e53935;
+  border-color: rgba(229, 57, 53, 0.45);
+  background: rgba(229, 57, 53, 0.12);
+}
+
+.ledger-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.ledger-stat {
+  background: #101010;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.ledger-stat-label {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: #7a7a7a;
+  letter-spacing: 0.08em;
+}
+
+.ledger-stat-val {
+  font-family: var(--font-mono);
+  font-size: 1.2rem;
+  color: #f0f0f0;
+}
+
+.ledger-stat-note {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: #666666;
+  line-height: 1.5;
+}
+
+.text-ok { color: #4caf50; }
+.text-bad { color: #e53935; }
+.text-amber { color: #fab219; }
+
+/* The hash chain, shown as a chain rather than a pair of opaque strings. */
+.ledger-chain {
+  background: #080808;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.chain-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.chain-label {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: #7a7a7a;
+  letter-spacing: 0.08em;
+  min-width: 82px;
+}
+
+.chain-hash {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  word-break: break-all;
+  line-height: 1.6;
+}
+
+.chain-hash.prev { color: #6f6f6f; }
+.chain-hash.current { color: #ff8a3d; }
+
+.chain-arrow {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: #5c5c5c;
+  margin: 0.4rem 0 0.4rem 82px;
+}
+
+/* CERT-In block */
+.compliance-block {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding-top: 1rem;
+}
+
+.compliance-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-bottom: 0.5rem;
+}
+
+.compliance-title {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.09em;
+  color: #cfcfcf;
+}
+
+.compliance-tag {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  padding: 0.24rem 0.55rem;
+  border-radius: 4px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.compliance-tag.reportable {
+  color: #ff7b00;
+  border-color: rgba(255, 123, 0, 0.4);
+  background: rgba(255, 123, 0, 0.1);
+}
+
+.compliance-tag.not-reportable {
+  color: #8a8a8a;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.compliance-category {
+  font-size: 0.82rem;
+  color: #e8e8e8;
+  line-height: 1.55;
+  margin-bottom: 0.7rem;
+}
+
+.compliance-deadline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  background: #101010;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 0.8rem;
+}
+
+.deadline-clock {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8rem;
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+}
+
+.deadline-label {
+  font-size: 0.62rem;
+  color: #7a7a7a;
+  letter-spacing: 0.08em;
+}
+
+.deadline-abs,
+.deadline-note {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: #6f6f6f;
+  line-height: 1.6;
+}
+
+.ledger-download {
+  margin-top: 0.85rem;
+  width: 100%;
+  padding: 0.6rem;
+  background: transparent;
+  border: 1px solid rgba(255, 123, 0, 0.4);
+  border-radius: 5px;
+  color: #ff8a3d;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ledger-download:hover {
+  background: rgba(255, 123, 0, 0.1);
+  border-color: rgba(255, 123, 0, 0.7);
+}
+
+@media (max-width: 600px) {
+  .chain-arrow { margin-left: 0; }
+  .chain-label { min-width: auto; }
+}

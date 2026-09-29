@@ -127,3 +127,32 @@
     transform: rotate(360deg);
   }
 }
+
+/* --- 60-second horizon presentation --- */
+.forecast-meta-summary .horizon-seconds {
+  color: #ff7b00;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.forecast-meta-summary .peak-at {
+  color: #8a8a8a;
+  font-weight: 400;
+}
+
+.svg-stage-label {
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Disclosure for steps whose stage came from a rule, not the trained classifier (audit S6/S7). */
+.forecast-disclosure {
+  margin-top: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border-left: 2px solid #fab219;
+  background: rgba(250, 178, 25, 0.06);
+  font-size: 0.66rem;
+  line-height: 1.6;
+  color: #b9a06a;
+}

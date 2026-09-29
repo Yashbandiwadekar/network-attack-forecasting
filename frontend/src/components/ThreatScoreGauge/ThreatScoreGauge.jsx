@@ -1,18 +1,16 @@
 import React from 'react';
 import './ThreatScoreGauge.css';
 
+/* Defaults are deliberately empty rather than plausible: an unfed gauge previously showed
+   0.87 / "Command & Control" / three invented evidence lines, which looked like a live reading. */
 const ThreatScoreGauge = ({
-  score = 0.87,
+  score = 0,
   horizon = 6,
   confidence = null,
-  attackFamily = 'Command & Control',
-  rationale = [
-    'Packet burst rate exceeds baseline threshold (> 145 pkts/sec)',
-    'Persistent lateral session targeting destination 10.0.4.5:443',
-    'Sequential transition probability aligns with ATT&CK T1071'
-  ]
+  attackFamily = '—',
+  rationale = []
 }) => {
-  const displayScore = typeof score === 'number' ? score.toFixed(2) : '0.00';
+  const displayScore = typeof score === 'number' ? score.toFixed(3) : '0.000';
   const displayConfidence = confidence !== null && confidence !== undefined 
     ? (typeof confidence === 'number' ? `${(confidence * 100).toFixed(1)}%` : confidence)
     : `${(score * 100).toFixed(1)}%`;
@@ -31,7 +29,7 @@ const ThreatScoreGauge = ({
       <div className="gauge-body">
         <div className="gauge-metric-box">
           <span className="gauge-score">{displayScore}</span>
-          <span className="gauge-scale">/ 1.00</span>
+          <span className="gauge-scale">/ 1.000</span>
         </div>
 
         <div className="gauge-details">
@@ -43,10 +41,12 @@ const ThreatScoreGauge = ({
             <span className="detail-label">Forecast Horizon</span>
             <span className="detail-val text-amber">K = {horizon} (60s)</span>
           </div>
-          <div className="gauge-detail-row">
-            <span className="detail-label">Model Confidence</span>
-            <span className="detail-val text-orange">{displayConfidence}</span>
-          </div>
+          {confidence !== null && confidence !== undefined && (
+            <div className="gauge-detail-row">
+              <span className="detail-label">Model Confidence</span>
+              <span className="detail-val text-orange">{displayConfidence}</span>
+            </div>
+          )}
         </div>
       </div>
 
