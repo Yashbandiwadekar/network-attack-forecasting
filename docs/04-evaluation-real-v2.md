@@ -1,5 +1,12 @@
 # Evaluation: World Model, day-disjoint split (v2, matched hyperparameters)
 
+> **Superseded for the headline number (2026-09-29).** This report describes a single unseeded
+> training run. Three seeded repeats of the same configuration score F1 0.481 +/- 0.033 and AUROC
+> 0.794 +/- 0.043, and this run falls below the minimum of all three on every metric -- it is an
+> unlucky draw, not a representative result. Quote `docs/04-evaluation-real-v2-seeds.md` instead.
+> Everything below remains an accurate account of the run it describes.
+
+
 **W7 regeneration (2026-09-23).** Model: `checkpoints_real_v2_converged` (configs/real_data_v2_converged.yaml), trained at v1's batch_size 64, 30 epochs, lr 3e-4, identical architecture. The fabricated benign days (2018-04-01/04-02 from `scripts/augment_benign_high_volume.py`) were **dropped entirely** from val/test (chosen over spreading them: removes the confound outright, and no synthetic traffic remains in this report). Test days 02-16, 02-23, 03-01 (7,191 seq); val days 02-15, 02-22 (6,685 seq). Supersedes the earlier undertrained v2 numbers (F1 0.431 on a test split that was 17.6% fabricated).
 
 ## v1 vs v2 under matched hyperparameters (re-measured, world model, t+1 infiltration)
