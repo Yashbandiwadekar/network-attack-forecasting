@@ -5,7 +5,7 @@ import TelemetryStrip from '../components/TelemetryStrip/TelemetryStrip';
 import ForecastTimeline from '../components/ForecastTimeline/ForecastTimeline';
 import ThreatScoreGauge from '../components/ThreatScoreGauge/ThreatScoreGauge';
 import ForecastProbabilityCurve from '../components/ForecastProbabilityCurve/ForecastProbabilityCurve';
-import { systemApi, datasetApi, forecastApi, explainApi, analysisApi, reportApi } from '../api';
+import { systemApi, datasetApi, forecastApi, explainApi, analysisApi, reportApi, evalApi } from '../api';
 import { UploadCloud, CheckCircle, AlertTriangle, FileText, Activity, ShieldCheck, Database, RefreshCw } from 'lucide-react';
 import './Dashboard.css';
 
@@ -46,13 +46,18 @@ const Dashboard = () => {
   const fetchInitialData = async () => {
     setIsRefreshing(true);
     try {
-      const [sys, ds, hList] = await Promise.all([
+      const [sys, ds, hList, metrics] = await Promise.all([
         systemApi.getStatus(),
         datasetApi.getDatasets(),
-        forecastApi.getHosts()
+        forecastApi.getHosts(),
+        // Measured evaluation results, served from docs/v2_converged_seed_results.json.
+        // Never hardcode these in the UI: the project withdrew a 0.917 F1 for exactly this
+        // reason (audit E1), and a stale literal here silently contradicts the README.
+        evalApi.getMetrics().catch(() => null)
       ]);
       setSystemStatus(sys);
       setDatasetsData(ds);
+      setEvalMetrics(metrics);
       if (ds && ds.active_dataset) setActiveDataset(ds.active_dataset);
 
       const returnedHosts = hList?.hosts || (Array.isArray(hList) ? hList : []);
@@ -262,34 +267,75 @@ const Dashboard = () => {
                 />
               </div>
 
-              {/* Model Audit Validation & Evaluation Metrics Panel */}
+              {/* Model Audit Validation & Evaluation Metrics Panel.
+                  Every figure comes from /api/v1/eval/metrics, which reads the seed-summary
+                  results file. Do not hardcode values here: a literal that drifts from the
+                  measured result is the failure mode audit E1 was about. */}
               <div className="gpf-panel">
                 <div className="panel-header-mono">
-                  <span>MODEL AUDIT VALIDATION & MEASURED PERFORMANCE</span>
-                  <span>HONEST MODEL EVALUATION WITH ERROR BARS</span>
+                  <span>MODEL AUDIT VALIDATION &amp; MEASURED PERFORMANCE</span>
+                  <span>{evalMetrics ? `${evalMetrics.n_seeds} SEEDS · ${evalMetrics.split?.toUpperCase()}` : 'AWAITING API'}</span>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', fontFamily: 'var(--font-mono)' }}>
-                  <div style={{ background: '#101010', padding: '1rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <span style={{ fontSize: '0.7rem', color: '#888888', display: 'block' }}>AUROC SCORE</span>
-                    <strong style={{ fontSize: '1.25rem', color: '#ffaa00', display: 'block', marginTop: '0.2rem' }}>0.794 ± 0.043</strong>
-                    <span style={{ fontSize: '0.65rem', color: '#666666' }}>Measured cross-validation</span>
+                {!evalMetrics ? (
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: '#888888', padding: '0.5rem 0' }}>
+                    Measured results unavailable — the backend API is not reachable.
                   </div>
-                  <div style={{ background: '#101010', padding: '1rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <span style={{ fontSize: '0.7rem', color: '#888888', display: 'block' }}>ACCURACY</span>
-                    <strong style={{ fontSize: '1.25rem', color: '#4caf50', display: 'block', marginTop: '0.2rem' }}>0.812 ± 0.038</strong>
-                    <span style={{ fontSize: '0.65rem', color: '#666666' }}>Multi-stage precision</span>
-                  </div>
-                  <div style={{ background: '#101010', padding: '1rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <span style={{ fontSize: '0.7rem', color: '#888888', display: 'block' }}>PRECISION</span>
-                    <strong style={{ fontSize: '1.25rem', color: '#ff7b00', display: 'block', marginTop: '0.2rem' }}>0.805 ± 0.041</strong>
-                    <span style={{ fontSize: '0.65rem', color: '#666666' }}>False positive bound</span>
-                  </div>
-                  <div style={{ background: '#101010', padding: '1rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <span style={{ fontSize: '0.7rem', color: '#888888', display: 'block' }}>F1 SCORE</span>
-                    <strong style={{ fontSize: '1.25rem', color: '#2196f3', display: 'block', marginTop: '0.2rem' }}>0.798 ± 0.040</strong>
-                    <span style={{ fontSize: '0.65rem', color: '#666666' }}>Harmonic mean evaluation</span>
-                  </div>
-                </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', fontFamily: 'var(--font-mono)' }}>
+                      {[
+                        { label: 'AUROC', stat: evalMetrics.auroc, color: '#ffaa00', note: 'Ranking quality' },
+                        { label: 'AUPRC', stat: evalMetrics.auprc, color: '#4caf50', note: 'Precision-recall area' },
+                        { label: 'PRECISION @ 0.5', stat: evalMetrics['precision_at_0.5'], color: '#ff7b00', note: 'Of what it flags' },
+                        { label: 'RECALL @ 0.5', stat: evalMetrics['recall_at_0.5'], color: '#e53935', note: 'Of attacks caught' },
+                        { label: 'F1 @ 0.5', stat: evalMetrics['f1_at_0.5'], color: '#2196f3', note: 'Harmonic mean' },
+                      ].map(({ label, stat, color, note }) => (
+                        <div key={label} style={{ background: '#101010', padding: '1rem', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                          <span style={{ fontSize: '0.7rem', color: '#888888', display: 'block' }}>{label}</span>
+                          <strong style={{ fontSize: '1.25rem', color, display: 'block', marginTop: '0.2rem' }}>
+                            {stat ? `${stat.mean.toFixed(3)} ± ${stat.sd.toFixed(3)}` : '—'}
+                          </strong>
+                          <span style={{ fontSize: '0.65rem', color: '#666666' }}>{note}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: '#777777', marginTop: '0.9rem', lineHeight: 1.6 }}>
+                      {evalMetrics.n_test_sequences?.toLocaleString()} test sequences
+                      ({evalMetrics.n_test_positive?.toLocaleString()} positive),
+                      mean ± SD over {evalMetrics.n_seeds} independent training runs.
+                      Source: {evalMetrics.source}
+                      {evalMetrics.note && (
+                        <div style={{ marginTop: '0.4rem', color: '#8a8a8a' }}>{evalMetrics.note}</div>
+                      )}
+                    </div>
+                    {evalMetrics.generalisation_lofo && (
+                      <div style={{ marginTop: '1rem' }}>
+                        <div className="panel-header-mono" style={{ marginBottom: '0.6rem' }}>
+                          <span>GENERALISATION TO UNSEEN ATTACK FAMILIES</span>
+                          <span>LEAVE-ONE-FAMILY-OUT</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem', fontFamily: 'var(--font-mono)', fontSize: '0.72rem' }}>
+                          {Object.entries(evalMetrics.generalisation_lofo).map(([family, v]) => (
+                            <div key={family} style={{ background: '#0d0d0d', padding: '0.7rem', borderRadius: '5px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                              <span style={{ color: '#888888', display: 'block' }}>{family.replace(/_/g, ' ').toUpperCase()}</span>
+                              <strong style={{ color: v.distinguishable_from_chance ? '#4caf50' : '#9e9e9e' }}>
+                                AUROC {v.auroc_mean.toFixed(3)} ± {v.auroc_sd.toFixed(3)}
+                              </strong>
+                              <span style={{ display: 'block', color: '#666666' }}>
+                                {v.distinguishable_from_chance ? 'above chance' : 'not distinguishable from chance'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        {evalMetrics.generalisation_note && (
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: '#777777', marginTop: '0.6rem', lineHeight: 1.6 }}>
+                            {evalMetrics.generalisation_note}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           )}
