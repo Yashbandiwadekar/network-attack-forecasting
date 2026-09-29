@@ -4,16 +4,17 @@ pandas>=2.2
 scikit-learn>=1.4
 shap>=0.45
 scapy>=2.5
-streamlit>=1.33
 pyyaml>=6.0
-matplotlib>=3.8
 pyarrow>=15.0
 pytest>=8.0
 tqdm>=4.66
 
-# app/api.py (optional, disabled-by-default SIEM webhook relay -- audit H1/W13) and
-# scripts/stream_consumer.py
+# app/server.py (the REST API the React frontend calls), app/api.py (optional,
+# disabled-by-default SIEM webhook relay -- audit H1/W13) and scripts/stream_consumer.py.
+# python-multipart is required by FastAPI's UploadFile: without it /api/v1/analysis/upload
+# fails at request time, not import time, so a fresh clone looks fine until someone uploads.
 fastapi>=0.110
+python-multipart>=0.0.9
 pydantic>=2.6
 uvicorn>=0.29
 requests>=2.31
