@@ -4,6 +4,7 @@ import Header from '../components/Dashboard/Header';
 import TelemetryStrip from '../components/TelemetryStrip/TelemetryStrip';
 import ForecastTimeline from '../components/ForecastTimeline/ForecastTimeline';
 import ThreatScoreGauge from '../components/ThreatScoreGauge/ThreatScoreGauge';
+import ForecastProbabilityCurve from '../components/ForecastProbabilityCurve/ForecastProbabilityCurve';
 import { systemApi, datasetApi, forecastApi, explainApi, analysisApi, reportApi } from '../api';
 import { UploadCloud, CheckCircle, AlertTriangle, FileText, Activity, ShieldCheck, Database, RefreshCw } from 'lucide-react';
 import './Dashboard.css';
@@ -269,13 +270,14 @@ const Dashboard = () => {
           {activeTab === 'forecast' && (
             <div className="tab-content">
               <div className="gpf-panel">
-                <div className="panel-header-mono">
-                  <span>K-STEP INFILTRATION PROBABILITY TIMELINE ({selectedHostIp})</span>
-                  <span>MODEL CHECKPOINT 447 KB</span>
-                </div>
+                <ForecastProbabilityCurve
+                  probabilities={forecastData?.infiltration_probs}
+                  stage_is_heuristic={forecastData?.stage_is_heuristic}
+                  title={`K-STEP INFILTRATION PROBABILITY TIMELINE (${selectedHostIp})`}
+                />
 
                 {forecastData && forecastData.infiltration_probs && (
-                  <div className="forecast-steps-bar">
+                  <div className="forecast-steps-bar" style={{ marginTop: '1.2rem' }}>
                     {forecastData.infiltration_probs.map((prob, idx) => (
                       <div key={idx} className="step-card">
                         <div className="step-k">STEP K = {idx + 1}</div>

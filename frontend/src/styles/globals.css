@@ -1,5 +1,19 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
 @import './variables.css';
+
+/* Local/Air-gap Font Fallbacks (Offline Ready - Zero External Requests) */
+@font-face {
+  font-family: 'Space Grotesk';
+  src: local('Space Grotesk'), local('SpaceGrotesk-Regular'), system-ui, -apple-system, sans-serif;
+  font-weight: 400 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: local('JetBrains Mono'), local('JetBrainsMono-Regular'), monospace;
+  font-weight: 400 700;
+  font-display: swap;
+}
 
 html, body, #root {
   width: 100%;
