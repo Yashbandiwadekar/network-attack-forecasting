@@ -1,0 +1,129 @@
+.forecast-curve-card {
+  background: var(--color-bg-panel, rgba(15, 15, 15, 0.6));
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-md, 8px);
+  padding: 1.25rem;
+  box-sizing: border-box;
+  position: relative;
+  width: 100%;
+}
+
+.forecast-curve-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.forecast-curve-title {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--color-text-main, #f0f0f0);
+}
+
+.heuristic-badge {
+  background: rgba(255, 170, 0, 0.15);
+  border: 1px solid rgba(255, 170, 0, 0.5);
+  color: #ffaa00;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.forecast-meta-summary {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #999999);
+}
+
+.forecast-svg-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.forecast-svg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.svg-label {
+  font-size: 10px;
+  fill: #888888;
+}
+
+.data-node {
+  cursor: pointer;
+}
+
+.forecast-tooltip {
+  position: absolute;
+  transform: translate(-50%, -120%);
+  background: #080808;
+  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.2));
+  padding: 0.4rem 0.7rem;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  z-index: 20;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.tooltip-step {
+  color: #a0a0a0;
+  font-size: 0.68rem;
+}
+
+.tooltip-prob {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.tooltip-risk {
+  color: #777777;
+  font-size: 0.68rem;
+}
+
+.forecast-curve-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  color: var(--color-text-muted, #999999);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85rem;
+}
+
+.forecast-curve-placeholder.error-text {
+  color: var(--color-accent-red, #e53935);
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(255, 123, 0, 0.2);
+  border-top-color: var(--color-accent-orange, #ff7b00);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin-bottom: 0.75rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

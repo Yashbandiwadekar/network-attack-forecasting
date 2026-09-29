@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import ParticleNetwork from '../components/ParticleNetwork/ParticleNetwork';
 import './Login.css';
+
+const ParticleNetwork = lazy(() => import('../components/ParticleNetwork/ParticleNetwork'));
 
 const Login = () => {
   const navigate = useNavigate();
@@ -34,7 +35,9 @@ const Login = () => {
 
   return (
     <div className="login-page">
-      <ParticleNetwork controlsConfig={loginParticleConfig} isPaused={false} visualTheme={theme} />
+      <Suspense fallback={<div className="particle-container" style={{ background: '#000000' }} />}>
+        <ParticleNetwork controlsConfig={loginParticleConfig} isPaused={false} visualTheme={theme} />
+      </Suspense>
       
       <button className="login-back-btn" onClick={() => navigate('/')}>
         <ArrowLeft size={16} />

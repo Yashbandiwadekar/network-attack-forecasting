@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ParticleNetwork from '../ParticleNetwork/ParticleNetwork';
 import BottomControls from '../BottomControls/BottomControls';
 import './Hero.css';
+
+const ParticleNetwork = lazy(() => import('../ParticleNetwork/ParticleNetwork'));
 
 const Hero = () => {
   const navigate = useNavigate();
@@ -34,15 +35,17 @@ const Hero = () => {
 
   return (
     <div className="hero-section">
-      <ParticleNetwork
-        controlsConfig={particleConfig}
-        isPaused={isPaused}
-        mode={mode}
-        resetTrigger={resetTrigger}
-        onCanvasClick={handleCanvasClick}
-        clickPulse={clickPulse}
-        formationIndex={formationIndex}
-      />
+      <Suspense fallback={<div className="particle-container" style={{ background: '#000000' }} />}>
+        <ParticleNetwork
+          controlsConfig={particleConfig}
+          isPaused={isPaused}
+          mode={mode}
+          resetTrigger={resetTrigger}
+          onCanvasClick={handleCanvasClick}
+          clickPulse={clickPulse}
+          formationIndex={formationIndex}
+        />
+      </Suspense>
 
       <BottomControls
         isPaused={isPaused}
