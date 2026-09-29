@@ -24,8 +24,9 @@ from typing import Any, Optional
 import numpy as np
 from fastapi import Depends, FastAPI, File, HTTPException, Security, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import APIKeyHeader
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app import service
@@ -240,7 +241,7 @@ class SelectDatasetRequest(BaseModel):
 
 # ---------------------------------------------------------------- endpoints
 
-@app.get("/")
+@app.get("/api/v1/health")
 def read_root():
     config, model, _, _ = service.load_backend(STATE.config_path)
     return {
@@ -758,6 +759,48 @@ def get_eval_metrics():
     return payload
 
 
+# ---------------------------------------------------------------- single-port deployment
+#
+# When `frontend/dist` exists (after `npm run build --prefix frontend`), the API also serves the
+# built dashboard. That makes the whole system one process on one port, which removes the two
+# things that silently broke a LAN demo: the browser and the API are now the same origin, so CORS
+# never applies, and the frontend calls relative URLs, so VITE_API_BASE_URL does not need to know
+# the host's LAN address. Binding 0.0.0.0 is then the only thing a LAN demo needs.
+#
+# Mounted last on purpose: every /api/v1 route above is matched first, so the SPA fallback can
+# never shadow the API.
+
+DIST_DIR = PROJECT_ROOT / "frontend" / "dist"
+
+
+def _mount_frontend() -> bool:
+    if not (DIST_DIR / "index.html").is_file():
+        return False
+
+    assets = DIST_DIR / "assets"
+    if assets.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(assets)), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def spa(full_path: str):
+        """Serve a built file when it exists, else index.html so client-side routes
+        (/dashboard, /login) survive a page reload."""
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail=f"No such endpoint: /{full_path}")
+        candidate = (DIST_DIR / full_path).resolve()
+        if full_path and candidate.is_file() and candidate.is_relative_to(DIST_DIR.resolve()):
+            return FileResponse(candidate)
+        return FileResponse(DIST_DIR / "index.html")
+
+    return True
+
+
+FRONTEND_MOUNTED = _mount_frontend()
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+
+    host = os.environ.get("PHOENIX_HOST", "127.0.0.1")
+    port = int(os.environ.get("PHOENIX_PORT", "8000"))
+    uvicorn.run(app, host=host, port=port)

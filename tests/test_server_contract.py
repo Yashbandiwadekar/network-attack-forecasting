@@ -278,3 +278,43 @@ def test_mitre_mapping_has_no_invented_confidences(client: TestClient):
         assert row["dataset_labels"], "each stage lists the real CIC labels that map to it"
     stages = {row["stage_id"] for row in body["mappings"]}
     assert "execution" not in stages
+
+
+# ----------------------------------------------------------------- single-port deployment
+
+def test_health_endpoint_reports_horizon(client: TestClient):
+    body = client.get("/api/v1/health").json()
+    assert body["status"] == "online"
+    assert body["horizon_seconds"] == 60
+
+
+def test_unknown_api_path_is_404_json_not_the_spa(client: TestClient):
+    """The SPA fallback must never swallow an API path: a typo'd endpoint has to fail loudly
+    rather than return index.html with a 200, which would look like a working call."""
+    resp = client.get("/api/v1/definitely-not-a-route")
+    assert resp.status_code == 404
+
+
+@pytest.mark.skipif(
+    not (PROJECT_ROOT / "frontend" / "dist" / "index.html").is_file(),
+    reason="frontend not built",
+)
+def test_spa_is_served_at_root_and_on_client_routes(client: TestClient):
+    """With a build present the API serves the dashboard itself, which is what makes the deployed
+    setup single-origin: no CORS, and no VITE_API_BASE_URL pointing at a hardcoded host."""
+    for path in ("/", "/dashboard", "/login"):
+        resp = client.get(path)
+        assert resp.status_code == 200, path
+        assert "text/html" in resp.headers["content-type"], path
+
+
+@pytest.mark.skipif(
+    not (PROJECT_ROOT / "frontend" / "dist" / "index.html").is_file(),
+    reason="frontend not built",
+)
+def test_spa_fallback_cannot_escape_the_build_directory(client: TestClient):
+    """The fallback resolves a client-supplied path against dist/; it must not serve files
+    outside it."""
+    resp = client.get("/../../app/server.py")
+    assert resp.status_code in (200, 404)
+    assert "uvicorn.run" not in resp.text

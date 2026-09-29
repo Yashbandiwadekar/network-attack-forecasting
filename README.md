@@ -32,27 +32,46 @@ python -m models.train
 # 5. Benchmark against the baselines
 python -m eval.benchmark
 
-# 6. Launch the backend API (serves the React dashboard)
-python -m uvicorn app.server:app --host 127.0.0.1 --port 8000
-
-# 7. In a second terminal, launch the frontend
-npm install --prefix frontend
-npm run dev --prefix frontend      # http://localhost:5173
+# 6. Build the dashboard and run everything as one service
+python -m scripts.serve            # http://127.0.0.1:8000
+python -m scripts.serve --lan      # also reachable from other devices on the network
 ```
+
+`scripts/serve.py` builds the dashboard if needed and serves it from the same uvicorn process as
+the API. One process, one port: the browser and the API share an origin, so there is no CORS to
+configure and no build-time API address to set. `--lan` binds `0.0.0.0` and prints the LAN URL to
+open on another machine. If a device on the network cannot connect, the host firewall is almost
+always the cause -- allow inbound TCP on the port.
 
 The dashboard starts with no hosts: upload a PCAP/PCAPNG or a CICFlowMeter CSV from the UI (or
 `curl -F "file=@data/raw/flows/synthetic_sample.csv" http://127.0.0.1:8000/api/v1/analysis/upload`)
 and it parses the capture, scores every host and forecasts 60 seconds ahead.
 
-Environment variables (all optional for a local demo):
+### Development (hot reload)
+
+For frontend work, run the two halves separately so Vite can hot-reload:
+
+```bash
+python -m uvicorn app.server:app --port 8000
+npm run dev --prefix frontend      # http://localhost:5173
+```
+
+Here the UI and API are different origins, so CORS applies and the frontend needs the API's
+address -- `frontend/.env.development` sets it, and the API's default CORS allowlist already
+covers the Vite ports. Nothing extra to configure.
+
+### Configuration
+
+All optional; the defaults run a complete local demo.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `PHOENIX_CORS_ORIGINS` | localhost:5173/5174 | Comma-separated browser origins allowed to call the API. Set this for a LAN demo. |
+| `PHOENIX_HOST` / `PHOENIX_PORT` | `127.0.0.1` / `8000` | Bind address and port (`--lan`/`--port` set these for you). |
+| `PHOENIX_CORS_ORIGINS` | Vite dev ports | Only needed for the split dev setup, or a separately-hosted frontend. Irrelevant in the single-port deployment. |
 | `PHOENIX_REQUIRE_AUTH` | off | `1` enforces `Authorization: Bearer <PHOENIX_API_TOKEN>` on every endpoint. |
 | `PHOENIX_API_TOKEN` | — | The bearer token, required when auth is enforced. |
 | `PHOENIX_DEMO_USER` / `PHOENIX_DEMO_PASSWORD` | — | Credentials for `/api/v1/auth/login`; without them login returns 503 rather than accepting anything. |
-| `VITE_API_BASE_URL` | `http://127.0.0.1:8000` | Frontend-side: where the dashboard looks for the API. |
+| `VITE_API_BASE_URL` | relative | Frontend build-time override. Leave unset for the single-port deployment. |
 
 GPU note: install torch from the CUDA index (`pip install torch --index-url
 https://download.pytorch.org/whl/cu128`) — the default PyPI wheel is CPU-only.
