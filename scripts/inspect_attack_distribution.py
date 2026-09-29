@@ -20,7 +20,7 @@ for scenario in scenarios:
 
         path = scenario / f"{split}.npz"
 
-        with np.load(path, allow_pickle=True) as data:
+        with np.load(path, allow_pickle=False) as data:
 
             current = data["current_stage"]
             future = data["future_stages"]

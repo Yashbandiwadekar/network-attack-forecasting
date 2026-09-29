@@ -1,0 +1,108 @@
+# UNSW-NB15 (D1: second permitted dataset). Raw CSVs live outside the repo on a separate drive
+# (103 GB total including PCAP/Argus/Bro files we don't use) -- raw_flow_dir points straight at
+# that folder; only UNSW-NB15_1..4.csv (587 MB) are read, via pipeline/adapters/unsw_nb15.py.
+#
+# Every row has a real srcip/dstip and Unix timestamp (Stime/Ltime) -- unlike 9/10 CIC-IDS-2018
+# days, this is genuine per-host, time-ordered traffic throughout. It is also the only dataset in
+# the project with real Reconnaissance labels. See pipeline/mitre_mapping.py::UNSW_LABEL_TO_STAGE
+# for which of its 9 attack categories map to which kill-chain stage, and which are deliberately
+# left as `impact` (excluded from the 5-way stage head) rather than forced into a stage the label
+# doesn't support.
+#
+# No PCAP downloaded for UNSW-NB15 either, so packet-level features are zero-filled here too (see
+# pipeline/build_unsw_dataset.py).
+#
+# Primary use: eval.benchmark.run_cross_dataset with configs/real_data_v2.yaml (or real_data.yaml)
+# as --train-config and this file as --test-config -- a CIC-trained model evaluated zero-shot on a
+# dataset it has never seen, addressing S8/D1's "generalise to unseen attacks" requirement without
+# depending on how CIC-IDS-2018 itself is split.
+
+paths:
+  raw_flow_dir: "V:/Datasets/UNSW NB15/CSV Files"
+  raw_pcap_dir: "V:/Datasets/UNSW NB15/pcap files"   # not used -- see note above
+  processed_dir: data/processed_unsw_v2
+  checkpoint_dir: checkpoints_unsw   # only used if a native UNSW-NB15 model is ever trained
+  eval_report: docs/04-evaluation-unsw_v2.md
+
+windowing:
+  window_seconds: 10
+  sequence_length: 12
+  forecast_horizon: 6
+  group_by: src_ip
+  recon_port_scan_threshold: 0.5
+
+features:
+  flow_level:
+    - flow_count
+    - unique_dst_ports
+    - unique_dst_ips
+    - has_ip_data
+    - total_bytes
+    - total_packets
+    - mean_duration
+    - syn_ratio
+    - ack_ratio
+    - fin_ratio
+    - rst_ratio
+    - psh_ratio
+    - urg_ratio
+    - mean_iat
+    - var_iat
+    - max_iat
+    - bidir_ratio
+    - tcp_ratio
+    - udp_ratio
+  graph_level:
+    - graph_out_degree
+    - graph_fan_out_ratio
+    - graph_fan_in_ratio
+    - graph_component_size
+    - graph_dst_entropy
+  graph_embedding:
+    - graph_embed_0
+    - graph_embed_1
+    - graph_embed_2
+    - graph_embed_3
+    - graph_embed_4
+    - graph_embed_5
+    - graph_embed_6
+    - graph_embed_7
+  packet_level:
+    - mean_ttl
+    - var_ttl
+    - mean_window_size
+    - frag_ratio
+    - mean_payload_size
+    - std_payload_size
+    - port_scan_score
+    - retransmit_ratio
+    - has_packet_features
+
+split:
+  train_frac: 0.7
+  val_frac: 0.15
+  test_frac: 0.15
+  chronological: true
+
+model:
+  d_model: 64
+  n_heads: 4
+  n_layers: 3
+  d_ff: 128
+  dropout: 0.1
+  batch_size: 512
+  lr: 0.0003
+  epochs: 30
+  device: cuda
+
+mitre_stages:
+  - benign
+  - reconnaissance
+  - initial_access
+  - lateral_movement
+  - command_and_control
+  - exfiltration
+
+baseline:
+  model: logistic_regression
+  max_iter: 1000

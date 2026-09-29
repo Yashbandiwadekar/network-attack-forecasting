@@ -71,6 +71,7 @@ def _heuristic_stage_override(
     scaler: FeatureScaler,
     config: dict[str, Any],
     predicted_stage: str,
+    infiltration_prob: float = 1.0,
 ) -> tuple[str, bool]:
     """Audit S6/S7: the trained stage classifier has never seen a single real Reconnaissance
     example (no CIC-IDS-2018 label maps to it) and every DoS/DDoS ("impact") window is masked out
@@ -89,7 +90,18 @@ def _heuristic_stage_override(
     training data (no new calibration artifact, no arbitrary constant) — `impact_volume_zscore`
     (default 4.0) and the existing `recon_port_scan_threshold` (already a per-window raw feature,
     0-1, no z-score needed) are both configurable under `windowing:` like the recon threshold.
+
+    Audit G7: the override used to fire regardless of the model's own infiltration score, so a
+    window the model itself scores as benign (e.g. 0.037, well under any alert threshold) could
+    still be labelled `impact` — a stage annotation contradicting the probability shown beside it.
+    It now only applies when `infiltration_prob` has crossed `alert_threshold` (config
+    `windowing.alert_threshold`, default 0.3 — the same value scripts/check_robustness.py already
+    uses as its pass/fail line), so a PASS-ing benign window can never be re-labelled `impact`.
     """
+    alert_threshold = config["windowing"].get("alert_threshold", 0.3)
+    if infiltration_prob < alert_threshold:
+        return predicted_stage, False
+
     def z(name: str) -> float:
         i = feature_index.get(name)
         if i is None:
@@ -118,9 +130,23 @@ def _heuristic_stage_override(
     return predicted_stage, False
 
 
+from models.checkpoint_io import load_checkpoint  # noqa: E402
+
+
 def load_world_model(checkpoint_path: str | Path, device: torch.device | None = None) -> tuple[WorldModel, dict[str, Any]]:
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    checkpoint = load_checkpoint(checkpoint_path, device)
+    # Audit W19: self-consistency check -- if the checkpoint carries feature_names (everything
+    # trained after this change does), it must still match what feature_columns(config) computes
+    # from the checkpoint's OWN stored config today. A mismatch means the config on disk was
+    # edited after training, or `common/config.py::feature_columns` changed its ordering, and the
+    # checkpoint should not be scored against silently.
+    if checkpoint.get("feature_names") is not None:
+        try:
+            from models.checkpoint_io import validate_feature_names
+            validate_feature_names(checkpoint, feature_columns(checkpoint["config"]))
+        except KeyError:
+            pass  # config predates a `features` section entirely -- nothing to check
     model = WorldModel(checkpoint["n_features"], checkpoint["n_stage_classes"], checkpoint["config"])
     model.load_state_dict(checkpoint["model_state"])
     model.to(device).eval()
@@ -145,10 +171,14 @@ class ForecastEngine:
         except KeyError:
             self._feature_index = None
 
-    def _override_stage(self, raw_features_row: np.ndarray, predicted_stage: str) -> tuple[str, bool]:
+    def _override_stage(
+        self, raw_features_row: np.ndarray, predicted_stage: str, infiltration_prob: float = 1.0,
+    ) -> tuple[str, bool]:
         if self._feature_index is None:
             return predicted_stage, False
-        return _heuristic_stage_override(raw_features_row, self._feature_index, self.scaler, self.config, predicted_stage)
+        return _heuristic_stage_override(
+            raw_features_row, self._feature_index, self.scaler, self.config, predicted_stage, infiltration_prob,
+        )
 
     def rollout(self, raw_sequence: np.ndarray) -> ForecastResult:
         """raw_sequence: (L, n_features) unscaled, most recent L windows in chronological order.
@@ -181,7 +211,7 @@ class ForecastEngine:
                 delta_raw = next_state_raw - self.scaler.inverse_transform(last_scaled.squeeze(0).cpu().numpy())
 
                 raw_stage = self.stage_labels[int(stage_prob.argmax())]
-                final_stage, was_heuristic = self._override_stage(next_state_raw, raw_stage)
+                final_stage, was_heuristic = self._override_stage(next_state_raw, raw_stage, inf_prob)
 
                 infiltration_probs.append(inf_prob)
                 stage_predictions.append(final_stage)
@@ -228,9 +258,12 @@ class ForecastEngine:
                     # forward pass it follows; see _heuristic_stage_override's docstring.
                     if self._feature_index is not None:
                         next_state_raw = self.scaler.inverse_transform(next_state.cpu().numpy())  # (b, F)
+                        inf_probs_np = probs_steps[-1]  # (b,) just computed above
                         overridden, flags = [], []
                         for i, idx in enumerate(raw_idx):
-                            stage, was_heuristic = self._override_stage(next_state_raw[i], self.stage_labels[int(idx)])
+                            stage, was_heuristic = self._override_stage(
+                                next_state_raw[i], self.stage_labels[int(idx)], float(inf_probs_np[i]),
+                            )
                             overridden.append(stage)
                             flags.append(was_heuristic)
                         stage_steps.append(overridden)
@@ -304,6 +337,40 @@ def one_step_reconstruction_error(
         predicted_next, _, _ = model(x)
 
     return float(np.linalg.norm(predicted_next.squeeze(0).cpu().numpy() - scaled_actual))
+
+
+def batched_reconstruction_errors(
+    model: WorldModel, X: torch.Tensor, next_state: torch.Tensor, device: torch.device | None = None,
+    batch_size: int = 4096,
+) -> np.ndarray:
+    """Audit W11 part 2: the vectorized counterpart to one_step_reconstruction_error, over an
+    already-scaled split (models.dataset.SequenceDataset's X/next_state) rather than one raw
+    sequence at a time -- used to calibrate an alarm threshold from a whole split's worth of
+    genuine (ground-truth) one-step transitions, e.g. the 99th percentile of a val split's
+    currently-benign windows."""
+    device = device or next(model.parameters()).device
+    errors = []
+    with torch.no_grad():
+        for start in range(0, len(X), batch_size):
+            xb = X[start:start + batch_size].to(device)
+            nb = next_state[start:start + batch_size].to(device)
+            pred, _, _ = model(xb)
+            errors.append(torch.linalg.norm(pred - nb, dim=-1).cpu().numpy())
+    return np.concatenate(errors) if errors else np.zeros(0)
+
+
+def or_gate_alarm(
+    infiltration_prob: float, reconstruction_error: float, prob_threshold: float, recon_threshold: float,
+) -> bool:
+    """Audit W11 part 2: a second, independent alarm condition alongside the infiltration
+    probability. The PGD evasion in scripts/check_adversarial_robustness.py works by pushing the
+    MOST RECENT window's raw feature values (e.g. flow_count, total_packets) into a
+    low-volume-looking shape, which fools the probability head -- but the resulting window is
+    itself an implausible one-step continuation of the L windows before it (an attack that was
+    mid-progression a moment ago does not really drop to near-zero volume), which
+    one_step_reconstruction_error can catch independently of the probability head. Alarms if
+    EITHER signal crosses its own threshold."""
+    return infiltration_prob >= prob_threshold or reconstruction_error >= recon_threshold
 
 
 def latest_sequence(windows_df, feature_cols: list[str], src_ip: str, sequence_length: int) -> np.ndarray | None:

@@ -1,3 +1,22 @@
+# NOT a standalone result config any more (audit H7/W20, 2026-09-29) -- for a v2 checkpoint result,
+# use configs/real_data_v2_converged.yaml instead. This file is STILL a live dependency of
+# eval/lofo.py (BASE_CONFIG), which overrides only paths.processed_dir/checkpoint_dir per LOFO
+# fold, so do not delete it -- the checkpoints_real_v2_lofo/ results depend on the split and
+# hyperparameters below exactly as written.
+#
+# It no longer reproduces either standalone v2 checkpoint, though: checkpoints_real_v2/ was
+# trained at batch_size 64, 15 epochs (confirmed: train_v2.log has exactly 15 "epoch" lines) with
+# the split below (val/test include the fabricated 04-01/04-02 benign days). This file's
+# batch_size/epochs were edited to 64/30 by a later commit to match the W7 retrain, but its split
+# section was not updated to match -- it still includes the fabricated April days that
+# real_data_v2_converged.yaml deliberately drops (see that file's own header). So today this file
+# matches NEITHER standalone checkpoint: not checkpoints_real_v2 (wrong epoch count) and not
+# checkpoints_real_v2_converged (wrong split). checkpoints_real_v2/ itself is left untouched
+# (protected artefact, do not touch without asking) and stays on disk as a superseded,
+# non-reproducible-by-any-current-config result -- docs/04-evaluation-real-v2.md already
+# documents it as superseded by the converged run.
+#
+# Original header, kept for context:
 # Day-disjoint variant of configs/real_data.yaml (audit E1, E8). Writes to *_v2 paths so the
 # original processed data, checkpoints and reports are never touched.
 # Same windowing/features/model/split/mitre_stages as configs/default.yaml — only the paths
@@ -96,9 +115,9 @@ model:
   n_layers: 3
   d_ff: 128
   dropout: 0.1
-  batch_size: 512
+  batch_size: 64
   lr: 0.0003
-  epochs: 15
+  epochs: 30
   device: cuda
 
 mitre_stages:

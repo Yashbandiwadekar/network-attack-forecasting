@@ -182,3 +182,35 @@ def test_rollout_batch_empty_input():
     result = engine.rollout_batch([], np.zeros((0, 5, 7), dtype=np.float32))
     assert result.host_ids == []
     assert result.infiltration_probs.shape == (0, 4)
+
+
+def test_or_gate_alarm_fires_on_either_signal():
+    from models.forecast import or_gate_alarm
+
+    assert or_gate_alarm(infiltration_prob=0.9, reconstruction_error=0.0, prob_threshold=0.5, recon_threshold=1.0)
+    assert or_gate_alarm(infiltration_prob=0.0, reconstruction_error=2.0, prob_threshold=0.5, recon_threshold=1.0)
+    assert not or_gate_alarm(infiltration_prob=0.1, reconstruction_error=0.2, prob_threshold=0.5, recon_threshold=1.0)
+
+
+def test_batched_reconstruction_errors_matches_one_step_version():
+    from models.forecast import batched_reconstruction_errors
+
+    n_features = 7
+    engine = _engine(n_features)
+    seq_len = CONFIG["windowing"]["sequence_length"]
+    n = 10
+    X = torch.randn(n, seq_len, n_features)
+    next_state = torch.randn(n, n_features)
+
+    errors = batched_reconstruction_errors(engine.model, X, next_state, device=engine.device, batch_size=3)
+
+    assert errors.shape == (n,)
+    assert np.all(errors >= 0) and np.all(np.isfinite(errors))
+    # Cross-check row 0 against the single-sequence helper operating in the SAME (already-scaled)
+    # space -- one_step_reconstruction_error itself calls scaler.transform, so use an identity
+    # scaler here to make the two comparable.
+    identity_scaler = FeatureScaler(mean=np.zeros(n_features), std=np.ones(n_features))
+    manual = one_step_reconstruction_error(
+        engine.model, identity_scaler, X[0].numpy(), next_state[0].numpy(),
+    )
+    assert abs(manual - float(errors[0])) < 1e-4

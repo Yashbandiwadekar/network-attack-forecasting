@@ -46,3 +46,42 @@ def test_protocol_mapped_to_numeric_and_udp_flag_set():
     assert out.loc[0, "protocol"] == 17
     assert out.loc[0, "is_udp"] == 1.0
     assert out.loc[0, "is_tcp"] == 0.0
+
+
+def test_flags_derived_honestly_from_state_and_handshake_timers():
+    # Audit G4/W5: completed handshake (synack>0, ackdat>0) on a TCP row seen closing (FIN state).
+    df = pd.DataFrame([_raw_row(proto="tcp", state="FIN", synack=0.01, ackdat=0.02)])
+    out = _normalize_columns(df)
+    assert out.loc[0, "syn_cnt"] == 1.0
+    assert out.loc[0, "ack_cnt"] == 1.0
+    assert out.loc[0, "fin_cnt"] == 1.0
+    assert out.loc[0, "rst_cnt"] == 0.0
+    # PSH/URG have no derivable UNSW signal anywhere -- always zero, not invented.
+    assert out.loc[0, "psh_cnt"] == 0.0
+    assert out.loc[0, "urg_cnt"] == 0.0
+
+
+def test_no_handshake_timers_means_no_syn_or_ack_derived():
+    df = pd.DataFrame([_raw_row(proto="tcp", state="INT", synack=0.0, ackdat=0.0)])
+    out = _normalize_columns(df)
+    assert out.loc[0, "syn_cnt"] == 0.0
+    assert out.loc[0, "ack_cnt"] == 0.0
+
+
+def test_rst_state_sets_rst_flag():
+    df = pd.DataFrame([_raw_row(proto="tcp", state="RST", synack=0.0, ackdat=0.0)])
+    out = _normalize_columns(df)
+    assert out.loc[0, "rst_cnt"] == 1.0
+
+
+def test_flags_never_set_for_non_tcp_rows():
+    df = pd.DataFrame([_raw_row(proto="udp", state="FIN", synack=0.01, ackdat=0.02)])
+    out = _normalize_columns(df)
+    assert out.loc[0, "syn_cnt"] == 0.0 and out.loc[0, "fin_cnt"] == 0.0
+
+
+def test_iat_mean_converted_ms_to_microseconds():
+    # sintpkt/dintpkt in ms; average of 2ms and 4ms -> 3ms -> 3000us.
+    df = pd.DataFrame([_raw_row(sintpkt=2.0, dintpkt=4.0)])
+    out = _normalize_columns(df)
+    assert out.loc[0, "iat_mean"] == 3000.0

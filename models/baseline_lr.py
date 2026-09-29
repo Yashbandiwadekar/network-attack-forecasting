@@ -38,6 +38,21 @@ from models.dataset import SequenceDataset
 from pipeline.mitre_mapping import STAGE_CLASSIFICATION_LABELS
 
 
+class _RestrictedUnpickler(pickle.Unpickler):
+    """Audit G12: only sklearn/numpy/scipy/this-module classes may be reconstructed, so a tampered
+    baseline file cannot import arbitrary callables (os.system etc.)."""
+
+    _ALLOWED_PREFIXES = ("sklearn.", "numpy", "scipy.", "models.baseline_lr", "collections.")
+    _ALLOWED_BUILTINS = {"set", "frozenset", "slice", "complex", "list", "dict", "tuple", "bytearray"}
+
+    def find_class(self, module, name):
+        if (module == "numpy" or module.startswith(self._ALLOWED_PREFIXES)) or (
+            module == "builtins" and name in self._ALLOWED_BUILTINS
+        ):
+            return super().find_class(module, name)
+        raise pickle.UnpicklingError(f"Blocked global {module}.{name} in baseline file")
+
+
 class BaselineModel:
     def __init__(self, config: dict[str, Any], mode: Literal["last", "stacked"] = "last"):
         max_iter = config["baseline"]["max_iter"]
@@ -85,7 +100,7 @@ class BaselineModel:
     @classmethod
     def load(cls, path: str | Path) -> "BaselineModel":
         with open(path, "rb") as f:
-            return pickle.load(f)
+            return _RestrictedUnpickler(f).load()
 
 
 class PersistenceBaseline:

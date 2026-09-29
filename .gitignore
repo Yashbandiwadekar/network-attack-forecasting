@@ -21,3 +21,11 @@ certin_directions.txt
 docs/CipherWraiths-Project-Report.pdf
 # Builder/Auditor agent role instructions dropped into the repo root — not a project source file
 Role.md
+
+# NOTE: data/* above excludes the directory itself, so a negation like
+# "!data/processed_real/metadata.json" cannot re-include anything under it. The two ~1 KB files the
+# shipped demo genuinely needs are force-added instead (git add -f):
+#   data/processed_real/scaler.npz     -- required to score with the real checkpoint
+#   data/processed_real/metadata.json  -- read by app/_is_flow_only_model to decide whether to
+#                                         zero-fill packet features (audit H11/W3); without it the
+#                                         guard fails open in a fresh clone.

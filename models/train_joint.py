@@ -141,6 +141,9 @@ def train(config_path: str = "configs/real_data.yaml") -> None:
     train_ds, val_ds, _ = _load_datasets(config)
     base_mask = _base_feature_mask(config)
     n_base_features = int(base_mask.sum())
+    # Audit W19: the names actually fed to the model, i.e. feature_columns(config) with the
+    # graph_embed_* block masked out (see _base_feature_mask) -- not the full column list.
+    base_feature_names = [c for c, keep in zip(feature_columns(config), base_mask) if keep]
     n_stage_classes = len(config["mitre_stages"])
     edge_dim = len(EDGE_FEATURE_COLS)
 
@@ -182,21 +185,25 @@ def train(config_path: str = "configs/real_data.yaml") -> None:
             "edge_dim": edge_dim,
             "embed_dim": EMBED_DIM,
             "base_mask": base_mask,
+            "feature_names": base_feature_names,
             "config": config,
         }
         if val_loss < best_val_loss:
             best_val_loss = val_loss
-            torch.save(checkpoint, checkpoint_dir / "joint_gnn_world_model_best.pt")
+            torch.save(with_config_json(checkpoint), checkpoint_dir / "joint_gnn_world_model_best.pt")
 
-    torch.save(checkpoint, checkpoint_dir / "joint_gnn_world_model_final.pt")
+    torch.save(with_config_json(checkpoint), checkpoint_dir / "joint_gnn_world_model_final.pt")
     print(f"Best val loss: {best_val_loss:.4f}. Checkpoints saved to {checkpoint_dir}")
+
+
+from models.checkpoint_io import load_checkpoint, with_config_json  # noqa: E402
 
 
 def load_joint_world_model(
     checkpoint_path: str, device: torch.device | None = None,
 ) -> tuple[JointWorldModel, dict]:
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    checkpoint = load_checkpoint(checkpoint_path, device)
     model = JointWorldModel(
         checkpoint["n_base_features"], checkpoint["n_stage_classes"], checkpoint["config"],
         edge_dim=checkpoint["edge_dim"], embed_dim=checkpoint["embed_dim"],

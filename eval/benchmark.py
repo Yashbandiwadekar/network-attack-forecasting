@@ -57,6 +57,7 @@ import torch
 from common.config import feature_columns, load_config, resolve_path
 from eval.metrics import binary_metrics, lead_time_metrics, stage_metrics, threshold_at_fpr, threshold_free_metrics
 from models.baseline_lr import BaselineModel, PersistenceBaseline, PersistenceOnPredictedLabel
+from eval.lofo import _predict_infiltration
 from models.dataset import FeatureScaler, SequenceDataset, build_datasets, load_split
 from models.forecast import load_world_model
 from models.lstm_model import load_lstm_baseline
@@ -87,12 +88,10 @@ MARKOV_ORACLE_LABEL = "Baseline (Markov chain) [ORACLE -- reads true current lab
 # ---------------------------------------------------------------------------
 
 def _world_model_predictions(model: WorldModel, ds: SequenceDataset, device) -> tuple[np.ndarray, np.ndarray]:
-    with torch.no_grad():
-        X = ds.X.to(device)
-        _, stage_logits, infiltration_logit = model(X)
-        infiltration_prob = torch.sigmoid(infiltration_logit).cpu().numpy()
-        stage_pred = torch.softmax(stage_logits, dim=-1).argmax(dim=-1).cpu().numpy()
-    return infiltration_prob, stage_pred
+    """Audit G10: batched via eval.lofo._predict_infiltration (the same helper eval/lofo.py added
+    after an unbatched single forward pass OOM'd on a 1.23M-sequence fold) instead of pushing the
+    whole split through in one call -- harmless on today's splits but the same failure mode."""
+    return _predict_infiltration(model, ds.X, device, return_stage=True)
 
 
 def _joint_predictions(model, ds: SequenceDataset, graphs: dict, base_mask: np.ndarray, device,
@@ -503,7 +502,9 @@ def run_cross_dataset(
 # Report formatters
 # ---------------------------------------------------------------------------
 
-def _format_lead_time_section(lead_time: dict | None, horizon: int, window_seconds: int) -> str:
+def _format_lead_time_section(
+    lead_time: dict | None, horizon: int, window_seconds: int, achieved_test_fpr: float | None = None,
+) -> str:
     """Renders the K-step forecast lead-time result — the one metric in this report that
     measures the world model's actual K-step rollout capability, which none of the baselines
     have an equivalent of (a single-window classifier cannot imagine future states to alarm on
@@ -525,6 +526,19 @@ def _format_lead_time_section(lead_time: dict | None, horizon: int, window_secon
     ap = lead_time.get("alarm_precision")
     far_str = f"{lead_time['n_false_alarms']} / {lead_time['n_false_alarm_eligible']} ({far:.2%})" if far is not None else "n/a"
     ap_str = f"{ap:.1%}" if ap is not None else "n/a (no alarms raised at all)"
+    achieved_fpr_str = f"{achieved_test_fpr:.1%}" if achieved_test_fpr is not None else "not measured"
+    if achieved_test_fpr is not None and achieved_test_fpr > 2 * TARGET_FPR:
+        fpr_instability_note = (
+            f"Here it came out **{achieved_test_fpr:.1%}** — {achieved_test_fpr / TARGET_FPR:.1f}x the "
+            f"{TARGET_FPR:.0%} budget it was tuned for. **The operating threshold does not transfer "
+            "across days**; this is a result worth stating plainly, not a footnote — a defender who "
+            "tunes on one day's traffic and deploys the next day should expect the false-positive "
+            "rate to move substantially, not stay near the budget they picked."
+        )
+    elif achieved_test_fpr is not None:
+        fpr_instability_note = f"Here it came out {achieved_test_fpr:.1%}, close to the budget."
+    else:
+        fpr_instability_note = "Not measured for this run."
 
     return f"""
 ## K-step forecast lead time
@@ -546,6 +560,7 @@ rollout itself against the baselines).
 | Median lead time (detected cases) | {median_str} |
 | False alarms / benign-for-whole-horizon sequences | {far_str} |
 | Alarm precision (true early alarms / all alarms raised) | {ap_str} |
+| Achieved FPR on this test split, at the val-tuned {TARGET_FPR:.0%}-budget threshold | {achieved_fpr_str} |
 
 Lead time is `(actual attack-onset step) - (first step the alarm threshold is crossed)`, in
 seconds. A positive value is a genuine early warning — the alarm fired before the attack window
@@ -557,6 +572,10 @@ rate instead, so a high miss rate can't silently inflate the mean by dropping ou
 metric that the original version omitted — a threshold low enough to catch every transition early
 can do so by alarming on nearly everything, which the miss-rate/lead-time numbers alone can't
 reveal. A low alarm precision means most of what this threshold flags is noise, not warning.
+
+**Audit G8/W9**: the threshold above is tuned on the val split for a {TARGET_FPR:.0%} FPR budget,
+then applied here to the test split unchanged, exactly as a deployment would carry it forward.
+{fpr_instability_note}
 """
 
 
@@ -596,6 +615,7 @@ def _format_report(
     )
     lead_time_section = _format_lead_time_section(
         lead_time, config["windowing"]["forecast_horizon"], config["windowing"]["window_seconds"],
+        achieved_test_fpr=results[0]["budget"]["false_positive_rate"],
     )
 
     return f"""# Evaluation: World Model vs Baselines
@@ -770,6 +790,7 @@ def _format_cross_dataset_report(
     seq_len = train_config["windowing"]["sequence_length"]
     lead_time_section = _format_lead_time_section(
         lead_time, train_config["windowing"]["forecast_horizon"], test_config["windowing"]["window_seconds"],
+        achieved_test_fpr=results[0]["budget"]["false_positive_rate"],
     )
 
     return f"""# Cross-Dataset Evaluation: Train on {train_label} / Test on {test_label}
