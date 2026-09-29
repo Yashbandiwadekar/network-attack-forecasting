@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { systemApi, forecastApi, analysisApi } from '../api';
 
+/* These assert RELATIVE request paths. The client used to default to an absolute
+   http://127.0.0.1:8000, which meant a dashboard opened from another device over the LAN called
+   back to that device's own loopback and silently failed. The deployed setup serves the built
+   dashboard from the API itself, so a relative path is correct on localhost, on a LAN IP and
+   behind a proxy alike. VITE_API_BASE_URL still overrides it for split development. */
+
 describe('Frontend API Client Layer', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -15,7 +21,7 @@ describe('Frontend API Client Layer', () => {
 
     const res = await systemApi.getStatus();
     expect(global.fetch).toHaveBeenCalledWith(
-      'http://127.0.0.1:8000/api/v1/system/status',
+      '/api/v1/system/status',
       expect.objectContaining({
         headers: expect.objectContaining({ 'Content-Type': 'application/json' }),
       })
@@ -39,7 +45,7 @@ describe('Frontend API Client Layer', () => {
 
     const res = await forecastApi.predict('10.0.4.5', 5);
     expect(global.fetch).toHaveBeenCalledWith(
-      'http://127.0.0.1:8000/api/v1/forecast/predict',
+      '/api/v1/forecast/predict',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ host_ip: '10.0.4.5', horizon: 5 }),
@@ -64,7 +70,7 @@ describe('Frontend API Client Layer', () => {
     const res = await analysisApi.uploadFile(file);
 
     expect(global.fetch).toHaveBeenCalledWith(
-      'http://127.0.0.1:8000/api/v1/analysis/upload',
+      '/api/v1/analysis/upload',
       expect.objectContaining({
         method: 'POST',
         body: expect.any(FormData),
