@@ -99,17 +99,22 @@ def _predict_infiltration(
     return probs_out, stages_out
 
 
-def evaluate_fold(cfg_path: str, family: str) -> dict:
+def evaluate_fold(cfg_path: str, family: str, seed: int | None = None) -> dict:
     config = load_config(cfg_path)
     _, val_ds, test_ds, _ = build_datasets(config)
-    model, _ = load_world_model(resolve_path(config, "checkpoint_dir") / "world_model_best.pt")
+    ckpt_dir = resolve_path(config, "checkpoint_dir")
+    if seed is not None:
+        # models.train writes to checkpoint_dir/seed<N> when seeded (audit E10), so read it back
+        # from the same place rather than silently scoring another seed's checkpoint.
+        ckpt_dir = ckpt_dir / f"seed{seed}"
+    model, _ = load_world_model(ckpt_dir / "world_model_best.pt")
     device = next(model.parameters()).device
     val_p = _predict_infiltration(model, val_ds.X, device)
     test_p = _predict_infiltration(model, test_ds.X, device)
     yv, yt = val_ds.infiltration[:, 0].numpy(), test_ds.infiltration[:, 0].numpy()
     # A window inside a held-out attack day; benign windows on those days are also negatives.
     result = {
-        "family": family, "held_out_days": fold_days(family)["test"],
+        "family": family, "seed": seed, "held_out_days": fold_days(family)["test"],
         "n_test": int(len(yt)), "n_test_positive": int(yt.sum()),
         "auroc": float(roc_auc_score(yt, test_p)) if 0 < yt.sum() < len(yt) else None,
         "auprc": float(average_precision_score(yt, test_p)) if yt.sum() > 0 else None,
@@ -125,6 +130,9 @@ def main() -> None:
     parser.add_argument("--families", nargs="+", default=list(FAMILY_DAYS), choices=list(FAMILY_DAYS))
     parser.add_argument("--epochs", type=int, default=None, help="override model.epochs for faster folds")
     parser.add_argument("--skip-train", action="store_true", help="evaluate existing fold checkpoints only")
+    parser.add_argument("--seed", type=int, default=None,
+                        help="Seed the RNGs; checkpoints go to checkpoint_dir/seed<N> and results to "
+                             "lofo_results_v2_seed<N>.json (audit E10). Default: unseeded, as before.")
     args = parser.parse_args()
     out_dir = PROJECT_ROOT / "docs"
     results = []
@@ -133,10 +141,12 @@ def main() -> None:
         cfg_path = prepare_fold(family, args.epochs) if not args.skip_train else \
             f"data/processed_real_v2_lofo/{family}/config.yaml"
         if not args.skip_train:
-            train(cfg_path)
-        results.append(evaluate_fold(cfg_path, family))
+            train(cfg_path, seed=args.seed)
+        results.append(evaluate_fold(cfg_path, family, seed=args.seed))
         print(json.dumps(results[-1], indent=2))
-    (out_dir / "lofo_results_v2.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
+    name = "lofo_results_v2.json" if args.seed is None else f"lofo_results_v2_seed{args.seed}.json"
+    (out_dir / name).write_text(json.dumps(results, indent=2), encoding="utf-8")
+    print(f"\nwrote {out_dir / name}")
 
 
 if __name__ == "__main__":
