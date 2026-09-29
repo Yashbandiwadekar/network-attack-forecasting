@@ -75,7 +75,7 @@ but to the model's own *prediction* instead:
   including a PCAP-only upload, see S4).
 
 Every override is reported back via `stage_is_heuristic` and disclosed in the UI
-(`app/streamlit_app.py::_stage_disclosure_note`) as "heuristic override... not the trained
+(`app/service.py::stage_disclosure_note`) as "heuristic override... not the trained
 classifier" — never silently blended in as if the network had learned it. `exfiltration` gets the
 same treatment for a different reason: it is never overridden *to* (nothing derives it), but
 whenever it IS shown (only ever on the synthetic sample, which is the only place

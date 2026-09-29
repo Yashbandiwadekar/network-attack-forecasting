@@ -36,3 +36,6 @@ Role.md
 
 # Runtime audit-ledger state written by the API at report time (per-deployment, not source)
 checkpoints*/audit_ledger.jsonl
+
+# Run logs, collected under logs/ rather than scattered across the repo root
+logs/
