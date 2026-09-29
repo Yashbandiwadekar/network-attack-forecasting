@@ -1,72 +1,107 @@
-# Cross-Dataset Evaluation: Train on real_data_v2 / Test on unsw_nb15
+# Cross-Dataset Evaluation: Train on real_data_v2 / Test on unsw_nb15_v2
 
-Test set: 16289 sequences from **unsw_nb15** (never seen during training).
+Test set: 16289 sequences from **unsw_nb15_v2** (never seen during training).
 
-The world model was trained on **real_data_v2** and evaluated here on **unsw_nb15** using
+The world model was trained on **real_data_v2** and evaluated here on **unsw_nb15_v2** using
 the *real_data_v2 scaler* — the model sees feature values on the same scale it was trained with.
 This is the strongest available evidence against signature memorisation: the model must generalise
 to a different dataset, capture tool, botnet family, and traffic distribution entirely.
 
-Native-dataset baselines (LR + Persistence) are trained on **unsw_nb15**'s own training split
-with a **unsw_nb15 scaler** — they represent the best a dataset-specific shallow model can do,
+Native-dataset baselines (LR + Persistence) are trained on **unsw_nb15_v2**'s own training split
+with a **unsw_nb15_v2 scaler** — they represent the best a dataset-specific shallow model can do,
 and serve as the comparison anchor.
+
+**Adapter caveat (audit G4/W5, superseding the earlier `..._cross_from_real_data_v2.md` that this
+file replaces, which used a broken adapter and must not be quoted — see below):**
+`pipeline/adapters/unsw_nb15.py` derives the 41 feature columns from UNSW-NB15's own fields, which
+are not the same measurements CIC-IDS-2018 (and this checkpoint's training data) records. Every
+number below inherits these caveats:
+
+| Feature(s) | Status | Derivation |
+|---|---|---|
+| `syn_ratio`, `ack_ratio`, `fin_ratio`, `rst_ratio` | **Derived, not zero, but structurally different from CIC** | One flag-equivalent per flow (not a per-packet count): SYN/ACK from `synack`/`ackdat` handshake timers being > 0, FIN/RST from `state` == FIN/RST. TCP flows only. |
+| `psh_ratio`, `urg_ratio` | **Zero-filled** | UNSW-NB15 has no push/urgent signal anywhere in its schema (no counts, no timers) — left at zero rather than invented. |
+| `mean_iat` | **Derived, unit-converted** | `(Sintpkt + Dintpkt) / 2`, converted ms → µs to match CIC's `Flow IAT Mean` units (previously **not converted at all** — the G4 bug). Still a per-direction mean-of-means, not CIC's true per-packet-gap mean, so residual scale differences vs. CIC are expected and visible in the before/after table below. |
+| `var_iat`, `max_iat` | **Zero-filled** | No per-flow packet-level variance/max is available in UNSW-NB15 (Argus reports flow-level summaries only), same convention used for CTU-13. |
+| `psh_cnt`/`urg_cnt` upstream raw columns | Zero-filled | See above. |
+
+**Feature-mean comparison (train split means, before vs. after this fix, vs. this checkpoint's own
+CIC-IDS-2018 training distribution for reference):**
+
+| Feature | UNSW before (broken) | UNSW after (fixed) | CIC (`real_data_v2` train) |
+|---|---:|---:|---:|
+| `syn_ratio` | 0.0000 | 0.0134 | 0.0368 |
+| `ack_ratio` | 0.0000 | 0.0134 | 0.2166 |
+| `fin_ratio` | 0.0000 | 0.0137 | 0.0054 |
+| `rst_ratio` | 0.0000 | 0.0000 | 0.0123 |
+| `psh_ratio` | 0.0000 | 0.0000 | 0.0387 |
+| `urg_ratio` | 0.0000 | 0.0000 | 0.0471 |
+| `mean_iat` | 34.00 | 34,004.85 | 4,180,031.25 |
+| `var_iat` | 0.0000 | 0.0000 | 29,328,377,118,720.00 |
+| `max_iat` | 0.0000 | 0.0000 | 12,543,920.00 |
+
+`mean_iat` moved from ~123,000x below the CIC mean to ~123x below it (the ms→µs fix accounts for
+almost exactly the missing 1000x; the residual ~123x gap is a genuine distributional difference,
+not a further unit bug — UNSW-NB15's captures are shorter/burstier flows on average). `rst_ratio`,
+`psh_ratio`, `urg_ratio` remain honestly zero. **This does not make the model transfer well — see
+the results below — it only removes the confound of feeding it obviously-wrong numbers.**
 
 ## Infiltration probability — default threshold (0.5)
 
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
-| World Model (Train: real_data_v2 / Test: unsw_nb15) | 0.000 | 0.000 | 0.000 | 0.002 |
-| Baseline (LR, last window, native unsw_nb15) | 0.919 | 0.927 | 0.910 | 0.014 |
-| Baseline (LR, stacked window, native unsw_nb15) | 0.985 | 0.978 | 0.992 | 0.005 |
-| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native unsw_nb15 | 0.995 | 0.995 | 0.995 | 0.001 |
-| Persistence [ORACLE -- reads true current label, not deployable], native unsw_nb15 | 0.995 | 0.995 | 0.995 | 0.001 |
-| Persistence (on predicted label -- deployable, native unsw_nb15) | 0.919 | 0.929 | 0.910 | 0.014 |
+| World Model (Train: real_data_v2 / Test: unsw_nb15_v2) | 0.000 | 0.000 | 0.000 | 0.002 |
+| Baseline (LR, last window, native unsw_nb15_v2) | 0.942 | 0.937 | 0.946 | 0.013 |
+| Baseline (LR, stacked window, native unsw_nb15_v2) | 0.988 | 0.979 | 0.997 | 0.004 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native unsw_nb15_v2 | 0.995 | 0.995 | 0.995 | 0.001 |
+| Persistence [ORACLE -- reads true current label, not deployable], native unsw_nb15_v2 | 0.995 | 0.995 | 0.995 | 0.001 |
+| Persistence (on predicted label -- deployable, native unsw_nb15_v2) | 0.942 | 0.938 | 0.945 | 0.013 |
 
 ## Infiltration probability — fixed 5% FPR budget
 
-Threshold selected on the **unsw_nb15 val split** only (never test).
+Threshold selected on the **unsw_nb15_v2 val split** only (never test).
 
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
-| World Model (Train: real_data_v2 / Test: unsw_nb15) | 0.411 | 0.535 | 0.334 | 0.058 |
-| Baseline (LR, last window, native unsw_nb15) | 0.897 | 0.815 | 0.996 | 0.045 |
-| Baseline (LR, stacked window, native unsw_nb15) | 0.955 | 0.915 | 1.000 | 0.019 |
-| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native unsw_nb15 | 0.995 | 0.995 | 0.995 | 0.001 |
-| Persistence [ORACLE -- reads true current label, not deployable], native unsw_nb15 | 0.995 | 0.995 | 0.995 | 0.001 |
-| Persistence (on predicted label -- deployable, native unsw_nb15) | 0.900 | 0.820 | 0.996 | 0.044 |
+| World Model (Train: real_data_v2 / Test: unsw_nb15_v2) | 0.359 | 0.525 | 0.273 | 0.050 |
+| Baseline (LR, last window, native unsw_nb15_v2) | 0.896 | 0.813 | 0.999 | 0.046 |
+| Baseline (LR, stacked window, native unsw_nb15_v2) | 0.985 | 0.973 | 0.998 | 0.006 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native unsw_nb15_v2 | 0.995 | 0.995 | 0.995 | 0.001 |
+| Persistence [ORACLE -- reads true current label, not deployable], native unsw_nb15_v2 | 0.995 | 0.995 | 0.995 | 0.001 |
+| Persistence (on predicted label -- deployable, native unsw_nb15_v2) | 0.904 | 0.827 | 0.998 | 0.042 |
 
 ## Infiltration probability — fixed 1% FPR budget
 
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
-| World Model (Train: real_data_v2 / Test: unsw_nb15) | 0.178 | 0.607 | 0.104 | 0.014 |
-| Baseline (LR, last window, native unsw_nb15) | 0.899 | 0.938 | 0.863 | 0.012 |
-| Baseline (LR, stacked window, native unsw_nb15) | 0.971 | 0.946 | 0.999 | 0.012 |
-| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native unsw_nb15 | 0.995 | 0.995 | 0.995 | 0.001 |
-| Persistence [ORACLE -- reads true current label, not deployable], native unsw_nb15 | 0.995 | 0.995 | 0.995 | 0.001 |
-| Persistence (on predicted label -- deployable, native unsw_nb15) | 0.900 | 0.939 | 0.864 | 0.011 |
+| World Model (Train: real_data_v2 / Test: unsw_nb15_v2) | 0.078 | 0.374 | 0.044 | 0.015 |
+| Baseline (LR, last window, native unsw_nb15_v2) | 0.943 | 0.932 | 0.955 | 0.014 |
+| Baseline (LR, stacked window, native unsw_nb15_v2) | 0.985 | 0.973 | 0.998 | 0.006 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native unsw_nb15_v2 | 0.995 | 0.995 | 0.995 | 0.001 |
+| Persistence [ORACLE -- reads true current label, not deployable], native unsw_nb15_v2 | 0.995 | 0.995 | 0.995 | 0.001 |
+| Persistence (on predicted label -- deployable, native unsw_nb15_v2) | 0.943 | 0.934 | 0.953 | 0.014 |
 
 ## Infiltration probability — fixed 0.1% FPR budget
 
 | Model | F1 | Precision | Recall | False Positive Rate |
 |---|---|---|---|---|
-| World Model (Train: real_data_v2 / Test: unsw_nb15) | 0.135 | 0.706 | 0.075 | 0.006 |
-| Baseline (LR, last window, native unsw_nb15) | 0.413 | 0.992 | 0.261 | 0.000 |
-| Baseline (LR, stacked window, native unsw_nb15) | 0.556 | 0.993 | 0.386 | 0.001 |
-| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native unsw_nb15 | 0.602 | 0.996 | 0.431 | 0.000 |
-| Persistence [ORACLE -- reads true current label, not deployable], native unsw_nb15 | 0.000 | 0.000 | 0.000 | 0.000 |
-| Persistence (on predicted label -- deployable, native unsw_nb15) | 0.374 | 0.992 | 0.231 | 0.000 |
+| World Model (Train: real_data_v2 / Test: unsw_nb15_v2) | 0.050 | 0.437 | 0.027 | 0.007 |
+| Baseline (LR, last window, native unsw_nb15_v2) | 0.489 | 0.993 | 0.325 | 0.000 |
+| Baseline (LR, stacked window, native unsw_nb15_v2) | 0.743 | 0.996 | 0.592 | 0.001 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native unsw_nb15_v2 | 0.602 | 0.996 | 0.431 | 0.000 |
+| Persistence [ORACLE -- reads true current label, not deployable], native unsw_nb15_v2 | 0.000 | 0.000 | 0.000 | 0.000 |
+| Persistence (on predicted label -- deployable, native unsw_nb15_v2) | 0.499 | 0.992 | 0.333 | 0.001 |
 
 ## Infiltration probability — threshold-free ranking (AUROC / AUPRC)
 
 | Model | AUROC | AUPRC |
 |---|---|---|
-| World Model (Train: real_data_v2 / Test: unsw_nb15) | 0.4433 | 0.2965 |
-| Baseline (LR, last window, native unsw_nb15) | 0.9945 | 0.9737 |
-| Baseline (LR, stacked window, native unsw_nb15) | 0.9990 | 0.9904 |
-| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native unsw_nb15 | 0.9969 | 0.9908 |
-| Persistence [ORACLE -- reads true current label, not deployable], native unsw_nb15 | 0.9969 | 0.9906 |
-| Persistence (on predicted label -- deployable, native unsw_nb15) | 0.9945 | 0.9739 |
+| World Model (Train: real_data_v2 / Test: unsw_nb15_v2) | 0.4239 | 0.2467 |
+| Baseline (LR, last window, native unsw_nb15_v2) | 0.9972 | 0.9782 |
+| Baseline (LR, stacked window, native unsw_nb15_v2) | 0.9993 | 0.9912 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native unsw_nb15_v2 | 0.9969 | 0.9908 |
+| Persistence [ORACLE -- reads true current label, not deployable], native unsw_nb15_v2 | 0.9969 | 0.9906 |
+| Persistence (on predicted label -- deployable, native unsw_nb15_v2) | 0.9972 | 0.9781 |
 
 ## MITRE stage classification (4 classes present, `impact`-mapped windows excluded)
 
@@ -74,12 +109,12 @@ Support by class: benign: 13563, reconnaissance: 398, initial_access: 1182, late
 
 | Model | F1 (macro, all classes) | F1 (macro, attack classes only) | Precision (macro) | Recall (macro) |
 |---|---|---|---|---|
-| World Model (Train: real_data_v2 / Test: unsw_nb15) | 0.236 | 0.000 | 0.224 | 0.250 |
-| Baseline (LR, last window, native unsw_nb15) | 0.455 | 0.275 | 0.432 | 0.485 |
-| Baseline (LR, stacked window, native unsw_nb15) | 0.464 | 0.285 | 0.485 | 0.497 |
-| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native unsw_nb15 | 0.436 | 0.252 | 0.428 | 0.444 |
-| Persistence [ORACLE -- reads true current label, not deployable], native unsw_nb15 | 0.468 | 0.295 | 0.495 | 0.448 |
-| Persistence (on predicted label -- deployable, native unsw_nb15) | 0.491 | 0.322 | 0.510 | 0.494 |
+| World Model (Train: real_data_v2 / Test: unsw_nb15_v2) | 0.236 | 0.000 | 0.224 | 0.250 |
+| Baseline (LR, last window, native unsw_nb15_v2) | 0.456 | 0.276 | 0.431 | 0.488 |
+| Baseline (LR, stacked window, native unsw_nb15_v2) | 0.464 | 0.285 | 0.478 | 0.496 |
+| Baseline (Markov chain) [ORACLE -- reads true current label, not deployable], native unsw_nb15_v2 | 0.436 | 0.252 | 0.428 | 0.444 |
+| Persistence [ORACLE -- reads true current label, not deployable], native unsw_nb15_v2 | 0.468 | 0.295 | 0.495 | 0.448 |
+| Persistence (on predicted label -- deployable, native unsw_nb15_v2) | 0.499 | 0.334 | 0.514 | 0.499 |
 
 ## K-step forecast lead time
 
@@ -94,12 +129,12 @@ rollout itself against the baselines).
 | Metric | Value |
 |---|---|
 | Benign-to-attack transitions in test set | 14 |
-| Missed entirely (never alarmed within horizon) | 4 (28.6%) |
+| Missed entirely (never alarmed within horizon) | 10 (71.4%) |
 | Detected *before* the attack actually started | 0.0% |
-| Mean lead time (detected cases; + = early, - = late) | -10.0s |
-| Median lead time (detected cases) | -10.0s |
-| False alarms / benign-for-whole-horizon sequences | 11390 / 13549 (84.07%) |
-| Alarm precision (true early alarms / all alarms raised) | 0.1% |
+| Mean lead time (detected cases; + = early, - = late) | -12.5s |
+| Median lead time (detected cases) | -15.0s |
+| False alarms / benign-for-whole-horizon sequences | 11029 / 13549 (81.40%) |
+| Alarm precision (true early alarms / all alarms raised) | 0.0% |
 
 Lead time is `(actual attack-onset step) - (first step the alarm threshold is crossed)`, in
 seconds. A positive value is a genuine early warning — the alarm fired before the attack window
@@ -117,7 +152,7 @@ reveal. A low alarm precision means most of what this threshold flags is noise, 
 - **Cross-dataset World Model vs native baselines**: a cross-dataset world model that outperforms
   a native-trained LR classifier demonstrates genuine generalisation — the Transformer has learned
   attack *dynamics*, not dataset-specific feature correlations.
-- **Graph features**: unsw_nb15 has real IP data throughout, so `graph_out_degree`,
+- **Graph features**: unsw_nb15_v2 has real IP data throughout, so `graph_out_degree`,
   `graph_fan_out_ratio`, `graph_fan_in_ratio`, `graph_component_size`, and `graph_dst_entropy`
   all carry real signal here.  The 12-window temporal structure over these graph features
   is what the world model exploits.

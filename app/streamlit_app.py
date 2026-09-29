@@ -31,7 +31,7 @@ from models.forecast import (
 )
 from models.audit_ledger import AuditLedger
 from models.compliance import generate_cert_in_report
-from models.cve_lookup import related_cves, snapshot_metadata
+from models.cve_lookup import related_cves, related_capec, snapshot_metadata
 from models.narrative import generate_attack_narrative
 from models.response import recommended_action
 from pipeline.flow_features import clean_and_normalize, load_flow_csv, load_flow_dir
@@ -227,11 +227,30 @@ def _load_backend(config_path: str):
     scaler = FeatureScaler.load(resolve_path(config, "processed_dir") / "scaler.npz")
 
     background = None
-    train_path = resolve_path(config, "processed_dir") / "train.npz"
-    if train_path.exists():
-        train_split = load_split(resolve_path(config, "processed_dir"), "train")
-        background = scaler.transform(train_split["X"])[:, -1, :]
+    shap_path = resolve_path(config, "processed_dir") / "shap_background.npy"
+    if shap_path.exists():
+        background = np.load(shap_path)
+    else:
+        train_path = resolve_path(config, "processed_dir") / "train.npz"
+        if train_path.exists():
+            train_split = load_split(resolve_path(config, "processed_dir"), "train")
+            full_background = scaler.transform(train_split["X"])[:, -1, :]
+            np.random.seed(42)
+            indices = np.random.choice(len(full_background), min(100, len(full_background)), replace=False)
+            background = full_background[indices]
+            np.save(shap_path, background)
     return config, model, scaler, background
+
+
+def _is_flow_only_model(config: dict) -> bool:
+    """Audit G11: True when the checkpoint's own processed dataset was built flow-only (read from
+    its metadata.json, never from a config name). Such a model has never seen packet features."""
+    import json
+    try:
+        meta = json.loads((resolve_path(config, "processed_dir") / "metadata.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return bool(meta.get("flow_only")) or meta.get("packet_features_available") is False
 
 
 def _process_uploads(flow_csv_path: Path | None, pcap_path: Path | None, config: dict) -> pd.DataFrame:
@@ -251,7 +270,7 @@ def _process_uploads(flow_csv_path: Path | None, pcap_path: Path | None, config:
     flow_windows = build_flow_windows(flow_df, config)
 
     packet_windows = None
-    if packet_df is not None:
+    if packet_df is not None and not _is_flow_only_model(config):
         packet_windows = compute_packet_window_features(packet_df, config["windowing"]["window_seconds"])
 
     windows = merge_packet_features(flow_windows, packet_windows, config)
@@ -479,7 +498,11 @@ def main() -> None:
 
     if use_bundled and is_real_data:
         with st.spinner("Loading and windowing real CIC-IDS-2018 data (16M flows, 1-3 min on first load)..."):
-            flow_df, windows = _load_real_data(config_path)
+            try:
+                flow_df, windows = _load_real_data(config_path)
+            except FileNotFoundError:
+                st.error("Real CIC-IDS-2018 data not found in `data/raw/flows_real/`. This dataset must be downloaded manually. See `docs/02-dataset-and-features.md` for instructions, or select the **Synthetic sample** option in the sidebar.")
+                return
     elif use_bundled:
         flow_path = resolve_path(config, "raw_flow_dir") / "synthetic_sample.csv"
         pcap_path = resolve_path(config, "raw_pcap_dir") / "synthetic_sample.pcap"
@@ -866,16 +889,30 @@ def main() -> None:
             "version field this system could fingerprint against). See models/cve_lookup.py."
         )
         cves = related_cves(peak_stage)
+        capecs = related_capec(peak_stage)
+        if cves or capecs:
+            st.markdown(f"**Threat Intel (CVE / CAPEC) for {peak_stage.replace('_', ' ')}**")
+
         if cves:
             for entry in cves:
                 st.markdown(
                     f'<div class="ledger-status" style="background:rgba(208,59,59,0.10); color:{stage_bg};">'
-                    f'<a href="{entry["url"]}" target="_blank">{entry["cve_id"]}</a> — '
+                    f'<a href="{entry["url"]}" target="_blank">{entry["cve_id"]}</a> - '
                     f'CVSS {entry["cvss_v3_score"]:.1f} ({entry["severity"]}), published {entry["published"]}'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
                 st.caption(entry["description"])
+        
+        if capecs:
+            for entry in capecs:
+                st.markdown(
+                    f'<div class="ledger-status" style="background:rgba(208,159,59,0.10); color:#c49e29;">'
+                    f'<a href="{entry["url"]}" target="_blank">{entry["capec_id"]}</a> - '
+                    f'{entry["name"]}'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
             meta = snapshot_metadata()
             st.caption(f"Source: {meta.get('source', 'NVD')} — snapshot cached {meta.get('fetched', 'n/a')}.")
         else:

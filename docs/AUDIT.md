@@ -24,7 +24,7 @@
 | # | Finding | Severity | Area | Status |
 |---|---|---|---|---|
 | E1 | Train/val/test are split per host in time order, so test attacks are the *same attack sessions* seen in training. The data cannot support any "unseen attacks" claim. | **Critical** | Evaluation | **IN PROGRESS** — day-disjoint split + v2 checkpoint built (`configs/real_data_v2.yaml`, `docs/04-evaluation-real-v2.md`); leave-one-family-out results now exist (see S8) and are negative except for DDoS. Not FIXED: this is honest new evidence *against* generalisation, not a resolution. See BUILD_REPORT.md. |
-| E2 | Lead-time metric: the 32 "transitions" are 2 pseudo-hosts, 30 of them re-onsets of one DDoS day. 0 of 32 are PS-stage attacks. | **Critical** | Evaluation | **Substantially addressed** — the day-disjoint split alone produces 628 real transitions across many hosts/days (`docs/04-evaluation-real-v2.md`), vs. the original 32. 93.5% are missed at the same operating point. |
+| E2 | Lead-time metric: the 32 "transitions" are 2 pseudo-hosts, 30 of them re-onsets of one DDoS day. 0 of 32 are PS-stage attacks. | **Critical** | Evaluation | **Substantially addressed** — the day-disjoint split produces 628 transition windows across 181 episodes on 3 day-level pseudo-hosts, 96% from 2018-02-23 (`docs/04-evaluation-real-v2.md`), vs. the original 32 windows / ~2 episodes / 2 hosts. Genuine improvement (3 hosts not 2, 181 episodes not ~2, PS stages present at onset not pure DDoS), but still concentrated and pseudo-host-only, not "many hosts/days" (W6/G2). 93.5% are missed at the same operating point. |
 | E3 | Lead-time metric ignores false alarms. At the same threshold the rollout raises 2,922 false early warnings against 32 true transitions (≈1% alarm precision). | **Critical** | Evaluation | **FIXED (code)** — `eval/metrics.py::lead_time_metrics` now reports `false_alarm_rate`/`alarm_precision` in every report. Re-measured on the day-disjoint split: alarm precision 1.5%, closely matching this finding's own hand-measured number. |
 | E4 | Stage macro-F1 is labelled "5-way" but test contains 4 classes, including benign. The 3 attack classes each come from a single day-level pseudo-host. | **High** | Evaluation | **FIXED** — `eval/metrics.py::stage_metrics` reports actual `n_classes_present`/per-class `support`; report headers are generated from these instead of hard-coded; added an attack-classes-only macro-F1 column. |
 | E5 | The "5% FPR budget" operating point is not 5% (1.4% achieved), and it hides the model's real low-FPR performance (F1 0.918 at 0.1% FPR vs reported 0.535). | **High** | Evaluation | **FIXED** — added 1% and 0.1% FPR budget tables plus an AUROC/AUPRC table alongside the original 5% table (kept, with a caveat note). |
@@ -39,15 +39,15 @@
 | S3 | Test-split scaler leak in the cross-dataset benchmark | Medium | Eval code | **Fixed** `de75a3b` |
 | S4 | No PCAP-only input; `.pcapng` rejected; no PCAP→flow conversion | High | PS compliance | **FIXED** — `.pcapng` rejection was purely the uploader's `type=` restriction (scapy already parsed it correctly, verified with a genuine pcapng-magic file); fixed. `pipeline/packet_features.py::build_flow_records` derives flow-level records directly from packets, so a PCAP/PCAPNG alone (no CSV) now drives the full pipeline. |
 | S5 | Uploads only run through the synthetic-data model | High | PS compliance | **FIXED** — upload widgets unified across both data-source branches; an upload is now scored by whichever model is selected, with an explicit "Scored by: \<model\>" caption on every result. |
-| S6 | Recon and Exfiltration never appear in real data; the model never predicts them | High | PS compliance | **Mitigated, not eliminated** — `models/forecast.py::_heuristic_stage_override` derives Reconnaissance from `port_scan_score` at inference time (same signal already used for training labels), disclosed in the UI as a heuristic. Still zero-fires on the real bundled dataset (no PCAP), same documented limitation as before; now genuinely usable on PCAP-only uploads (S4). Exfiltration now carries an explicit "synthetic, demo-only" caption wherever shown. |
+| S6 | Recon and Exfiltration never appear in real data; the model never predicts them | High | PS compliance | **Mitigated, not eliminated, and currently unreachable on any shipped checkpoint (H5/W17).** `models/forecast.py::_heuristic_stage_override` derives Reconnaissance from `port_scan_score` at inference time (same signal already used for training labels), disclosed in the UI as a heuristic. Both shipped processed builds (`data/processed_real`, `data/processed/cicids2018/splits`) report `flow_only: true`, so W3's guard zero-fills `port_scan_score` — a packet-level feature — before this override can read it, for every checkpoint including the PCAP-only upload path. The earlier claim that it is "now genuinely usable on PCAP-only uploads (S4)" was wrong and is withdrawn; see `BUILD_REPORT.md`'s W17 entry. Exfiltration still carries an explicit "synthetic, demo-only" caption wherever shown. |
 | S7 | DoS/DDoS ("impact") is predicted as Command & Control 570 of 684 times | High | Model/UI | **FIXED** — the same heuristic overrides extreme flow-volume + low destination diversity to `impact`, disclosed as a heuristic override, and rendered as its own badge outside the 5-way stepper. |
-| S8 | No leave-one-attack-family-out test for "generalise to unseen attacks" | High | PS compliance | **Addressed (evaluation exists)** — all 4 folds run (`eval/lofo.py`, `docs/lofo_results_v2.json`). Result is negative: AUROC 0.612/0.432/0.531/0.872 for initial_access/lateral_movement/command_and_control/impact respectively — only DDoS (the one family with abundant real per-host data, see E7) generalises. This is the honest answer to S8, not a fix to what it measures. |
+| S8 | No leave-one-attack-family-out test for "generalise to unseen attacks" | High | PS compliance | **Addressed; re-measured across 3 seeds 2026-09-29 () — the single-run AUROC 0.432 "worse than chance" for lateral_movement is WITHDRAWN (3-seed mean 0.528 +/- 0.129, i.e. chance). Means for 3 of 4 folds rose once seeded; only  is distinguishable from chance, marginally.** Original single-run note follows: **Addressed (evaluation exists)** — all 4 folds run (`eval/lofo.py`, `docs/lofo_results_v2.json`). Result is negative: AUROC 0.612/0.432/0.531/0.872 for initial_access/lateral_movement/command_and_control/impact respectively — only DDoS (the one family with abundant real per-host data, see E7) generalises. This is the honest answer to S8, not a fix to what it measures. |
 | S9 | App loads the full train split (~1.7 GB) to sample 20 SHAP background rows | Low | App | Open — not started. |
 | S10 | Jointly-trained GNN model is built but unused by the app, and shows no benefit | Low | Scope | Open — not started. |
 | S11 | README checklist is stale; repo root is cluttered with untracked logs and scripts | Low | Docs | Open — not started. |
 | S12 | Demo video and 5-slide deck are not in the repo | Low | Deliverables | Open — not started. |
 | S13 | Both robustness scripts (`check_robustness.py`, `check_adversarial_robustness.py`) raise `KeyError` on the 41-feature schema — they never build the `graph_embed_*` columns. Neither has run since the GNN work landed. | **High** | Scripts | **FIXED** — both now build the missing `graph_embed_*` columns and run cleanly on `configs/real_data.yaml`. Re-measured: the PGD evasion finding reproduces on the current 41-feature checkpoint (0.9975 -> 0.0000). |
-| D1 | The PS's "Dataset Link" section permits 6 datasets; the project uses 2, and uses no authentication-log telemetry (LANL) at all. Unused datasets are the cheapest route out of E1. | Medium | Data scope | **IN PROGRESS** — UNSW-NB15 added (`pipeline/adapters/unsw_nb15.py`, real per-host IPs/timestamps, includes genuine Reconnaissance), zero-shot cross-dataset eval run. Result is also negative (AUROC 0.443 on the v2 checkpoint) — independent confirmation of E1/S8, not a win. CICIoT2023 investigated and ruled out (no IPs/timestamps in its CSVs; raw PCAPs are ~548 GB). |
+| D1 | The PS's "Dataset Link" section permits 6 datasets; the project uses 2, and uses no authentication-log telemetry (LANL) at all. Unused datasets are the cheapest route out of E1. | Medium | Data scope | **IN PROGRESS** — UNSW-NB15 added (`pipeline/adapters/unsw_nb15.py`, real per-host IPs/timestamps, includes genuine Reconnaissance), zero-shot cross-dataset eval run. W5 (G4) fixed the adapter's IAT-unit bug and derived honest TCP-flag signal; re-measured AUROC **0.4239** on the v2 checkpoint with the fixed adapter (`docs/04-evaluation-unsw_cross_from_real_data_v2.md`) — superseding the earlier 0.443, which used the broken adapter and must not be quoted. Still a negative result — independent confirmation of E1/S8, not a win. CICIoT2023 investigated and ruled out (no IPs/timestamps in its CSVs; raw PCAPs are ~548 GB). |
 | D2 | The PS names CAPEC alongside ATT&CK and CVE/NVD. The project maps to ATT&CK stages and enriches with CVE/NVD, but has no CAPEC linkage. | Low | PS compliance | Open — not started. |
 
 **Builder progress note (2026-09-23):** see `BUILD_REPORT.md` for full detail, evidence, and honest caveats behind every status above. Nothing above has been swapped in as the project's primary checkpoint/report yet — all new artefacts (`*_v2`, `*_REGEN`, `*_unsw`) sit alongside the originals pending review.
@@ -569,3 +569,265 @@ under a minute, not because an exploit path exists in the current workflow.
    drop the synthetic days (G6) in the same rebuild.
 5. **Gate the stage override on infiltration probability** (G7).
 6. Report achieved FPR in the lead-time section (G8); regenerate `BUILD_REPORT.md`'s table (G9).
+
+---
+
+## Part H: Integration-branch audit — `integration/all-branches-2026-09-29`
+
+**Review date:** 2026-09-29. **Audited state:** HEAD `a60c549`, 25 commits ahead of `origin/master`,
+merging `builder/audit-fixes-2026-09-23`, `origin/2026-09-26_tahir`, `origin/abuzar-dev` and
+`origin/tahir` (all confirmed ancestors of HEAD). 63 files changed vs `master`.
+**Method:** read-only. `pytest` run (276 passed). Unit behaviour re-derived with controlled inputs
+in a scratch directory and in a temporary git worktree at the pre-fix merge commit;
+`eval/benchmark.py`, `eval/lofo.py` and the `build_*` pipelines were not run, so no report,
+checkpoint or scaler was overwritten.
+
+This part audits the merge itself first and the builder's W1–W12 work second, per the rule that a
+clean merge of two correct branches can still be wrong.
+
+### H.0 What holds up
+
+| Claim | Verdict | Evidence |
+|---|---|---|
+| 276 tests pass | **Verified** | `pytest` → 276 passed (was 194 on the builder branch). |
+| `a60c549` fixed a real double IAT conversion introduced by the merge | **Verified, and the commit message is accurate** | Checked out `af062e4` (the merge commit, pre-fix) in a throwaway worktree and ran the two named tests: both fail there, reporting `1,056,666,660,333` against an expected `1,056,666` — exactly 1e6 too large. The tests pass at HEAD. |
+| W2's CSV-vs-PCAP parity test is a real guard | **Verified** | It is what caught the above. The acceptance criterion written into W2 ("assert the CSV and PCAP paths agree on identical traffic") did the job it was specified for — this is the clearest evidence in this audit that acceptance criteria pay for themselves. |
+| Every ingestion path reports IAT in microseconds, converted once | **Verified** | Controlled 3-packet flow spaced exactly 1.000 s, pushed through all four paths at HEAD: scapy `build_flow_records` **1,000,000**; fast streaming `assemble_flows` **1,000,000**; CIC CSV `clean_and_normalize` **1,000,000**; UNSW adapter with `Sintpkt=1000 ms` **1,000,000**. G4 and G5 are genuinely closed, on every path, including tahir's new fast parser. |
+| W1 (0.534 retraction) survived the merge | **Verified** | Every `0.534` in the tree is a retraction note, an archived file, or an unrelated metric (`docs/04-evaluation-real.md` LR-stacked F1). The teammate's commit `f1e432c` independently corrected the README to 0.0065 as well; the merge kept the fuller retraction. |
+| W4 (safe deserialization) survived the merge | **Verified** | No `weights_only=False`, bare `pickle.load` or `allow_pickle=True` remains in `models/`, `eval/`, `app/` or `pipeline/`. |
+| W8 (gated stage override) survived the merge | **Verified** | `ForecastEngine._override_stage(next_state_raw, raw_stage, inf_prob)` — the infiltration probability is passed in and gates the override. |
+| W3 (flow-only packet guard) works | **Verified** | PCAP-only upload with the real config: 0 of 258 windows carry non-zero packet features, `has_packet_features` is uniformly 0, feature matrix is 41 columns. See H5 for an unintended consequence. |
+| W7 (converged retrain, matched hyperparameters) | **Verified to the digit** | Recomputed from `checkpoints_real_v2_converged` on its own test split: 7,191 sequences (report: 7,191), F1 **0.3697** (0.370), precision **0.8785** (0.878), recall **0.2341** (0.234), FPR **0.0084** (0.008), AUROC **0.7058** (0.7058). Zero `10.90.x` synthetic rows remain in the test split, exactly as the report claims. The report also states plainly that the model is *not* converged and lists all 30 val-loss values — that is the standard the rest of the project's reporting should be held to. |
+| CAPEC linkage (D2) | **Appears closed** | `models/cve_lookup.py` now carries a static CAPEC snapshot (IDs, names, reference URLs) per stage. Offline; the URLs are citations, not fetches. |
+
+The builder's W1–W12 work stands up to independent checking, and the one merge defect was caught by
+the project's own tests rather than by this audit. The findings below are concentrated almost
+entirely in the **unaudited teammate commit `f1e432c`**, which never had a work order.
+
+### H1 (High, NEW): `app/api.py` is an unauthenticated SSRF and alert-exfiltration surface
+
+`f1e432c` adds a FastAPI service with three endpoints and no authentication on any of them:
+
+```python
+@app.post("/api/v1/webhooks")          # anyone reachable can register any URL
+async def register_webhook(webhook: WebhookConfig):
+    webhooks.append(webhook)
+
+def dispatch_webhook(alert: dict, webhook: WebhookConfig):
+    requests.post(webhook.url, json=alert, headers=headers, timeout=5)   # unvalidated URL
+```
+
+Four distinct problems, in descending severity:
+
+1. **Alert exfiltration via open webhook registration.** Anyone who can reach the API registers an
+   arbitrary URL, and *every subsequent alert* — host IP, infiltration probability, predicted
+   ATT&CK stage — is POSTed to it. In a defensive product this hands an attacker the defender's own
+   detection state.
+2. **Server-side request forgery.** `webhook.url` is never validated. The service will POST to
+   internal addresses, including cloud metadata endpoints such as `169.254.169.254`, from inside
+   the deployment's trust boundary.
+3. **Unauthenticated ingest and read.** `POST /api/v1/alerts/ingest` lets anyone inject fabricated
+   alerts into the store (poisoning the SOC view — and the project's own rules forbid fabricated
+   detection results); `GET /api/v1/alerts` discloses up to 1,000 recent alerts including real host
+   IPs, which the same rules call out as data not to expose.
+4. **Offline requirement, in tension rather than breached.** The PS requires the interface to "run
+   fully offline without cloud API dependencies", and an outbound `requests.post` to a user-supplied
+   URL is exactly a webhook dependency. The README's wording — "No cloud APIs, no network calls *at
+   inference time*" — is still literally defensible, because this service is not on the inference
+   path and is never started. It is one wiring commit away from being false, and a judge reading
+   `app/api.py` will not weigh that distinction charitably.
+
+**Severity note.** Graded **High**, not Critical, against this document's own key: it misses no
+requirement that was previously met and misrepresents no headline number. Three facts limit the
+blast radius — the module is imported by nothing (`app/streamlit_app.py` references neither `api`,
+`webhook`, `fastapi` nor `uvicorn`), `fastapi` and `pydantic` are not installed and not in
+`requirements.txt` so it cannot start at all (H2), and `uvicorn` binds `127.0.0.1` by default. It
+ships the risk surface with none of the functionality.
+
+**Two options; this is the owner's call, not the auditor's.** Either (a) delete the file and state
+in the README that the demo makes no network calls, or (b) keep the SIEM story for the pitch and
+harden it: off by default behind an explicit flag, authentication on every endpoint, webhook URLs
+validated against a configured allowlist with private and link-local ranges rejected, tokens read
+from the environment rather than held in a module global, and documented as an optional online
+component disabled in the offline demo. Deleting a teammate's feature is a product decision.
+
+### H2 (High, NEW): the new features cannot run from a clean install
+
+Measured in the project's own venv: `fastapi` and `pydantic` are **not importable**; `requests` and
+`uvicorn` are, but only because `streamlit` pulls them in transitively (`pip show` reports
+`Required-by: streamlit` for both). None of the four appears in `requirements.txt`.
+
+So `app/api.py` cannot start at all, and `scripts/stream_consumer.py` imports `requests` only by
+luck of a transitive dependency that nothing guarantees. Either declare the dependencies explicitly
+or remove the code; shipping an import the documented install cannot satisfy is worse than shipping
+neither.
+
+### H3 (High, NEW): `scripts/stream_consumer.py` feeds 19 features to a 41-feature model
+
+```python
+feature_cols = config["features"]["flow_level"]   # "Simplified for demo, omitting packet/graph for speed"
+```
+
+Measured: `flow_level` is **19** columns, `feature_columns(config)` is **41**, and both shipped
+checkpoints report `input_proj.in_features == 41`.
+
+**Correction to a first reading of this finding:** the consumer does *not* crash. It pads the
+missing 22 columns with zeros ("Pad remaining features with 0s if we only used flow_level"), so it
+runs and emits confident-looking forecasts built from an input whose graph-level, graph-embedding
+and packet-level features are all zero. Because `flow_level` happens to be the first 19 entries of
+`feature_columns`, the surviving columns land in the right positions, which is precisely why the
+failure is silent. The 8 `graph_embed_*` values are never zero in training, so every prediction this
+script produces is off-distribution by construction — a silent degradation, not a loud failure,
+which is the worse of the two.
+
+This is the project's recurring schema-drift failure (S13, G11, and the merge bug above) appearing a
+fourth time, in code by a different author — the signal being that the schema is too easy to get
+wrong silently, and that zero-filling absent features is now a reflex here rather than a decision.
+
+### H4 (High, NEW): the two missing deliverables are now 0-byte placeholder files
+
+`docs/demo.mp4` and `docs/presentation.pdf` were added by `f1e432c` and are **0 bytes**. Anyone
+scanning the repo — or a checklist that tests for file presence — now reads S12 as satisfied when
+nothing exists. Empty placeholders are worse than absence: they convert a known gap into a silent
+one. Remove them until there is real content, or replace them with a one-line note.
+
+### H5 (Medium, NEW): W3's guard silently disables the S6 reconnaissance heuristic everywhere
+
+W3 (correctly) zero-fills packet features when the selected checkpoint was trained flow-only. But
+**both** shipped processed builds report `flow_only: true` — `data/processed_real` *and*
+`data/processed/cicids2018/splits`, which `configs/default.yaml` points at. Since the S6
+reconnaissance override triggers on `port_scan_score`, a packet-level feature, and that feature is
+zero-filled before the override sees it, **reconnaissance can never be predicted on any shipped
+configuration**, including the PCAP-only upload path.
+
+`BUILD_REPORT.md` states S6 is "now genuinely usable on PCAP-only uploads (S4)". Measured: it is
+not, for either checkpoint. Two individually-correct fixes cancel each other. The honest options
+are to rebuild one processed dataset with packet features so the synthetic demo can exercise recon,
+or to correct the S6 claim and document that recon remains unreachable. Neither is hard; leaving the
+claim as written is the only bad option.
+
+### H6 (Medium, NEW): this branch's upstream is `origin/master`
+
+`git status -sb` reports `integration/all-branches-2026-09-29...origin/master [ahead 25]`.
+
+**Mechanism, checked rather than assumed:** `push.default` is unset, so Git's default `simple`
+applies, and a bare `git push` is *refused* because the upstream branch name differs from the local
+one. The hazard is therefore not a slip of the fingers but the remedy Git prints alongside that
+refusal — `git push origin HEAD:master` — plus any GUI or IDE that offers "push to upstream"
+without showing the target. Either would land 25 commits on `master`, including the empty
+deliverable placeholders (H4) and the webhook service (H1). Set the upstream to a remote branch of
+the same name before anyone works around the refusal.
+
+### H.7 Notes
+
+- **`configs/default.yaml` pointing at `data/processed/cicids2018/splits`** predates this branch
+  (`ed065b6`, already on `master`) and the directory exists and loads, so it is not an integration
+  regression. It is still a naming trap: the app labels that source "Synthetic sample (fast demo)".
+- **The teammate's README edit was a genuine improvement**, independently correcting the CTU-13
+  number to 0.0065 and deleting the now-fixed "robustness scripts are broken" and "PCAP cannot be
+  used on its own" limitations. No conflict damage was found in the merged documentation.
+- **Part G and the builder's status edits survived the merge intact.**
+- **Correction to an earlier draft of this part: S9 is no longer untouched.** `f1e432c` fixed it —
+  the SHAP background is now a cached 100-row sample in `shap_background.npy` instead of a
+  transform over the whole train split. `BUILD_REPORT.md`'s summary still lists "S9-S12, D2 | NOT
+  STARTED", which is now wrong for S9 (see H7).
+
+### H7 (Medium, NEW): the merge left two configs for one checkpoint, and W10 is not actually done
+
+Two problems, both created by independent work landing on the same files.
+
+1. **`configs/real_data_v2.yaml` no longer describes `checkpoints_real_v2`.** `f1e432c` changed it
+   from `batch_size: 512` / `epochs: 15` to `64` / `30` — the same G3 confound fix the builder made
+   separately by creating `configs/real_data_v2_converged.yaml`. The checkpoint named
+   `checkpoints_real_v2` was trained at 512/15, so no config in the tree now reproduces it, and
+   `real_data_v2_converged.yaml` still carries the stale comment "matches v1, not the 512
+   `configs/real_data_v2.yaml` carries today". Reproducibility is a stated PS deliverable; decide
+   which of the two configs survives and retire the other.
+2. **W10 (G9) is contradicted, not fixed.** `BUILD_REPORT.md` now holds *two* summary tables: the
+   rebuilt one near the top, and a second at roughly line 332 that still reads
+   `| W3-W12 | | NOT STARTED |` while the body below it documents W3–W12 as done. The top table's
+   `S9-S12, D2 | NOT STARTED` row is also wrong for S9 (above). The finding G9 was raised about is
+   therefore still live.
+
+**The same duplication happened on W8/G7**: the gating fix currently in `models/forecast.py` came
+from the teammate's `f1e432c`, and the builder implemented the same fix in `f14a95f`. The merged
+result is correct — verified by running W8's own acceptance command at HEAD, where the OOD benign
+transfer now reports `predicted stage: benign` and PASSes — but two people solved the same finding
+in the same function without either knowing, and the IAT case (`a60c549`) shows how that pattern
+fails when it fails silently.
+
+### H.8 Results present on this branch that this audit did **not** verify
+
+Listed so their numbers cannot reach a slide on the strength of a commit message alone.
+
+| Commit | Produces | Status |
+|---|---|---|
+| `5d95cda` | UNSW packet-aware pilot, "matched 3-seed comparison" | **Not verified.** First seed-repeated result in the project (E10's gap); worth verifying before it is quoted. |
+| `1065ddd` | CIC-IDS-2018 one-day packet-aware dataset, training results, "threshold-shift finding" | **Not verified.** The threshold-shift claim plausibly bears on G8; treat as unconfirmed. |
+| `482352b` | Fast streaming PCAP parser, "49-78x, identical features to the Scapy path" | **Partially verified.** Its IAT output matches the scapy path exactly on the controlled input (H.0); the speed claim and full feature parity were not re-measured beyond the project's own `tests/test_fast_flows.py`. |
+
+---
+
+## Part I: W13–W20 verification and merge verdict
+
+**Date:** 2026-09-29. **Audited state:** `integration/all-branches-2026-09-29` at `e9e9efa`, in sync
+with its own remote, open as **PR #1 → master** (30 commits, MERGEABLE). **Method:** read-only;
+each item checked against the acceptance criterion written for it in `WORK_ORDER-2026-09-29.md`,
+not against `BUILD_REPORT.md`'s status column. Full suite: **290 passed**.
+
+| Item | Builder status | **Audit verdict** | Evidence |
+|---|---|---|---|
+| W13 | FIXED | **VERIFIED** | `tests/test_api_hardening.py` covers every case the criterion named, by name: disabled by default, unauthenticated rejected, wrong token rejected, webhook to `169.254.169.254` refused, non-allowlisted host refused, plain-HTTP scheme rejected, allowlisted HTTPS accepted. Implementation also resolves the host via `getaddrinfo` and rejects private/loopback/link-local/multicast, which closes DNS-rebinding as well as the literal IMDS address. |
+| W14 | FIXED | **VERIFIED (declaration only)** | `requirements.txt` now declares `fastapi>=0.110`, `pydantic>=2.6`, `uvicorn>=0.29`, `requests>=2.31`, `networkx>=3.2`. **Not** re-verified by building a clean venv from that file; the criterion asked for a fresh-install import check and that was not run. |
+| W15 | FIXED | **VERIFIED** | `tests/test_stream_consumer.py` asserts the assembled width equals the scaler's, that every `feature_columns` entry is present, and — the substantive part — that `graph_embed_0` is **not** all-zero, which is the exact defect H3 described. |
+| W16 | FIXED | **VERIFIED** | `docs/demo.mp4` and `docs/presentation.pdf` are gone from disk. |
+| W17 | FIXED | **VERIFIED** | Part A's S6 row now states reconnaissance is unreachable on every shipped checkpoint and explicitly withdraws the earlier "genuinely usable on PCAP-only uploads" claim. |
+| W18 | VERIFIED, no action | **VERIFIED** | Branch now tracks `origin/integration/all-branches-2026-09-29`; confirmed by the push that created it. |
+| W19 | FIXED | **PARTIALLY FIXED — see I1** | Guard is correct and raises on a mismatched list, but is inert on every checkpoint that exists. |
+| W20 | FIXED | **VERIFIED** | One summary table; S9 and D2 corrected to FIXED; only S10/S11 remain NOT STARTED, which is accurate. Config↔checkpoint mapping documented. |
+
+### I1 (High, NEW): the W19 schema guard is inert on all 47 existing checkpoints
+
+`models/checkpoint_io.py::validate_feature_names` compares the caller's feature list against a
+`feature_names` key stored in the checkpoint, **by name and order** — a genuinely better design than
+a width check, since the bugs behind S13, G11, H3 and the `a60c549` merge all produced a
+right-width/wrong-columns matrix. It raises correctly when the lists differ, and it deliberately
+passes through checkpoints that carry no `feature_names`, documented as backward compatibility.
+
+Measured across every checkpoint on disk:
+
+| | Count |
+|---|---|
+| Checkpoints carrying `feature_names` | **0** |
+| Checkpoints without it (guard skips silently) | **47** |
+| …including the two the demo loads (`checkpoints_real`, `checkpoints/`) | yes |
+
+So the guard protects nothing that currently exists, and `BUILD_REPORT.md`'s claim that W19 "closes
+the class behind S13/G11/H3/a60c549" is **not yet true in practice** — it will become true only for
+checkpoints trained after this change, and nothing has been retrained since.
+
+**The fix is cheap and needs no retraining:** a one-off script that opens each checkpoint, writes
+the `feature_names` list from the config that produced it, and re-saves. Then the guard is live on
+the shipped artefacts and the claim holds. Until then, W19 is PARTIALLY FIXED.
+
+Separately: 6 of the 47 checkpoints are LSTM-baseline or joint-GNN files that `load_world_model`
+cannot load. That is **not** a regression — they have their own loaders (`load_lstm_baseline`,
+`load_joint_world_model`), and all three load cleanly when called correctly. Noted so a future audit
+does not re-raise it.
+
+### Merge verdict
+
+**Do not merge yet.** The condition set for the merge was "if the work order is complete". Seven of
+eight items are verified; **W19 is partially fixed** (I1), and its remedy is a short backfill script.
+
+Two further things PR #1 carries that this audit has *not* cleared, which the owner should weigh
+before merging 30 commits onto `master`:
+
+- **Teammate work reviewed only at Part H depth**: `f1e432c` (SIEM/streaming/CAPEC/topology) plus
+  the `tahir`, `2026-09-26_tahir` and `abuzar-dev` branches. Part H reviewed the parts that
+  intersected the audit; none of it went through a full work-order cycle.
+- **Unverified results on the branch** (Part H, H.8): the packet-aware pilots `5d95cda` / `1065ddd`
+  and the truncated scale-invariance run. These are safe to merge as code, but their numbers must
+  not be quoted until measured.
+
+Once the W19 backfill lands, this audit's position is that PR #1 is ready to merge.

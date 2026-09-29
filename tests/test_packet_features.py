@@ -126,3 +126,74 @@ def test_build_flow_records_drops_icmp_only_capture(tmp_path):
 
     with pytest.raises(ValueError, match="No TCP/UDP packets"):
         build_flow_records(packet_df)
+
+
+# ---------------------------------------------------------------------------
+# G5: PCAP path and CSV path must agree on units (audit W2)
+# ---------------------------------------------------------------------------
+
+def test_pcap_and_csv_paths_produce_matching_window_features(tmp_path):
+    """Same traffic, two routes: (a) a real multi-packet PCAP -> load_pcap -> build_flow_records,
+    (b) a CICFlowMeter-format CSV whose values are computed here INDEPENDENTLY from the packet
+    list (not by calling build_flow_records) -> load_flow_csv -> clean_and_normalize. Both go
+    through build_flow_windows; the resulting window features must agree.
+
+    data/raw/pcap/synthetic_sample.pcap cannot exercise this: all 944 of its flows are
+    single-packet, so it has no inter-arrival times at all. This capture is generated here.
+    """
+    import numpy as np
+    import pandas as pd
+
+    from pipeline.flow_features import clean_and_normalize, load_flow_csv
+    from pipeline.windowing import build_flow_windows
+
+    base = 1_700_000_000 - (1_700_000_000 % 10)  # start of a 10s window
+    # (src, dst, sport, dport, [(t_offset_s, direction, flags, payload_len), ...]) direction 0=fwd 1=bwd
+    flows = [
+        ("10.0.0.1", "10.0.0.2", 40000, 80, [(0.10, 0, "S", 0), (0.35, 1, "SA", 0), (0.40, 0, "A", 0),
+                                              (1.20, 0, "PA", 120), (2.90, 1, "PA", 500), (3.00, 0, "FA", 0)]),
+        ("10.0.0.1", "10.0.0.3", 40001, 443, [(0.50, 0, "S", 0), (0.62, 1, "SA", 0), (0.70, 0, "A", 0),
+                                               (5.10, 0, "PA", 64)]),
+    ]
+    pkts, csv_rows = [], []
+    for src, dst, sport, dport, plan in flows:
+        times = np.array([base + t for t, *_ in plan])
+        fwd = [d == 0 for _, d, _, _ in plan]
+        for (t, d, fl, ln) in plan:
+            a, b, sp, dp = (src, dst, sport, dport) if d == 0 else (dst, src, dport, sport)
+            pkt = IP(src=a, dst=b) / TCP(sport=sp, dport=dp, flags=fl) / (b"x" * ln)
+            pkt.time = base + t
+            pkts.append(pkt)
+        iats_us = np.diff(times) * 1e6
+        csv_rows.append({
+            "Src IP": src, "Dst IP": dst, "Src Port": sport, "Dst Port": dport, "Protocol": 6,
+            "Timestamp": pd.Timestamp(times[0], unit="s").isoformat(),
+            "Flow Duration": (times[-1] - times[0]) * 1e6,
+            "Tot Fwd Pkts": sum(fwd), "Tot Bwd Pkts": len(fwd) - sum(fwd),
+            "TotLen Fwd Pkts": sum(ln for (_, d, _, ln) in plan if d == 0),
+            "TotLen Bwd Pkts": sum(ln for (_, d, _, ln) in plan if d == 1),
+            "SYN Flag Cnt": sum("S" in fl for (_, _, fl, _) in plan),
+            "ACK Flag Cnt": sum("A" in fl for (_, _, fl, _) in plan),
+            "FIN Flag Cnt": sum("F" in fl for (_, _, fl, _) in plan),
+            "RST Flag Cnt": 0, "URG Flag Cnt": 0,
+            "PSH Flag Cnt": sum("P" in fl for (_, _, fl, _) in plan),
+            "Flow IAT Mean": iats_us.mean(), "Flow IAT Std": iats_us.std(), "Flow IAT Max": iats_us.max(),
+            "Label": "BENIGN",
+        })
+
+    pcap_path = tmp_path / "flows.pcap"
+    _write_pcap(pcap_path, pkts)
+    csv_path = tmp_path / "flows.csv"
+    pd.DataFrame(csv_rows).to_csv(csv_path, index=False)
+    config = {"windowing": {"window_seconds": 10}}
+
+    from_pcap = build_flow_windows(build_flow_records(load_pcap(pcap_path)), config)
+    from_csv = build_flow_windows(clean_and_normalize(load_flow_csv(csv_path)), config)
+
+    cols = ["flow_count", "total_packets", "total_bytes", "mean_duration", "syn_ratio", "ack_ratio",
+            "fin_ratio", "psh_ratio", "mean_iat", "var_iat", "max_iat", "bidir_ratio", "tcp_ratio"]
+    assert len(from_pcap) == len(from_csv) == 1
+    for col in cols:
+        assert from_pcap[col].iloc[0] == pytest.approx(from_csv[col].iloc[0], rel=1e-3, abs=1e-6), col
+    # and the IAT features really are on the microsecond scale the model was trained on
+    assert from_pcap["mean_iat"].iloc[0] > 1e5

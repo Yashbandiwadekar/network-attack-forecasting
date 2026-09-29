@@ -44,6 +44,36 @@ def related_cves(stage: str) -> list[dict[str, Any]]:
     return snapshot.get(stage, [])
 
 
+def related_capec(stage: str) -> list[dict[str, Any]]:
+    """Returns a curated list of CAPEC (Common Attack Pattern Enumeration and Classification) 
+    IDs associated with the `stage`, fulfilling SIH PS 26153's CAPEC requirement."""
+    # Hardcoded mapping of MITRE stages to their most common CAPEC parent patterns
+    capec_map = {
+        "reconnaissance": [
+            {"capec_id": "CAPEC-169", "name": "Footprinting", "url": "https://capec.mitre.org/data/definitions/169.html"},
+            {"capec_id": "CAPEC-285", "name": "ICMP Echo Request Ping", "url": "https://capec.mitre.org/data/definitions/285.html"}
+        ],
+        "initial_access": [
+            {"capec_id": "CAPEC-112", "name": "Brute Force", "url": "https://capec.mitre.org/data/definitions/112.html"},
+            {"capec_id": "CAPEC-47", "name": "Buffer Overflow via Parameter Expansion", "url": "https://capec.mitre.org/data/definitions/47.html"}
+        ],
+        "lateral_movement": [
+            {"capec_id": "CAPEC-561", "name": "Windows Admin Shares with Pass the Hash", "url": "https://capec.mitre.org/data/definitions/561.html"}
+        ],
+        "command_and_control": [
+            {"capec_id": "CAPEC-268", "name": "UDP Traffic to Unknown Port", "url": "https://capec.mitre.org/data/definitions/268.html"}
+        ],
+        "exfiltration": [
+            {"capec_id": "CAPEC-602", "name": "Data Exfiltration Over DNS", "url": "https://capec.mitre.org/data/definitions/602.html"}
+        ],
+        "impact": [
+            {"capec_id": "CAPEC-125", "name": "Flooding", "url": "https://capec.mitre.org/data/definitions/125.html"},
+            {"capec_id": "CAPEC-488", "name": "HTTP Flood", "url": "https://capec.mitre.org/data/definitions/488.html"}
+        ]
+    }
+    return capec_map.get(stage, [])
+
+
 def snapshot_metadata() -> dict[str, str]:
     """Provenance info (source, fetch date, scope note) for display alongside any CVE shown in
     the UI, so a viewer can see this is a cached snapshot rather than a live lookup."""

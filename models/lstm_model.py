@@ -47,6 +47,9 @@ class LSTMWorldModel(nn.Module):
         return next_state, stage_logits, infiltration_logit
 
 
+from models.checkpoint_io import load_checkpoint  # noqa: E402
+
+
 def load_lstm_baseline(
     checkpoint_path: str | Path, device: torch.device | None = None,
 ) -> tuple[LSTMWorldModel, dict[str, Any]]:
@@ -54,7 +57,7 @@ def load_lstm_baseline(
     --arch lstm produces. No K-step rollout wrapper -- this baseline is only ever scored on the
     immediate next-step task in eval/benchmark.py, the same as the Markov/LR baselines."""
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    checkpoint = load_checkpoint(checkpoint_path, device)
     model = LSTMWorldModel(checkpoint["n_features"], checkpoint["n_stage_classes"], checkpoint["config"])
     model.load_state_dict(checkpoint["model_state"])
     model.to(device).eval()

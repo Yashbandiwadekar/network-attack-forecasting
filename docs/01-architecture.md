@@ -111,16 +111,40 @@ false-positive-rate budget (threshold picked on **val**, applied to test) — ho
 tunes such a system. `docs/04-evaluation.md` includes a computed honesty check: if the stacked
 baseline ties or beats the world model, the report says so rather than only showing favourable numbers.
 
+**Evaluation pitfalls are treated as a design constraint.** Arp et al., *"Dos and Don'ts of Machine
+Learning in Computer Security"* (USENIX Security 2022), catalogues the failure modes that inflate
+published security-ML results. This project's audit (`docs/AUDIT.md`) hit three and records the
+fixes: **data snooping** (E1, §6), **base-rate fallacy** — a 5%-FPR budget is meaningless at 0.8%
+prevalence, so 1%/0.1% budgets and threshold-free AUPRC were added (E5) — and **inappropriate
+baselines**: persistence and Markov read the current window's true label and are now labelled
+oracles, with a deployable counterpart alongside (E6).
+
 ## 6. Known limitations
 
-- MITRE stage labels are a documented heuristic mapping (`docs/03-mitre-mapping.md`), not ground
-  truth CIC-IDS-2018 provides directly; `reconnaissance` is derived (high port-scan score preceding
-  an attack from the same IP), not assigned from a label.
-- Validated end-to-end on a synthetic sample; real CIC-IDS-2018 training is the next step
-  (`docs/02-dataset-and-features.md`).
-- Two stronger architectures were deliberately not attempted, for timeline reasons, and are noted
-  here rather than silently skipped: an RSSM (Dreamer-style GRU + prior/posterior latent dynamics
-  with genuine "imagination" rollouts) is more faithful to the World Models literature than this
-  Transformer; a GNN (nodes = hosts, edges = flows per window) is the other natural extension. Both
-  add meaningfully more implementation risk than fit alongside dual feature levels, K-step rollout,
-  MITRE mapping, three baselines, and the demo.
+Measured, not estimated; evidence and finding IDs in `docs/AUDIT.md`.
+
+- **Generalisation is the honest weak point.** Day-disjoint, the model scores F1 0.370 / AUROC 0.706
+  (t+1, 7,191 real test sequences). The earlier 0.917 came from a per-host split that shared attack
+  sessions between train and test (E1) — data snooping, found by audit and corrected.
+  Leave-one-attack-family-out is negative for three of four families (AUROC 0.612 / 0.432 / 0.531)
+  and positive only for DDoS (0.872); zero-shot transfer to CTU-13 is chance (0.517). No claim is
+  made to generalise to unseen attacks — the claim is that this was measured and published.
+- **The data sets that ceiling.** Nine of ten CIC-IDS-2018 days ship without Src/Dst IP and collapse
+  to one pseudo-host per day; the only day with real per-host structure is DDoS, and the three
+  families LOFO fails on are exactly those without per-host data. CIC-IDS-2017, which keeps the
+  5-tuple every day, is the next step.
+- **Packet features are implemented but zero-filled in both shipped checkpoints** (no CIC-IDS-2018
+  PCAP: 37 GB/day). A PCAP-only path exists and is unit-matched to the CSV path, but flow-only
+  training makes `reconnaissance` unreachable at inference, since it keys on a packet-level
+  port-scan score. `exfiltration` exists only as a synthetic, demo-only label, captioned as such.
+- **MITRE stage labels are a documented heuristic mapping** (`docs/03-mitre-mapping.md`), not ground
+  truth; DoS/DDoS maps to `impact`, outside the five-stage task.
+- **Adversarial evasion succeeds and is unfixed**: a white-box PGD attack suppressing volume
+  features drives t+1 infiltration probability from 0.9975 to 0.0000. Threat model stated rather
+  than hidden — it requires the attacker to send genuinely less traffic, which defeats a flood but
+  is realistic for low-and-slow intrusion.
+- **Operating points do not transfer across days**: a 5%-FPR budget tuned on validation yields ~36%
+  FPR on test, so every budgeted number carries its achieved FPR.
+- **Architecture alternatives.** A GNN was built and ablated — no measurable benefit
+  (`docs/06-gnn-ablation.md`). An RSSM (Dreamer-style latent dynamics) remains more faithful to the
+  world-model literature and was not attempted, for timeline reasons.
