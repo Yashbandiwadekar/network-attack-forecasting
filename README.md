@@ -32,9 +32,27 @@ python -m models.train
 # 5. Benchmark against the baselines
 python -m eval.benchmark
 
-# 6. Launch the demo
-streamlit run app/streamlit_app.py
+# 6. Launch the backend API (serves the React dashboard)
+python -m uvicorn app.server:app --host 127.0.0.1 --port 8000
+
+# 7. In a second terminal, launch the frontend
+npm install --prefix frontend
+npm run dev --prefix frontend      # http://localhost:5173
 ```
+
+The dashboard starts with no hosts: upload a PCAP/PCAPNG or a CICFlowMeter CSV from the UI (or
+`curl -F "file=@data/raw/flows/synthetic_sample.csv" http://127.0.0.1:8000/api/v1/analysis/upload`)
+and it parses the capture, scores every host and forecasts 60 seconds ahead.
+
+Environment variables (all optional for a local demo):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PHOENIX_CORS_ORIGINS` | localhost:5173/5174 | Comma-separated browser origins allowed to call the API. Set this for a LAN demo. |
+| `PHOENIX_REQUIRE_AUTH` | off | `1` enforces `Authorization: Bearer <PHOENIX_API_TOKEN>` on every endpoint. |
+| `PHOENIX_API_TOKEN` | — | The bearer token, required when auth is enforced. |
+| `PHOENIX_DEMO_USER` / `PHOENIX_DEMO_PASSWORD` | — | Credentials for `/api/v1/auth/login`; without them login returns 503 rather than accepting anything. |
+| `VITE_API_BASE_URL` | `http://127.0.0.1:8000` | Frontend-side: where the dashboard looks for the API. |
 
 GPU note: install torch from the CUDA index (`pip install torch --index-url
 https://download.pytorch.org/whl/cu128`) — the default PyPI wheel is CPU-only.
@@ -77,7 +95,8 @@ python -m eval.benchmark --train-config configs/real_data.yaml \
 | `models/audit_ledger.py` | Hash-chained, tamper-evident log of dashboard alerts |
 | `models/compliance.py`, `models/cve_lookup.py` | CERT-In-style incident report generator and offline CVE/NVD enrichment |
 | `eval/metrics.py`, `eval/benchmark.py` | F1/precision/recall/FPR, fixed-FPR thresholds, lead-time metric, single- and cross-dataset benchmarks |
-| `app/streamlit_app.py` | Offline demo: alert dashboard, forecast timeline, explainability, counterfactual probing |
+| `app/server.py`, `app/service.py` | REST API for the React dashboard (forecast, explainability, narrative, CERT-In report, audit ledger) and the headless pipeline behind it |
+| `frontend/` | React + Vite dashboard: alert table, 60-second forecast timeline, explainability, 3D network field |
 | `scripts/` | Synthetic sample generation, benign-traffic augmentation, robustness and adversarial checks, one-off data-inspection scripts |
 | `configs/` | `default.yaml` (synthetic), `real_data.yaml` (CIC-IDS-2018), `ctu13*.yaml` — windowing, features and hyperparameters |
 | `docs/` | Problem statement, architecture, dataset notes, MITRE mapping, evaluation reports, related work, audit |
@@ -205,7 +224,7 @@ These are documented rather than hidden. `docs/AUDIT.md` is the full list with m
 - [x] Trained on real CIC-IDS-2018 (10 days, ~16M flows) — `checkpoints_real/`, `docs/04-evaluation-real.md`
 - [x] K-step infiltration prediction engine with MITRE stage mapping — `models/forecast.py`
 - [x] Explainability (attention + gradient×input + SHAP) — `models/explain.py`
-- [x] Offline demo interface — `app/streamlit_app.py`
+- [x] Offline demo interface — `frontend/` (React) over `app/server.py`
 - [x] Benchmark vs logistic regression and three further baselines, at default and fixed-FPR thresholds — `eval/benchmark.py`, `docs/04-evaluation-real.md`
 - [x] Lead-time metric ("before compromise completes") — `eval/metrics.py::lead_time_metrics`
 - [x] Cross-dataset generalisation evaluation (CIC-IDS-2018 → CTU-13) — `docs/04-evaluation-ctu13_cross_from_real_data.md`

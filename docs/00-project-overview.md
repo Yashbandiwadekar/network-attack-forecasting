@@ -26,7 +26,7 @@ Full original text: `C:\Users\Yash\Documents\Texts\AI based Network Attack Forec
 - Attention-based (temporal) and SHAP-based (feature) explainability, wired into every forecast —
   `models/explain.py`.
 - A logistic-regression baseline and benchmark harness — `models/baseline_lr.py`, `eval/`.
-- An offline Streamlit demo — `app/streamlit_app.py`.
+- An offline React dashboard — `frontend/`, served by the REST API in `app/server.py`.
 
 ## Key design decisions and why
 

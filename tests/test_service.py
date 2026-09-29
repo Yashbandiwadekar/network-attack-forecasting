@@ -1,10 +1,14 @@
-"""Integration coverage for the app's upload path (audit S4/S5) -- calls _process_uploads
-directly, the same function the Streamlit UI calls, so this exercises the real pipeline without
-needing a live browser session."""
+"""Integration coverage for the upload path (audit S4/S5) -- calls app.service.process_uploads
+directly, the same function /api/v1/analysis/upload calls, so this exercises the real pipeline
+without needing a running server.
+
+Ported unchanged from tests/test_streamlit_uploads.py when app/streamlit_app.py was replaced by
+the React frontend; the assertions are the S4 (PCAP-only input) and G11/W3 (flow-only models must
+not be fed packet features) guarantees, which outlived the UI that used to host them."""
 import numpy as np
 from scapy.all import IP, TCP, wrpcap
 
-from app.streamlit_app import _process_uploads
+from app.service import process_uploads as _process_uploads
 from common.config import load_config
 
 

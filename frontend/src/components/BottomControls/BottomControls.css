@@ -1,0 +1,36 @@
+.bottom-bar-panel {
+  position: absolute;
+  bottom: 2.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  gap: 0.8rem;
+  pointer-events: auto;
+}
+
+.bottom-ctrl-btn {
+  background: rgba(10, 10, 10, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #f5f5f5;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 500;
+  padding: 0.65rem 1.4rem;
+  border-radius: 6px;
+  cursor: pointer;
+  backdrop-filter: blur(12px);
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+
+.bottom-ctrl-btn:hover {
+  background: rgba(30, 30, 30, 0.9);
+  border-color: rgba(255, 106, 0, 0.5);
+  color: #ff6a00;
+}
+
+.bottom-ctrl-btn.paused {
+  border-color: #ff6a00;
+  color: #ff6a00;
+}

@@ -1,0 +1,183 @@
+.landing-page {
+  position: relative;
+  background-color: #000000;
+  color: #f5f5f5;
+  min-height: 100vh;
+}
+
+.section-technical {
+  scroll-margin-top: 80px;
+  padding: 5rem 10%;
+  background: #000000;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.section-technical.alt-bg {
+  background: #050505;
+}
+
+.section-header {
+  max-width: 800px;
+  margin: 0 auto 3rem auto;
+  text-align: center;
+}
+
+.section-mono-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #ff6a00;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.6rem;
+}
+
+.section-header h2 {
+  font-size: 2rem;
+  font-weight: 600;
+  color: #f5f5f5;
+  margin-bottom: 0.8rem;
+  letter-spacing: -0.01em;
+}
+
+.section-desc {
+  font-size: 0.95rem;
+  color: #a0a0a0;
+  line-height: 1.6;
+}
+
+.deployment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.deployment-panel {
+  background: #0a0a0a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.panel-mono-tag {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: #888888;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.6rem;
+}
+
+.deployment-panel h3 {
+  font-size: 1.1rem;
+  color: #f5f5f5;
+  margin-bottom: 0.6rem;
+}
+
+.deployment-panel p {
+  font-size: 0.85rem;
+  color: #a0a0a0;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.cta-section {
+  text-align: center;
+  padding: 6rem 10%;
+}
+
+.cta-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+.footer-technical {
+  background: #080808;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 3rem 10% 2rem 10%;
+}
+
+.footer-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1200px;
+  margin: 0 auto 2rem auto;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.footer-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.footer-brand {
+  font-family: var(--font-main);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #ff6a00;
+  letter-spacing: 0.08em;
+}
+
+.footer-desc {
+  font-family: var(--font-main);
+  font-size: 0.8rem;
+  color: #888888;
+}
+
+.footer-right {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.footer-right a {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: #a0a0a0;
+}
+
+.footer-right a:hover {
+  color: #ff6a00;
+}
+
+.footer-sub {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #666666;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding-top: 1.5rem;
+}
+
+/* Caption for sections that render illustrative sample figures rather than measured output.
+   The landing page is pre-login and has no capture loaded, so its numbers cannot be live;
+   saying so is the difference between a mock-up and a misreported result. */
+.sample-data-note {
+  max-width: 1180px;
+  margin: 0.75rem auto 0;
+  padding: 0 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1.6;
+  color: #888888;
+  text-align: center;
+}
+
+/* Recorded-run showcase blocks */
+.showcase-forecast,
+.showcase-ledger {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.showcase-forecast .forecast-curve-card,
+.showcase-ledger .ledger-panel {
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+}

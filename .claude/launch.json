@@ -2,10 +2,16 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "streamlit-demo",
+      "name": "phoenix-api",
       "runtimeExecutable": ".venv/Scripts/python.exe",
-      "runtimeArgs": ["-m", "streamlit", "run", "app/streamlit_app.py", "--server.headless", "true", "--server.port", "8501"],
-      "port": 8501
+      "runtimeArgs": ["-m", "uvicorn", "app.server:app", "--host", "127.0.0.1", "--port", "8000"],
+      "port": 8000
+    },
+    {
+      "name": "phoenix-frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "frontend", "run", "dev"],
+      "port": 5173
     }
   ]
 }
