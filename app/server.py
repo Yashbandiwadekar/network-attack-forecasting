@@ -248,6 +248,10 @@ class WhatIfRequest(BaseModel):
     scale: float  # multiplies the feature's value in the most recent observed window only
 
 
+class SimulateIsolationRequest(BaseModel):
+    host_ip: str
+
+
 class ReportRequest(BaseModel):
     host_ip: str
     format: Optional[str] = "json"
@@ -761,6 +765,44 @@ def generate_report(req: ReportRequest):
         },
         "timestamp": time.time(),
         "download_url": f"/api/v1/reports/download/{req.host_ip}.json",
+    }
+
+
+@app.post("/api/v1/response/simulate-isolation", dependencies=[Depends(_require_token)])
+def simulate_isolation(req: SimulateIsolationRequest):
+    """Competitive-parity item 5 (2026-09-30): a UI-only simulated device-isolation action.
+
+    Deliberately NOT real automation -- models/response.py's own docstring states "nothing here
+    is executed automatically" and that guarantee is kept here. This endpoint makes no firewall,
+    network, or process-control call of any kind; it only records, on the existing tamper-evident
+    ledger, that a demo isolation action was simulated for this host. The literal word "SIMULATED"
+    is required to appear in the ledger entry itself (not just the API response or the UI), so
+    reading the ledger export alone -- without this endpoint's code -- is enough to tell this was
+    never a real action.
+    """
+    _require_data()
+    engine, config = _engine()
+    seq = _sequence_for(req.host_ip, config)
+    result = engine.rollout(seq)
+    peak_step = int(np.argmax(result.infiltration_probs))
+    peak_prob = float(result.infiltration_probs[peak_step])
+    peak_stage = result.stage_predictions[peak_step]
+
+    ledger_path = _ledger_path()
+    ledger = AuditLedger.load_or_create(ledger_path)
+    entry = ledger.append(
+        req.host_ip, peak_prob, peak_stage,
+        "SIMULATED: host isolated (demo action, no real network change)",
+    )
+    ledger.save(ledger_path)
+
+    return {
+        "status": "simulated",
+        "host_ip": req.host_ip,
+        "audit_hash": entry.record_hash,
+        "ledger_index": entry.index,
+        "note": "This is a UI simulation. No real network or firewall change was made.",
+        "timestamp": time.time(),
     }
 
 

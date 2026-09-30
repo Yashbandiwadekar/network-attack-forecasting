@@ -32,6 +32,13 @@ export const forecastApi = {
   }),
 };
 
+export const responseApi = {
+  simulateIsolation: (hostIp) => apiFetch('/api/v1/response/simulate-isolation', {
+    method: 'POST',
+    body: JSON.stringify({ host_ip: hostIp }),
+  }),
+};
+
 export const explainApi = {
   getAttribution: (hostIp) => apiFetch('/api/v1/explainability/attribution', {
     method: 'POST',
