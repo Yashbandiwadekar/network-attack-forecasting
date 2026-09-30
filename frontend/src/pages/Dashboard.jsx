@@ -5,6 +5,7 @@ import TelemetryStrip from '../components/TelemetryStrip/TelemetryStrip';
 import ForecastTimeline from '../components/ForecastTimeline/ForecastTimeline';
 import ThreatScoreGauge from '../components/ThreatScoreGauge/ThreatScoreGauge';
 import ForecastProbabilityCurve from '../components/ForecastProbabilityCurve/ForecastProbabilityCurve';
+import WhatIfPanel from '../components/WhatIfPanel/WhatIfPanel';
 import AuditLedger from '../components/AuditLedger/AuditLedger';
 import { systemApi, datasetApi, forecastApi, explainApi, analysisApi, reportApi, evalApi } from '../api';
 import { UploadCloud, CheckCircle, AlertTriangle, FileText, Activity, ShieldCheck, Database, RefreshCw } from 'lucide-react';
@@ -26,6 +27,7 @@ const Dashboard = () => {
   const [reportResult, setReportResult] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [whatIfResult, setWhatIfResult] = useState(null);
 
   // Initial load & 5-second polling loop
   useEffect(() => {
@@ -42,6 +44,7 @@ const Dashboard = () => {
     if (selectedHostIp) {
       fetchHostDetails(selectedHostIp);
     }
+    setWhatIfResult(null); // a counterfactual from a different host is meaningless here
   }, [selectedHostIp]);
 
   const fetchInitialData = async () => {
@@ -394,6 +397,19 @@ const Dashboard = () => {
                   disclosureNotes={forecastData?.stage_disclosure_notes}
                   horizonSeconds={forecastData?.horizon_seconds}
                   title={`INFILTRATION FORECAST — ${selectedHostIp || 'SELECT HOST'}`}
+                  counterfactualProbabilities={whatIfResult?.counterfactual_infiltration_probs}
+                  counterfactualLabel={
+                    whatIfResult
+                      ? `What-if: ${whatIfResult.feature_label} × ${whatIfResult.scale}`
+                      : null
+                  }
+                  counterfactualCaveat={whatIfResult?.caveat}
+                />
+
+                <WhatIfPanel
+                  hostIp={selectedHostIp}
+                  onResult={setWhatIfResult}
+                  onClear={() => setWhatIfResult(null)}
                 />
 
                 {forecastData && forecastData.infiltration_probs && (

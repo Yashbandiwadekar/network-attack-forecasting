@@ -64,6 +64,18 @@ def _display(stage: str) -> str:
     return STAGE_DISPLAY.get(stage, stage.replace("_", " ").title())
 
 
+# Curated subset of feature_columns(config) offered to the what-if UI (audit competitive-parity
+# item 4, 2026-09-30): features with an obvious plain-language story. The endpoint itself accepts
+# any real feature name, validated against common.config.feature_columns(config) -- this list is
+# only a UI convenience, not an allowlist enforced server-side.
+WHAT_IF_FEATURE_LABELS = {
+    "flow_count": "Number of flows",
+    "total_packets": "Total packets",
+    "syn_ratio": "SYN-flag ratio",
+    "port_scan_score": "Port-scan signature",
+}
+
+
 # ---------------------------------------------------------------- app + auth
 
 def _cors_origins() -> list[str]:
@@ -228,6 +240,12 @@ class LoginRequest(BaseModel):
 class PredictRequest(BaseModel):
     host_ip: str
     horizon: Optional[int] = None  # ignored; K comes from the config (see /forecast/predict)
+
+
+class WhatIfRequest(BaseModel):
+    host_ip: str
+    feature: str
+    scale: float  # multiplies the feature's value in the most recent observed window only
 
 
 class ReportRequest(BaseModel):
@@ -432,6 +450,76 @@ def predict_forecast(req: PredictRequest):
         "horizon_note": (
             f"Forecast covers {horizon['horizon_seconds']} seconds "
             f"({horizon['horizon_k']} steps x {horizon['window_seconds']}s)."
+        ),
+    }
+
+
+@app.get("/api/v1/forecast/what-if/features", dependencies=[Depends(_require_token)])
+def get_what_if_features():
+    """The curated feature list the what-if UI offers, plus the model's real feature order so the
+    frontend never has to hardcode column names independently of what the loaded checkpoint
+    actually uses (audit W19 -- this endpoint reads common.config.feature_columns(config), the one
+    supported way to know the model's feature list, rather than the frontend guessing)."""
+    _, config = _engine()
+    all_features = service.feature_cols_for(config)
+    curated = [
+        {"feature": f, "label": WHAT_IF_FEATURE_LABELS[f]}
+        for f in WHAT_IF_FEATURE_LABELS if f in all_features
+    ]
+    return {"curated_features": curated, "all_features": all_features}
+
+
+@app.post("/api/v1/forecast/what-if", dependencies=[Depends(_require_token)])
+def what_if_forecast(req: WhatIfRequest):
+    """Counterfactual rollout (audit competitive-parity item 4, 2026-09-30): reruns the same
+    K-step rollout as /forecast/predict, but with one named feature in the most recent observed
+    window scaled by `req.scale` before the model sees it -- e.g. scale=0.0 asks "what would the
+    model forecast if this host's port-scan signature had been zero?"
+
+    This is the model's own learned dynamics responding to a perturbed input, not a causal
+    simulation of network behaviour -- the response says so via `caveat` and callers/UI must not
+    present it as a guaranteed outcome.
+
+    Column indexing goes through common.config.feature_columns(config), never a hand-picked
+    index, so this cannot become a fifth instance of the schema-drift bug class (audit W19,
+    models/checkpoint_io.py::validate_feature_names)."""
+    _require_data()
+    engine, config = _engine()
+    feature_cols = service.feature_cols_for(config)
+    if req.feature not in feature_cols:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown feature {req.feature!r}. Must be one of the model's trained "
+                   f"features (see GET /api/v1/forecast/what-if/features).",
+        )
+    idx = feature_cols.index(req.feature)
+
+    baseline_seq = _sequence_for(req.host_ip, config)
+    perturbed_seq = baseline_seq.copy()
+    perturbed_seq[-1, idx] = perturbed_seq[-1, idx] * req.scale
+
+    baseline = engine.rollout(baseline_seq)
+    counterfactual = engine.rollout(perturbed_seq)
+
+    horizon = service.horizon_info(config)
+    baseline_probs = [round(float(p), 4) for p in baseline.infiltration_probs]
+    cf_probs = [round(float(p), 4) for p in counterfactual.infiltration_probs]
+    return {
+        "host_ip": req.host_ip,
+        "feature": req.feature,
+        "feature_label": WHAT_IF_FEATURE_LABELS.get(req.feature, req.feature),
+        "scale": req.scale,
+        **horizon,
+        "step_seconds": [(i + 1) * horizon["window_seconds"] for i in range(len(baseline_probs))],
+        "baseline_infiltration_probs": baseline_probs,
+        "counterfactual_infiltration_probs": cf_probs,
+        "probability_delta": [round(c - b, 4) for b, c in zip(baseline_probs, cf_probs)],
+        "baseline_predicted_stages": [_display(s) for s in baseline.stage_predictions],
+        "counterfactual_predicted_stages": [_display(s) for s in counterfactual.stage_predictions],
+        "caveat": (
+            "This shows what the trained model's own learned dynamics predict in response to a "
+            "perturbed input -- not a causal simulation of real network behaviour, and not a "
+            "guarantee of what would actually happen."
         ),
     }
 

@@ -25,6 +25,11 @@ export const forecastApi = {
     method: 'POST',
     body: JSON.stringify({ host_ip: hostIp, horizon }),
   }),
+  getWhatIfFeatures: () => apiFetch('/api/v1/forecast/what-if/features'),
+  whatIf: (hostIp, feature, scale) => apiFetch('/api/v1/forecast/what-if', {
+    method: 'POST',
+    body: JSON.stringify({ host_ip: hostIp, feature, scale }),
+  }),
 };
 
 export const explainApi = {
