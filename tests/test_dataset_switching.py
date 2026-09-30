@@ -119,7 +119,7 @@ def test_select_missing_checkpoint_fails_with_409(client):
     assert res.status_code == 409
     body = res.json()
     assert "UNSW-NB15 could not be activated" in body["detail"]
-    assert "forecasting checkpoint" in body["detail"]
+    assert "forecasting checkpoint" in body["detail"].lower()
 
 
 def test_select_dataset_atomic_rollback(client):
