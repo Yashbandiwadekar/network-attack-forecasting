@@ -317,7 +317,7 @@ more (see "Takeaways" at the end of this section for what still is).
 | Repo | Stars | Created | Why it stands out |
 |---|---|---|---|
 | **[ErenSnowh/Argus](https://github.com/ErenSnowh/Argus)** | 4 (most-starred of the field) | 2026-06-23 | "Autonomous... Multi-Agent SOC Co-Pilot powered by Temporal World Models, MITRE ATT&CK, **CAPEC, CVE/NVD**, and **Dual Statutory Reporting (CERT-In + NCIIPC)**." The only team found integrating specific vulnerability databases (CVE/NVD) and, notably, actual **Indian regulatory compliance reporting** (CERT-In, NCIIPC) — a genuinely different differentiation axis (regulatory/statutory framing) than this project's five differentiator features as they stood in September. Given the PS issuer is NTRO, this angle may resonate with judges. **Stale as of 2026-09-27**: this project now has both CVE/NVD enrichment (`models/cve_lookup.py`) and CERT-In-style reporting (`models/compliance.py`), so the gap is narrower than this row implies. Argus remains the most-starred entry (4) but has not been pushed to since 2026-09-08. |
-| **[raushankumarsah07](https://github.com/raushankumarsah07/aI-based-network-attack-forecasting-from-network-traffic-data)** | 0 | 2026-08-26 | GRU-based world model plus **counterfactual "what-if" rollout simulation** (this project independently built the same capability, see Feature #4) — AND **Solidity smart contracts on Ethereum for tamper-proof prediction auditing**. The blockchain-audit angle answers the PS's stated theme ("Blockchain & Cybersecurity"). **Partly stale as of 2026-09-27**: this project now ships a hash-chained tamper-evident ledger (`models/audit_ledger.py`) — blockchain's core primitive without a distributed ledger — so the remaining difference is on-chain verifiability, not tamper evidence as such. |
+| **[raushankumarsah07](https://github.com/raushankumarsah07/aI-based-network-attack-forecasting-from-network-traffic-data)** | 0 | 2026-08-26 | GRU-based world model plus **counterfactual "what-if" rollout simulation** (this project built the same capability on 2026-09-30, `POST /api/v1/forecast/what-if` in `app/server.py`, *after* and in response to this survey — not independently) — AND **Solidity smart contracts on Ethereum for tamper-proof prediction auditing**. The blockchain-audit angle answers the PS's stated theme ("Blockchain & Cybersecurity"). **Partly stale as of 2026-09-27**: this project now ships a hash-chained tamper-evident ledger (`models/audit_ledger.py`) — blockchain's core primitive without a distributed ledger — so the remaining difference is on-chain verifiability, not tamper evidence as such. |
 | **[ayushshandilya-dev/netsight](https://github.com/ayushshandilya-dev/netsight)** | 0 | 2026-09-06 | "Model-internal XAI, novelty callout, **SHA-256 audit ledger**. Runs 100% offline." Another tamper-evidence angle (hash-chained audit log rather than blockchain), combined with an explicit "novelty callout" signal — conceptually similar to this project's own reconstruction-error novelty metric. |
 | **[SuhithZ-dreambot/Precursor](https://github.com/SuhithZ-dreambot/Precursor)** | 0 | 2026-09-10 | Fuses a classical **EWMA/CUSUM statistical drift detector** with a GRU/LSTM sequence model, and reports an explicit **"lead-time" evaluation metric** — i.e., directly measures how many seconds/windows of advance warning the system provides, rather than only F1/precision/recall. This is a meaningfully different and arguably more PS-aligned evaluation methodology (the PS explicitly asks for forecasting *before* compromise, i.e., lead time is the point). **Addressed as of 2026-09-27**: this project now reports lead time with false-alarm accounting (`eval/metrics.py::lead_time_metrics`), which is what prompted the change. Precursor was last pushed 2026-09-23. |
 | **[raghuraj72/Vanguard-GWM](https://github.com/raghuraj72/Vanguard-GWM)** | 0 | 2026-08-27 | "**Generative Graph World Model**" — a GNN-based world model. This project explicitly chose Transformer over GNN in Round 1 for timeline/complexity reasons (documented in `01-architecture.md`); this is a live example of a competing team taking the GNN path instead. |
@@ -540,13 +540,44 @@ attack-volume forecasting study on the public Loghub OpenSSH server log corpus, 
   is a real distributed ledger rather than this project's single-writer hash chain. Repo is ~291 MB
   and was pushed 2026-09-28.
 
-  Measurement honesty is therefore **no longer an unmatched axis**. What remains distinctive here,
-  on the evidence read so far, is narrower and should be claimed narrowly: a leave-one-attack-family-
-  out evaluation, adversarial evasion testing with a stated threat model, and an audit trail that
-  retracted the project's own headline number. ShadowCat's disclosed negative is about its
-  *baseline's* fold failure, not its own model's generalisation; no repo read in this survey has
-  published a negative result about its own model's transfer. That is a real but much smaller gap
-  than this document previously claimed.
+  Measurement honesty is therefore **no longer an unmatched axis**.
+
+  **Second correction, 2026-09-30 (read at source).** The 09-29 version of this paragraph retreated
+  to a narrower claim — that ShadowCat's disclosed negative was about its *baseline*, and that no
+  repo had published a negative result about *its own model's* transfer. **That narrower claim is
+  also false.** Two counter-examples, both read at source:
+
+  1. **`muthukkumaranb/ShadowCat`** (`docs/competitive_edge_final_report.md`, pushed 2026-09-30)
+     ran a **37-fold Leave-One-Entity-Out** evaluation of its GraphSAGE fusion, found
+     **F1 0.0000 in 3 of 18 DDOS-LOIC-UDP folds** (macro 0.9157 against 0.9971 for the plain
+     stacked LSTM), diagnosed the cause as over-smoothing in dense bipartite attack subgraphs, and
+     issued an **unequivocal NO-GO retiring the architecture** in favour of decoupled graph
+     traversal. That is a negative result about their own model, with a root cause and a decision
+     attached. The same report also records that they **retired their own latency benchmark** for
+     timing an untrained model on `np.random.randn` inputs, replacing it with a real wall-clock
+     measurement (P50 1,630.87 ms).
+  2. **`shonaxx/sih-26153-cyberpulse`** states in its README's own summary that it *"is not a
+     demonstrated early-warning system"*, that its model *"matches a trivial 'persistence'
+     baseline"* with onset recall ≤0.5%, and that its published horizons *"t+1 to t+4 are the next
+     1 to 4 rows of the dataset... not seconds or minutes of future time"*. Its table shows its GRU
+     (F1 0.924–0.932) losing to logistic regression (0.940–0.944).
+
+  **A caveat that cuts the other way, and must travel with the ShadowCat figure.** Its 0.9971
+  macro-F1 spans only three attack categories, and the fold names
+  (`21-02-2018_DDOS-LOIC-UDP_17`) together with per-category reporting indicate folds withhold
+  *one episode while training on other episodes of the same attack type*. That is **not**
+  leave-one-attack-family-out: this project's LOFO withholds an entire family, so the model never
+  sees `lateral_movement` at all, which is why it scores 0.53–0.82 rather than 0.99. The two
+  numbers measure different difficulties and must not be compared directly. This reading is from
+  fold naming and reporting structure and was **not verified against their split code**.
+
+  **What remains distinctive, claimed narrowly:** leave-one-attack-*family*-out (not episode-out)
+  evaluation, adversarial evasion testing with a stated threat model, and an audit trail that
+  retracted this project's own headline number. To which this project has now added its own
+  negative result: the **frozen-state ablation** (`docs/04-evaluation-frozen-state-ablation.md`,
+  2026-09-30) shows the K-step rollout scoring *below* a frozen t+1 estimate at every horizon
+  (AUROC 0.755 vs 0.785 at t+60s), and reports the finding that the published headline is a t+1
+  measurement rather than a 60-second one.
 - **Stars are not activity**: `Argus`, still the most-starred entry at 4, has not been pushed to
   since 2026-09-08.
 - **Recurring differentiation axes across many teams**: (1) blockchain/hash-chain audit trails for
@@ -563,9 +594,12 @@ attack-volume forecasting study on the public Loghub OpenSSH server log corpus, 
   family-out evaluation, a lead-time metric with false-alarm accounting, label-oracle baselines
   named as oracles, a documented *and fixed* robustness bug, a documented and *unfixed* adversarial
   vulnerability with its threat model stated, and an independent audit trail (`docs/AUDIT.md`) that
-  retracts the project's own headline number when it failed to reproduce. No surveyed repo describes
-  adversarial testing, false-positive robustness work, or a negative result of its own. The
-  response-playbook/attack-narrative pairing also remains unobserved elsewhere.
+  retracts the project's own headline number when it failed to reproduce, and (2026-09-30) a
+  frozen-state ablation that found this project's own rollout does not improve on reusing its
+  first step. **Corrected 2026-09-30:** the claim that no surveyed repo publishes a negative
+  result of its own is withdrawn — see the ShadowCat and CyberPulse counter-examples above. What
+  is still unobserved elsewhere in this survey is **adversarial evasion testing with a stated
+  threat model** and the response-playbook/attack-narrative pairing.
 - **Two differentiators have been matched by others since the last survey**: the hash-chained audit
   ledger (ayushshandilya-dev/netsight describes a SHA-256 audit ledger; Radhika-coder46 and two
   earlier teams use blockchain for the same purpose) and the digital-twin/world-model framing
