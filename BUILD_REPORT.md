@@ -1010,3 +1010,35 @@ W13-W19.
 `configs/real_data_v2.yaml` is kept (LOFO needs it) but given a header explaining it no longer
 represents a standalone, reproducible v2 checkpoint result and pointing to
 `real_data_v2_converged.yaml` for that purpose.
+
+
+## W21 — Frozen-state rollout ablation (2026-09-30) — DONE, negative result
+
+Work order: `WORK_ORDER-2026-09-30.md`. Script: `scripts/ablate_frozen_state.py`.
+Report: `docs/04-evaluation-frozen-state-ablation.md`. Raw: `docs/frozen_state_ablation.json`.
+
+Acceptance asked for the conclusion "in whichever direction the numbers land". It landed negative.
+
+```
+  step   seconds           genuine AUROC            frozen AUROC     delta
+     1       10s      0.7937 +/- 0.0349       0.7937 +/- 0.0349    +0.0000
+     2       20s      0.7823 +/- 0.0443       0.7917 +/- 0.0360    -0.0094
+     3       30s      0.7725 +/- 0.0510       0.7894 +/- 0.0352    -0.0170
+     4       40s      0.7663 +/- 0.0545       0.7876 +/- 0.0358    -0.0213
+     5       50s      0.7602 +/- 0.0581       0.7868 +/- 0.0346    -0.0267
+     6       60s      0.7549 +/- 0.0608       0.7853 +/- 0.0335    -0.0303
+```
+
+- k=1 is identical by construction (sanity check passed) and reproduces the published headline
+  AUROC to the digit: 0.7937 here vs 0.794 in `docs/04-evaluation-real-v2-seeds.md`.
+- Advancing the world model's state makes infiltration ranking **worse**, monotonically with
+  horizon. AUPRC and F1@0.5 at k=6 agree (0.5714 vs 0.6214, 0.4121 vs 0.4735).
+- All 15 paired comparisons (3 seeds x k=2..6) are negative, but |t| ~ 1.56 at df=2 against the
+  4.303 needed. Reported as "no evidence the rollout adds value, consistent evidence of a small
+  penalty" -- not as proof of harm.
+- Side finding, arguably the more important one: **the published headline is a t+1 (10-second)
+  measurement.** `eval/lofo.py::_predict_infiltration` runs a single forward pass and scores
+  `infiltration[:, 0]`; the K-step rollout had never been evaluated. Any claim that F1 0.481 /
+  AUROC 0.794 describe a 60-second forecast is overstating them.
+
+Seeds 1/2/3 at k=6: genuine 0.7743 / 0.6728 / 0.8178 vs frozen 0.7930 / 0.7409 / 0.8218.
