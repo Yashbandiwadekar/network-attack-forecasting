@@ -199,10 +199,10 @@ const Dashboard = () => {
 
         <div className="gpf-content-area">
           {/* Top Bar Status & Dataset Context Switcher */}
-          <div className="dashboard-status-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', padding: '0.8rem 1.2rem', background: '#080808', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px' }}>
+          <div className="dashboard-status-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', padding: '0.8rem 1.2rem', background: 'var(--bg-panel)', border: '1px solid var(--line-10)', borderRadius: '6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
               <Database size={16} className="text-orange" />
-              <span className="font-mono" style={{ fontSize: '0.8rem', color: '#a0a0a0' }}>ACTIVE MODEL:</span>
+              <span className="font-mono" style={{ fontSize: '0.8rem', color: 'var(--text-2)' }}>ACTIVE MODEL:</span>
               {/* The server ships model checkpoints, not raw datasets (those are large and git-ignored),
                   so only models actually present here are offered. With a single model there is nothing
                   to switch, so it is shown as a plain label rather than a one-item dropdown. Analysis
@@ -212,7 +212,7 @@ const Dashboard = () => {
                   value={activeDataset}
                   onChange={handleDatasetChange}
                   disabled={datasetSwitching}
-                  style={{ background: '#121212', color: datasetSwitching ? '#666' : '#ff6a00', border: `1px solid ${datasetSwitching ? 'rgba(255,106,0,0.2)' : 'rgba(255,106,0,0.4)'}`, borderRadius: '4px', padding: '0.3rem 0.8rem', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', cursor: datasetSwitching ? 'wait' : 'pointer' }}
+                  style={{ background: 'var(--bg-input)', color: datasetSwitching ? '#666' : 'var(--c-orange)', border: `1px solid ${datasetSwitching ? 'rgba(255,106,0,0.2)' : 'rgba(255,106,0,0.4)'}`, borderRadius: '4px', padding: '0.3rem 0.8rem', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', cursor: datasetSwitching ? 'wait' : 'pointer' }}
                 >
                   {availableDatasets.map((d) => (
                     <option key={d.id} value={d.id}>{d.name}</option>
@@ -222,28 +222,28 @@ const Dashboard = () => {
                 <span
                   className="font-mono"
                   data-testid="active-model-label"
-                  style={{ fontSize: '0.8rem', color: '#ff6a00', border: '1px solid rgba(255,106,0,0.4)', borderRadius: '4px', padding: '0.3rem 0.8rem' }}
+                  style={{ fontSize: '0.8rem', color: 'var(--c-orange)', border: '1px solid rgba(255,106,0,0.4)', borderRadius: '4px', padding: '0.3rem 0.8rem' }}
                 >
                   {availableDatasets[0]?.name || activeDataset}
-                  <span style={{ color: '#888888' }}> · trained model loaded · upload a capture to analyse</span>
+                  <span style={{ color: 'var(--text-3)' }}> · trained model loaded · upload a capture to analyse</span>
                 </span>
               )}
               {/* BUG-006: spinner while switching datasets */}
               {datasetSwitching && (
-                <span style={{ fontSize: '0.75rem', color: '#f59e0b', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--c-amber-3)', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <RefreshCw size={12} className="spin" /> Switching dataset…
                 </span>
               )}
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: '#888888' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-3)' }}>
               <span>
                 STATUS: <strong className="text-good">● LIVE POLLING</strong>
               </span>
               <span>
                 LAST UPDATED: <strong className="text-white">{lastUpdated || 'Initialing...'}</strong>
               </span>
-              <button onClick={fetchInitialData} style={{ background: 'transparent', border: 'none', color: '#a0a0a0', cursor: 'pointer' }} title="Force Refresh Data">
+              <button onClick={fetchInitialData} style={{ background: 'transparent', border: 'none', color: 'var(--text-2)', cursor: 'pointer' }} title="Force Refresh Data">
                 <RefreshCw size={14} className={isRefreshing ? 'spin' : ''} />
               </button>
             </div>
@@ -273,7 +273,7 @@ const Dashboard = () => {
                   <span>{evalMetrics ? `${evalMetrics.n_seeds} SEEDS · ${evalMetrics.split?.toUpperCase()}` : 'AWAITING API'}</span>
                 </div>
                 {!evalMetrics ? (
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: '#888888', padding: '0.5rem 0' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--text-3)', padding: '0.5rem 0' }}>
                     Measured results unavailable — the backend API is not reachable.
                   </div>
                 ) : (
@@ -281,50 +281,52 @@ const Dashboard = () => {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', fontFamily: 'var(--font-mono)' }}>
                       {[
                         { label: 'AUROC', stat: evalMetrics.auroc, color: 'var(--color-accent-amber)', note: 'Ranking quality' },
-                        { label: 'AUPRC', stat: evalMetrics.auprc, color: '#0ca30c', note: 'Precision-recall area' },
+                        { label: 'AUPRC', stat: evalMetrics.auprc, color: 'var(--c-green)', note: 'Precision-recall area' },
                         { label: 'PRECISION @ 0.5', stat: evalMetrics['precision_at_0.5'], color: 'var(--color-accent-orange)', note: 'Of what it flags' },
                         { label: 'RECALL @ 0.5', stat: evalMetrics['recall_at_0.5'], color: 'var(--color-accent-red)', note: 'Of attacks caught' },
-                        { label: 'F1 @ 0.5', stat: evalMetrics['f1_at_0.5'], color: '#ff6a00', note: 'Harmonic mean' },
+                        { label: 'F1 @ 0.5', stat: evalMetrics['f1_at_0.5'], color: 'var(--c-orange)', note: 'Harmonic mean' },
                       ].map(({ label, stat, color, note }) => (
-                        <div key={label} style={{ background: '#0a0a0a', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
-                          <span style={{ fontSize: '0.7rem', color: '#888888', display: 'block' }}>{label}</span>
+                        <div key={label} style={{ background: 'var(--bg-panel-2)', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-3)', display: 'block' }}>{label}</span>
                           <strong style={{ fontSize: '1.25rem', color, display: 'block', marginTop: '0.2rem' }}>
                             {stat ? `${stat.mean.toFixed(3)} ± ${stat.sd.toFixed(3)}` : '—'}
                           </strong>
-                          <span style={{ fontSize: '0.65rem', color: '#888888' }}>{note}</span>
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-3)' }}>{note}</span>
                         </div>
                       ))}
                     </div>
-                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: '#888888', marginTop: '0.9rem', lineHeight: 1.6 }}>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--text-3)', marginTop: '0.9rem', lineHeight: 1.6 }}>
                       {evalMetrics.n_test_sequences?.toLocaleString()} test sequences
                       ({evalMetrics.n_test_positive?.toLocaleString()} positive),
                       mean ± SD over {evalMetrics.n_seeds} independent training runs.
                       Source: {evalMetrics.source}
                       {evalMetrics.note && (
-                        <div style={{ marginTop: '0.4rem', color: '#a0a0a0' }}>{evalMetrics.note}</div>
+                        <div style={{ marginTop: '0.4rem', color: 'var(--text-2)' }}>{evalMetrics.note}</div>
                       )}
                     </div>
                     {evalMetrics.generalisation_lofo && (
-                      <div style={{ marginTop: '1rem' }}>
-                        <div className="panel-header-mono" style={{ marginBottom: '0.6rem' }}>
+                      <div style={{ marginTop: '1.2rem' }}>
+                        <div className="panel-header-mono" style={{ marginBottom: '0.8rem', fontSize: '0.92rem', color: 'var(--text-1-dim)' }}>
                           <span>GENERALISATION TO UNSEEN ATTACK FAMILIES</span>
-                          <span>LEAVE-ONE-FAMILY-OUT</span>
+                          <span style={{ color: 'var(--text-2-hi)' }}>LEAVE-ONE-FAMILY-OUT</span>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.6rem', fontFamily: 'var(--font-mono)', fontSize: '0.72rem' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.8rem', fontFamily: 'var(--font-mono)' }}>
                           {Object.entries(evalMetrics.generalisation_lofo).map(([family, v]) => (
-                            <div key={family} style={{ background: '#080808', padding: '0.7rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' }}>
-                              <span style={{ color: '#888888', display: 'block' }}>{family.replace(/_/g, ' ').toUpperCase()}</span>
-                              <strong style={{ color: v.distinguishable_from_chance ? '#0ca30c' : '#888888' }}>
+                            <div key={family} style={{ background: 'var(--bg-input)', padding: '0.95rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--line-15)' }}>
+                              <span style={{ color: 'var(--text-2-hi)', display: 'block', fontSize: '0.85rem', letterSpacing: '0.04em', marginBottom: '0.35rem' }}>
+                                {family.replace(/_/g, ' ').toUpperCase()}
+                              </span>
+                              <strong style={{ display: 'block', fontSize: '1.15rem', color: v.distinguishable_from_chance ? 'var(--c-green)' : 'var(--text-1)', marginBottom: '0.3rem' }}>
                                 AUROC {v.auroc_mean.toFixed(3)} ± {v.auroc_sd.toFixed(3)}
                               </strong>
-                              <span style={{ display: 'block', color: '#888888' }}>
+                              <span style={{ display: 'block', fontSize: '0.85rem', color: v.distinguishable_from_chance ? 'var(--c-green)' : 'var(--text-2-hi)' }}>
                                 {v.distinguishable_from_chance ? 'above chance' : 'not distinguishable from chance'}
                               </span>
                             </div>
                           ))}
                         </div>
                         {evalMetrics.generalisation_note && (
-                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: '#888888', marginTop: '0.6rem', lineHeight: 1.6 }}>
+                          <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.82rem', color: 'var(--text-2-hi)', marginTop: '0.8rem', lineHeight: 1.65 }}>
                             {evalMetrics.generalisation_note}
                           </div>
                         )}
@@ -361,7 +363,7 @@ const Dashboard = () => {
                         >
                           <td style={{ fontWeight: 600 }}>{h.host_ip}</td>
                           <td>{h.flow_count?.toLocaleString() || 0}</td>
-                          <td style={{ color: (h.peak_prob || 0) > 0.7 ? '#c83b32' : '#ff6a00' }}>
+                          <td style={{ color: (h.peak_prob || 0) > 0.7 ? 'var(--c-red)' : 'var(--c-orange)' }}>
                             {((h.peak_prob || 0) * 100).toFixed(1)}%
                           </td>
                           <td>{h.current_stage || 'ANALYZING'}</td>
@@ -374,12 +376,12 @@ const Dashboard = () => {
                     </tbody>
                   </table>
                 ) : (
-                  <div style={{ padding: '2.5rem 1rem', textAnchor: 'middle', textAlign: 'center', background: '#0a0a0a', border: '1px stroke rgba(255,255,255,0.05)', borderRadius: '6px' }}>
-                    <Activity size={36} style={{ color: '#ff7b00', marginBottom: '0.8rem', opacity: 0.8 }} />
-                    <h3 style={{ color: '#f5f5f5', fontSize: '1rem', fontWeight: 600, marginBottom: '0.4rem' }}>
+                  <div style={{ padding: '2.5rem 1rem', textAnchor: 'middle', textAlign: 'center', background: 'var(--bg-panel-2)', border: '1px stroke var(--line-05)', borderRadius: '6px' }}>
+                    <Activity size={36} style={{ color: 'var(--c-orange-2)', marginBottom: '0.8rem', opacity: 0.8 }} />
+                    <h3 style={{ color: 'var(--text-1)', fontSize: '1rem', fontWeight: 600, marginBottom: '0.4rem' }}>
                       No active network capture loaded
                     </h3>
-                    <p style={{ color: '#888888', fontSize: '0.82rem', fontFamily: 'var(--font-mono)' }}>
+                    <p style={{ color: 'var(--text-3)', fontSize: '0.82rem', fontFamily: 'var(--font-mono)' }}>
                       Upload a PCAP, PCAPNG, or CSV capture file in <strong>INGESTION & FLOWS</strong> to populate endpoints and trigger real-time sequence forecasting.
                     </p>
                   </div>
@@ -434,14 +436,14 @@ const Dashboard = () => {
                 
                 <label className="upload-dropzone">
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', pointerEvents: 'none' }}>
-                    <UploadCloud size={44} style={{ color: '#ff6a00', marginBottom: '1rem' }} />
-                    <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: '#f5f5f5', marginBottom: '0.5rem', textAlign: 'center' }}>
+                    <UploadCloud size={44} style={{ color: 'var(--c-orange)', marginBottom: '1rem' }} />
+                    <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: 'var(--text-1)', marginBottom: '0.5rem', textAlign: 'center' }}>
                       Upload PCAP, PCAPNG, or Flow CSV File
                     </h3>
-                    <p style={{ color: '#888888', fontSize: '0.85rem', textAlign: 'center', maxWidth: '500px' }}>
+                    <p style={{ color: 'var(--text-3)', fontSize: '0.85rem', textAlign: 'center', maxWidth: '500px' }}>
                       Drag &amp; drop network captures or click to select file. Supported: .pcap, .pcapng, .csv
                     </p>
-                    <p style={{ color: '#888888', fontSize: '0.78rem', textAlign: 'center', maxWidth: '520px', marginTop: '0.5rem', fontFamily: 'var(--font-mono)' }}>
+                    <p style={{ color: 'var(--text-3)', fontSize: '0.78rem', textAlign: 'center', maxWidth: '520px', marginTop: '0.5rem', fontFamily: 'var(--font-mono)' }}>
                       Needs at least 2 minutes of traffic from the same source IP (12 consecutive
                       10s windows). CSVs must use the CICFlowMeter schema.
                     </p>
@@ -450,7 +452,7 @@ const Dashboard = () => {
                 </label>
 
                 {uploadStatus && (
-                  <div className={`upload-status-box ${uploadStatus.state}`} style={{ marginTop: '1.2rem', padding: '1rem', background: '#121212', borderRadius: '6px' }}>
+                  <div className={`upload-status-box ${uploadStatus.state}`} style={{ marginTop: '1.2rem', padding: '1rem', background: 'var(--bg-input)', borderRadius: '6px' }}>
                     {uploadStatus.state === 'success' ? <CheckCircle className="text-good" size={20} /> : <AlertTriangle className="text-orange" size={20} />}
                     <span style={{ marginLeft: '0.8rem', fontFamily: 'var(--font-mono)', fontSize: '0.85rem' }}>
                       {uploadStatus.message}
@@ -502,7 +504,7 @@ const Dashboard = () => {
                           <div className="step-prob">{(prob * 100).toFixed(1)}%</div>
                           <div className="step-stage">{forecastData.predicted_stages?.[idx] || 'STAGE'}</div>
                           {isHeuristicStep && (
-                            <div style={{ fontSize: '0.65rem', color: '#ffaa00', marginTop: '0.3rem', fontFamily: 'var(--font-mono)' }}>
+                            <div style={{ fontSize: '0.65rem', color: 'var(--c-amber-2)', marginTop: '0.3rem', fontFamily: 'var(--font-mono)' }}>
                               ⚠️ HEURISTIC RULE
                             </div>
                           )}
@@ -552,20 +554,20 @@ const Dashboard = () => {
                   return (
                     <div className="attribution-list">
                       {!hasSignal && (
-                        <div className="font-mono" style={{ fontSize: '0.75rem', color: '#a0a0a0', marginBottom: '0.8rem' }}>
+                        <div className="font-mono" style={{ fontSize: '0.75rem', color: 'var(--text-2)', marginBottom: '0.8rem' }}>
                           No measurable attribution for this host.
                         </div>
                       )}
                       {hasSignal && (
-                        <div className="font-mono" style={{ fontSize: '0.68rem', color: '#888888', marginBottom: '0.8rem' }}>
-                          Share of the explanation per feature. <span style={{ color: '#ff6a00' }}>Orange</span> pushes the
-                          infiltration score up, <span style={{ color: '#33c9ff' }}>blue</span> pushes it down.
+                        <div className="font-mono" style={{ fontSize: '0.68rem', color: 'var(--text-3)', marginBottom: '0.8rem' }}>
+                          Share of the explanation per feature. <span style={{ color: 'var(--c-orange)' }}>Orange</span> pushes the
+                          infiltration score up, <span style={{ color: 'var(--c-cyan)' }}>blue</span> pushes it down.
                         </div>
                       )}
                       {attrs.map((attr, idx) => {
                         const share = shareOf(attr);
                         const dir = dirOf(attr);
-                        const color = dir === 'lowers' ? '#33c9ff' : '#ff6a00';
+                        const color = dir === 'lowers' ? 'var(--c-cyan)' : 'var(--c-orange)';
                         return (
                           <div key={idx} className="attr-item">
                             <div className="attr-header">
@@ -598,15 +600,15 @@ const Dashboard = () => {
                     data-testid="provenance-callout"
                     style={{ marginTop: '1.2rem', padding: '0.8rem 1rem', border: '1px solid rgba(250,178,25,0.5)', borderLeft: '3px solid #fab219', background: 'rgba(250,178,25,0.07)', borderRadius: '4px' }}
                   >
-                    <div className="font-mono" style={{ fontSize: '0.72rem', letterSpacing: '0.04em', color: '#fab219', marginBottom: '0.4rem' }}>
+                    <div className="font-mono" style={{ fontSize: '0.72rem', letterSpacing: '0.04em', color: 'var(--c-amber)', marginBottom: '0.4rem' }}>
                       DATASET ARTEFACT — NOT ATTACK EVIDENCE ({(attributionData.provenance_share_total * 100).toFixed(1)}% OF THIS EXPLANATION)
                     </div>
                     {attributionData.provenance_attributions.filter((a) => a.share >= 0.005).map((a) => (
-                      <div key={a.feature} className="font-mono" style={{ fontSize: '0.75rem', color: '#e0e0e0', marginBottom: '0.3rem' }}>
+                      <div key={a.feature} className="font-mono" style={{ fontSize: '0.75rem', color: 'var(--text-1-dim)', marginBottom: '0.3rem' }}>
                         {a.feature}: {a.direction === 'lowers' ? '−' : '+'}{(a.share * 100).toFixed(1)}%
                       </div>
                     ))}
-                    <div style={{ fontSize: '0.72rem', color: '#a0a0a0', lineHeight: 1.5, marginTop: '0.3rem' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-2)', lineHeight: 1.5, marginTop: '0.3rem' }}>
                       {attributionData.provenance_attributions[0].note}
                     </div>
                   </div>
@@ -619,37 +621,37 @@ const Dashboard = () => {
                     <span>AUTOMATED ATTACK NARRATIVE & CVE THREAT INTEL</span>
                     <span>NVD CVE & CAPEC SNAPSHOT</span>
                   </div>
-                  <p style={{ color: '#a0a0a0', lineHeight: '1.6', marginBottom: '1.2rem' }}>
+                  <p style={{ color: 'var(--text-2)', lineHeight: '1.6', marginBottom: '1.2rem' }}>
                     {narrativeData.narrative}
                   </p>
 
                   {narrativeData.cve_details && (
                     <div className="cve-snapshot-list" style={{ marginBottom: '1.2rem' }}>
-                      <strong style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: '#888888', marginBottom: '0.6rem' }}>
+                      <strong style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-3)', marginBottom: '0.6rem' }}>
                         HISTORICAL EXPLOITED CVES (NVD SNAPSHOT):
                       </strong>
                       {narrativeData.cve_details.map((cve, i) => (
-                        <div key={i} style={{ background: '#121212', border: '1px solid rgba(255,255,255,0.08)', padding: '0.8rem', borderRadius: '4px', marginBottom: '0.5rem', fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}>
-                          <span style={{ color: '#ff6a00', fontWeight: 600 }}>{cve.cve_id}</span> - {cve.description}
+                        <div key={i} style={{ background: 'var(--bg-input)', border: '1px solid var(--line-08)', padding: '0.8rem', borderRadius: '4px', marginBottom: '0.5rem', fontFamily: 'var(--font-mono)', fontSize: '0.78rem' }}>
+                          <span style={{ color: 'var(--c-orange)', fontWeight: 600 }}>{cve.cve_id}</span> - {cve.description}
                         </div>
                       ))}
                     </div>
                   )}
 
                   <div style={{ background: 'rgba(200, 59, 50, 0.1)', border: '1px solid #c83b32', padding: '1rem', borderRadius: '6px' }}>
-                    <strong style={{ color: '#c83b32', display: 'block', marginBottom: '0.4rem', fontFamily: 'var(--font-mono)' }}>
+                    <strong style={{ color: 'var(--c-red)', display: 'block', marginBottom: '0.4rem', fontFamily: 'var(--font-mono)' }}>
                       RECOMMENDED ACTION: {narrativeData.recommended_action?.title}
                     </strong>
-                    <span style={{ fontSize: '0.85rem', color: '#f5f5f5' }}>
+                    <span style={{ fontSize: '0.85rem', color: 'var(--text-1)' }}>
                       {narrativeData.recommended_action?.action}
                     </span>
 
                     {isolationResult ? (
                       <div style={{ marginTop: '0.8rem', padding: '0.6rem 0.8rem', border: '1px solid #33c9ff', borderRadius: '4px', background: 'rgba(51,201,255,0.08)' }}>
-                        <strong style={{ color: '#33c9ff', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em' }}>
+                        <strong style={{ color: 'var(--c-cyan)', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em' }}>
                           ISOLATED (SIMULATED)
                         </strong>
-                        <div style={{ fontSize: '0.72rem', color: '#a0d8ea', marginTop: '0.3rem' }}>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-2)', marginTop: '0.3rem' }}>
                           {isolationResult.note}
                         </div>
                       </div>
@@ -661,7 +663,7 @@ const Dashboard = () => {
                         style={{
                           marginTop: '0.8rem', fontFamily: 'var(--font-mono)', fontSize: '0.7rem',
                           letterSpacing: '0.04em', padding: '0.4rem 0.8rem', borderRadius: '4px',
-                          border: '1px solid #33c9ff', background: 'transparent', color: '#33c9ff',
+                          border: '1px solid #33c9ff', background: 'transparent', color: 'var(--c-cyan)',
                           cursor: isolationLoading || !selectedHostIp ? 'not-allowed' : 'pointer',
                           opacity: isolationLoading || !selectedHostIp ? 0.5 : 1,
                         }}

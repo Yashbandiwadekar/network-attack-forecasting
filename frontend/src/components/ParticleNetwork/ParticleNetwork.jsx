@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useRef, useMemo, useEffect, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
@@ -36,7 +37,7 @@ function CameraController({ resetTrigger }) {
   );
 }
 
-const NetworkField = ({ particleCount, controlsConfig, isPaused, mode, clickPulse, formationIndex }) => {
+const NetworkField = ({ particleCount, controlsConfig, isPaused, mode, clickPulse, formationIndex, isLight = false }) => {
   const meshRef = useRef();
   const linesRef = useRef();
 
@@ -237,8 +238,8 @@ const NetworkField = ({ particleCount, controlsConfig, isPaused, mode, clickPuls
         <lineBasicMaterial
           vertexColors={true}
           transparent={true}
-          opacity={0.75}
-          blending={THREE.AdditiveBlending}
+          opacity={isLight ? 0.38 : 0.75}
+          blending={isLight ? THREE.NormalBlending : THREE.AdditiveBlending}
           depthWrite={false}
         />
       </lineSegments>
@@ -247,6 +248,11 @@ const NetworkField = ({ particleCount, controlsConfig, isPaused, mode, clickPuls
 };
 
 const ParticleNetwork = ({ controlsConfig, isPaused, mode, resetTrigger, onCanvasClick, clickPulse, formationIndex = 0 }) => {
+  // Read the theme here, not inside <Canvas>: R3F renders in its own reconciler, so React context does
+  // not cross the Canvas boundary and the scene has to be handed the value as a prop.
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
+  const canvasBg = isLight ? '#f3f4f6' : '#000000';
   const [particleCount, setParticleCount] = useState(() => getAdaptiveParticleCount());
 
   useEffect(() => {
@@ -268,8 +274,8 @@ const ParticleNetwork = ({ controlsConfig, isPaused, mode, resetTrigger, onCanva
         gl={{ alpha: false, antialias: true, powerPreference: "high-performance" }}
         dpr={[1, 2]}
       >
-        <color attach="background" args={['#000000']} />
-        <fog attach="fog" args={['#000000', 30, 95]} />
+        <color attach="background" args={[canvasBg]} />
+        <fog attach="fog" args={[canvasBg, 30, 95]} />
 
         <NetworkField
           particleCount={particleCount}
@@ -278,6 +284,7 @@ const ParticleNetwork = ({ controlsConfig, isPaused, mode, resetTrigger, onCanva
           mode={mode}
           clickPulse={clickPulse}
           formationIndex={formationIndex}
+          isLight={isLight}
         />
 
         <CameraController resetTrigger={resetTrigger} />

@@ -18,7 +18,7 @@ html, body, #root {
   min-height: 100vh;
   margin: 0;
   padding: 0;
-  background-color: #000000;
+  background-color: var(--bg-void);
   box-sizing: border-box;
 }
 
@@ -29,7 +29,7 @@ html, body, #root {
 }
 
 body {
-  background-color: #000000;
+  background-color: var(--bg-void);
   color: var(--color-text-main);
   font-family: var(--font-main);
   -webkit-font-smoothing: antialiased;

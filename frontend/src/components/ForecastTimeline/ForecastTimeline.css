@@ -2,8 +2,8 @@
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   gap: 1.5rem;
-  background: #0a0a0a;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--line-12);
   border-radius: 8px;
   padding: 1.8rem;
   max-width: 1100px;
@@ -20,15 +20,15 @@
   font-family: var(--font-mono);
   font-size: 0.75rem;
   font-weight: 600;
-  color: #888888;
+  color: var(--text-3);
   letter-spacing: 0.08em;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--line-08);
   padding-bottom: 0.5rem;
 }
 
 .timeline-card {
-  background: #121212;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-input);
+  border: 1px solid var(--line-10);
   border-radius: 6px;
   padding: 1rem;
 }
@@ -55,14 +55,14 @@
   font-family: var(--font-mono);
   font-size: 0.88rem;
   font-weight: 600;
-  color: #f5f5f5;
+  color: var(--text-1);
 }
 
 .badge-observed {
   font-family: var(--font-mono);
   font-size: 0.65rem;
-  color: #a0a0a0;
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-2);
+  background: var(--ov-08);
   padding: 0.15rem 0.4rem;
   border-radius: 3px;
 }
@@ -75,13 +75,13 @@
 }
 
 .badge-risk.critical {
-  color: #c83b32;
+  color: var(--c-red);
   background: rgba(200, 59, 50, 0.15);
   border: 1px solid rgba(200, 59, 50, 0.3);
 }
 
 .badge-risk.high {
-  color: #ff6a00;
+  color: var(--c-orange);
   background: rgba(255, 106, 0, 0.15);
   border: 1px solid rgba(255, 106, 0, 0.3);
 }
@@ -89,7 +89,7 @@
 .card-desc {
   font-family: var(--font-main);
   font-size: 0.8rem;
-  color: #a0a0a0;
+  color: var(--text-2);
   margin: 0;
 }
 
@@ -97,11 +97,11 @@
   margin-top: 0.6rem;
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  color: #888888;
+  color: var(--text-3);
 }
 
 .card-meta .val {
-  color: #ffb000;
+  color: var(--c-amber);
 }
 
 .horizon-divider {
@@ -123,7 +123,7 @@
   transform: rotate(180deg);
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  color: #ffb000;
+  color: var(--c-amber);
   letter-spacing: 0.1em;
   padding: 0.5rem 0;
 }

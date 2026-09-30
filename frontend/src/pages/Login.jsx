@@ -1,3 +1,4 @@
+import ThemeToggle from '../components/ThemeToggle/ThemeToggle';
 import React, { useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, X } from 'lucide-react';
@@ -64,10 +65,12 @@ const Login = () => {
 
   return (
     <div className="login-page">
-      <Suspense fallback={<div className="particle-container" style={{ background: '#000000' }} />}>
+      <Suspense fallback={<div className="particle-container" style={{ background: 'var(--bg-void)' }} />}>
         <ParticleNetwork controlsConfig={loginParticleConfig} isPaused={false} visualTheme={theme} />
       </Suspense>
       
+      <div className="login-theme-toggle"><ThemeToggle /></div>
+
       <button className="login-back-btn" onClick={() => navigate('/')}>
         <ArrowLeft size={16} />
         <span>Back to Landing Page</span>

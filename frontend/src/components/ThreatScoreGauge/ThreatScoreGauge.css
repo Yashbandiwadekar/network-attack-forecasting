@@ -1,6 +1,6 @@
 .threat-gauge-panel {
-  background: #0a0a0a;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--line-12);
   border-radius: 8px;
   padding: 1.5rem;
   max-width: 550px;
@@ -11,7 +11,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--line-08);
   padding-bottom: 0.8rem;
   margin-bottom: 1.2rem;
 }
@@ -20,7 +20,7 @@
   font-family: var(--font-mono);
   font-size: 0.75rem;
   font-weight: 600;
-  color: #888888;
+  color: var(--text-3);
   letter-spacing: 0.08em;
 }
 
@@ -28,7 +28,7 @@
   font-family: var(--font-mono);
   font-size: 0.65rem;
   font-weight: 600;
-  color: #c83b32;
+  color: var(--c-red);
   background: rgba(200, 59, 50, 0.15);
   border: 1px solid rgba(200, 59, 50, 0.3);
   padding: 0.2rem 0.5rem;
@@ -45,7 +45,7 @@
 .gauge-metric-box {
   display: flex;
   align-items: baseline;
-  background: #121212;
+  background: var(--bg-input);
   border: 1px solid rgba(200, 59, 50, 0.4);
   padding: 1rem 1.4rem;
   border-radius: 6px;
@@ -55,13 +55,13 @@
   font-family: var(--font-mono);
   font-size: 2.4rem;
   font-weight: 700;
-  color: #c83b32;
+  color: var(--c-red);
 }
 
 .gauge-scale {
   font-family: var(--font-mono);
   font-size: 0.8rem;
-  color: #888888;
+  color: var(--text-3);
   margin-left: 0.4rem;
 }
 
@@ -80,20 +80,20 @@
 }
 
 .detail-label {
-  color: #888888;
+  color: var(--text-3);
 }
 
 .detail-val {
   font-weight: 600;
 }
 
-.detail-val.text-red { color: #c83b32; }
-.detail-val.text-amber { color: #ffb000; }
-.detail-val.text-orange { color: #ff6a00; }
+.detail-val.text-red { color: var(--c-red); }
+.detail-val.text-amber { color: var(--c-amber); }
+.detail-val.text-orange { color: var(--c-orange); }
 
 .gauge-evidence-box {
-  background: #121212;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-input);
+  border: 1px solid var(--line-08);
   padding: 1rem;
   border-radius: 6px;
 }
@@ -102,7 +102,7 @@
   display: block;
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  color: #888888;
+  color: var(--text-3);
   letter-spacing: 0.08em;
   margin-bottom: 0.5rem;
 }
@@ -112,7 +112,7 @@
   padding-left: 1.2rem;
   font-family: var(--font-main);
   font-size: 0.8rem;
-  color: #a0a0a0;
+  color: var(--text-2);
 }
 
 .evidence-list li {

@@ -9,7 +9,7 @@
 .what-if-title {
   font-size: 0.66rem;
   letter-spacing: 0.06em;
-  color: #33c9ff;
+  color: var(--c-cyan);
   margin-bottom: 0.5rem;
 }
 
@@ -21,9 +21,9 @@
 }
 
 .what-if-select {
-  background: #0d0d0d;
-  color: #e0e0e0;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--bg-panel-3);
+  color: var(--text-1-dim);
+  border: 1px solid var(--line-15);
   border-radius: 3px;
   padding: 0.3rem 0.5rem;
   font-size: 0.7rem;
@@ -34,7 +34,7 @@
   align-items: center;
   gap: 0.4rem;
   font-size: 0.66rem;
-  color: #999999;
+  color: var(--text-3-hi);
 }
 
 .what-if-run,
@@ -46,7 +46,7 @@
   cursor: pointer;
   border: 1px solid rgba(51, 201, 255, 0.4);
   background: transparent;
-  color: #33c9ff;
+  color: var(--c-cyan);
 }
 
 .what-if-run:disabled,
@@ -57,11 +57,11 @@
 
 .what-if-clear {
   border-color: rgba(255, 255, 255, 0.15);
-  color: #999999;
+  color: var(--text-3-hi);
 }
 
 .what-if-error {
   margin-top: 0.4rem;
   font-size: 0.66rem;
-  color: #e53935;
+  color: var(--c-red-2);
 }

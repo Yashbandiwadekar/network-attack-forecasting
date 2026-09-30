@@ -8,8 +8,8 @@
 .dataset-table {
   width: 100%;
   border-collapse: collapse;
-  background: #0a0a0a;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--line-12);
   border-radius: 8px;
   font-family: var(--font-main);
   text-align: left;
@@ -19,18 +19,18 @@
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 600;
-  color: #888888;
+  color: var(--text-3);
   letter-spacing: 0.08em;
   padding: 1rem 1.2rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid var(--line-10);
+  background: var(--ov-02);
 }
 
 .dataset-table td {
   padding: 1rem 1.2rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--line-06);
   font-size: 0.88rem;
-  color: #a0a0a0;
+  color: var(--text-2);
 }
 
 .dataset-table tr:last-child td {
@@ -40,18 +40,18 @@
 .dataset-name {
   font-family: var(--font-mono);
   font-weight: 600;
-  color: #ff6a00 !important;
+  color: var(--c-orange) !important;
 }
 
 .dataset-mono {
   font-family: var(--font-mono);
-  color: #f5f5f5 !important;
+  color: var(--text-1) !important;
 }
 
 .badge-role {
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  color: #ffb000;
+  color: var(--c-amber);
   background: rgba(255, 176, 0, 0.1);
   border: 1px solid rgba(255, 176, 0, 0.25);
   padding: 0.2rem 0.5rem;
@@ -67,9 +67,9 @@
 }
 
 .badge-role-withdrawn {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--ov-05);
   border-color: var(--color-border);
-  color: #888888;
+  color: var(--text-3);
   text-decoration: line-through;
 }
 
@@ -82,6 +82,6 @@
   font-size: 0.62rem;
   font-weight: 400;
   line-height: 1.5;
-  color: #888888;
+  color: var(--text-3);
   white-space: normal;
 }

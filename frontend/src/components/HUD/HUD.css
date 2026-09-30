@@ -3,14 +3,14 @@
   top: 90px;
   left: 2rem;
   z-index: 10;
-  background: rgba(10, 10, 10, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--glass-3);
+  border: 1px solid var(--line-12);
   border-radius: 8px;
   padding: 1.1rem 1.3rem;
   max-width: 290px;
   backdrop-filter: blur(12px);
   pointer-events: auto;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 4px 20px var(--shadow-60);
 }
 
 .hud-header {
@@ -25,20 +25,20 @@
   font-weight: 700;
   font-size: 0.9rem;
   letter-spacing: 0.08em;
-  color: #ff6a00;
+  color: var(--c-orange);
 }
 
 .hud-sub {
   font-family: var(--font-mono);
   font-size: 0.72rem;
-  color: #a0a0a0;
+  color: var(--text-2);
   letter-spacing: 0.05em;
 }
 
 .hud-instructions {
   font-family: var(--font-main);
   font-size: 0.78rem;
-  color: #888888;
+  color: var(--text-3);
   line-height: 1.45;
   margin: 0;
 }

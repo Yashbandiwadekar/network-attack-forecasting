@@ -4,7 +4,7 @@ import Navbar from '../components/Navbar/Navbar';
 
 const LandingLayout = () => {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: '#000000' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: 'var(--bg-void)' }}>
       <Navbar />
       <main style={{ flex: 1, position: 'relative' }}>
         <Outlet />

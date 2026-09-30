@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { ShieldAlert } from 'lucide-react';
+import ThemeToggle from '../ThemeToggle/ThemeToggle';
 import './Navbar.css';
 
 const Navbar = () => {
@@ -87,6 +88,7 @@ const Navbar = () => {
         </div>
 
         <div className="nav-actions">
+          <ThemeToggle />
           {!isAuthenticated ? (
             <button className="btn-ghost" onClick={() => navigate('/login')}>
               Login
