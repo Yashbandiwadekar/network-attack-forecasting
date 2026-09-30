@@ -1,9 +1,10 @@
 # AI-Based Network Attack Forecasting
 
-A world-model AI system that learns network traffic dynamics from flow and packet telemetry,
-forecasts attacker progression K steps ahead, maps predicted behaviour to MITRE ATT&CK stages,
-and explains every prediction — built for SIH problem statement 26153 (full text in
-`docs/problem-statement.md`, project framing in `docs/00-project-overview.md`).
+A world-model AI system — a digital twin of network behaviour — that learns network traffic
+dynamics from flow and packet telemetry, forecasts attacker progression K steps ahead, maps
+predicted behaviour to MITRE ATT&CK stages, and explains every prediction — built for SIH problem
+statement 26153 (full text in `docs/problem-statement.md`, project framing in
+`docs/00-project-overview.md`).
 
 Rather than classifying each flow in isolation (the traditional approach the problem statement
 explicitly wants moved beyond), the core model learns `P(S_t+1 | S_t-L..S_t)` over windowed
@@ -46,6 +47,21 @@ always the cause -- allow inbound TCP on the port.
 The dashboard starts with no hosts: upload a PCAP/PCAPNG or a CICFlowMeter CSV from the UI (or
 `curl -F "file=@data/raw/flows/synthetic_sample.csv" http://127.0.0.1:8000/api/v1/analysis/upload`)
 and it parses the capture, scores every host and forecasts 60 seconds ahead.
+
+**Two constraints worth knowing before you capture something yourself**, because either one
+produces an upload that succeeds and then shows no hosts:
+
+- **At least 2 minutes of traffic from the same source IP.** A host is scored only once it has
+  12 consecutive 10-second windows (`sequence_length` x `window_seconds`). A 30-second Wireshark
+  capture parses fine and scores nothing; the response says so (`"status": "partial"`).
+- **CSVs must use the CICFlowMeter schema.** The required fields are `dst_port`, `protocol`,
+  `timestamp`, `duration_us`, `fwd_pkts`, `bwd_pkts`, `fwd_bytes`, `bwd_bytes`, `syn_cnt`,
+  `ack_cnt`, `fin_cnt`, `rst_cnt`, `psh_cnt`, `urg_cnt`, `iat_mean`, `iat_std`, `iat_max`,
+  `label` (several common CIC/Zeek spellings are auto-renamed). A CSV with other columns is
+  rejected with 422 and the list of what is missing.
+
+PCAP has no schema requirement -- flow records are derived from the packets directly, so an
+ordinary Wireshark/tcpdump capture works, subject to the 2-minute rule above.
 
 ### Development (hot reload)
 
@@ -111,7 +127,7 @@ python -m eval.benchmark --train-config configs/real_data.yaml \
 | `models/baseline_lr.py`, `models/lstm_model.py`, `models/markov_baseline.py` | Baselines: last-window LR, stacked-window LR, LSTM, Markov chain, label persistence |
 | `models/world_model_joint.py`, `models/train_joint.py`, `models/graph_encoder.py` | Jointly-trained GNN variant (negative result — see `docs/06-gnn-ablation.md`) |
 | `models/narrative.py`, `models/response.py` | Template-based attack narrative and MITRE-stage → first-response playbook |
-| `models/audit_ledger.py` | Hash-chained, tamper-evident log of dashboard alerts |
+| `models/audit_ledger.py` | Blockchain-style SHA-256 hash chain, tamper-evident log of dashboard alerts. Same core tamper-evidence primitive as a blockchain (each entry's hash depends on the previous entry's, so altering or deleting a past entry breaks every hash after it, detectably) — a single-writer chain rather than a distributed ledger, which was the deliberate scope for an offline demo. |
 | `models/compliance.py`, `models/cve_lookup.py` | CERT-In-style incident report generator and offline CVE/NVD enrichment |
 | `eval/metrics.py`, `eval/benchmark.py` | F1/precision/recall/FPR, fixed-FPR thresholds, lead-time metric, single- and cross-dataset benchmarks |
 | `app/server.py`, `app/service.py` | REST API for the React dashboard (forecast, explainability, narrative, CERT-In report, audit ledger) and the headless pipeline behind it |
@@ -185,15 +201,52 @@ build that no longer exist and is withdrawn (see `docs/AUDIT.md` G1). The model 
 domain shift between the datasets' fundamental feature scales -- generalising across different
 network topologies and packet-capture tools remains a significant challenge.
 
+## What this system does not do
+
+Stated here, next to the results, rather than only in `docs/AUDIT.md`. Every figure is measured
+and links to the report it comes from.
+
+- **It misses most attacks.** Recall 0.325 ± 0.029 at the 0.5 threshold — roughly two in three
+  attack windows go unflagged. Precision is the strong side (0.931 ± 0.024): what it flags is
+  almost always real. Use it as a second signal beside existing detection, not as sole coverage.
+  (`docs/04-evaluation-real-v2-seeds.md`)
+- **It does not warn early.** Measured lead time over 628 benign-to-attack transitions is
+  **−0.5 s mean, +0.0 s median** — it alarms *at* onset, fractionally late, not before. 93.5% of
+  transitions are missed entirely and alarm precision at that operating point is 1.5%.
+  (`docs/04-evaluation-real-v2.md`)
+- **The headline is a t+1 number.** F1 0.481 / AUROC 0.794 measure **one step — 10 seconds —
+  ahead**, not 60. The evaluation path runs a single forward pass.
+  (`docs/04-evaluation-frozen-state-ablation.md`)
+- **The 60-second rollout is not better than reusing the first step.** Holding the t+1 estimate
+  for the whole minute scores *higher* than advancing the model's state (AUROC 0.785 vs 0.755 at
+  t+60s, consistent across three seeds, not statistically established at n=3). The rollout
+  produces the trajectory, stages and what-if path; it does not improve infiltration ranking.
+  (`docs/04-evaluation-frozen-state-ablation.md`)
+- **No demonstrated generalisation to unseen attack families or datasets.** Leave-one-family-out
+  is chance-level on three of four families; zero-shot CTU-13 is AUROC 0.517.
+  (`docs/04-evaluation-lofo-seeds.md`, `docs/AUDIT.md` G1)
+- **Single dataset, single network.** Trained on CIC-IDS-2018 only. Cross-network transfer is a
+  known-hard problem in this literature and this project is a textbook instance of the collapse,
+  not an exception (`docs/05-related-work-and-competitive-landscape.md`).
+
+Speed is not the constraint: interactive drill-down is **9.9 ms** and scoring 5,000 hosts takes
+**60 ms** (`docs/04-latency-benchmark.md`).
+
 ## Known limitations
 
 These are documented rather than hidden. `docs/AUDIT.md` is the full list with measurements.
 
-- **Split reuses attack sessions.** Train/val/test are cut per host in time order, so test windows
-  come from the same attack sessions as training. The project cannot yet claim generalisation to
-  unseen attack patterns on CIC-IDS-2018; the CTU-13 cross-dataset run is the only out-of-distribution evidence.
-- **Lead-time metric rests on few events.** The reported 32 benign-to-attack transitions come from
-  2 network-wide pseudo-hosts, mostly re-onsets of one DDoS run, and the metric doesn't count false alarms.
+- **The v1 per-host split leaked; the headline no longer uses it.** The original split cut
+  train/val/test per host in time order, so test windows came from the same attack sessions as
+  training — data snooping in the sense of Arp et al. That is what produced the withdrawn F1
+  0.917. The reported headline is now the **day-disjoint** split (no attack session appears in
+  both), which is where F1 0.481 / AUROC 0.794 come from. The older split survives only in
+  `docs/04-evaluation-real.md`, marked as superseded.
+- **Lead-time metric rests on narrow events.** The day-disjoint re-measure covers 628
+  benign-to-attack transitions (the earlier "32 transitions" figure predates it), but they come
+  from 3 network-wide pseudo-hosts with 96% from a single day, so the sample is wide in count and
+  narrow in origin. False alarms are now counted (audit E3): 93.5% of transitions missed, 1.5%
+  alarm precision.
 - **3 of 5 MITRE stages on real data.** CIC-IDS-2018 has no Reconnaissance or Exfiltration labels.
   DoS/DDoS is mapped to `impact`, which is excluded from the 5-way stage task.
 - **Flow-only in practice.** Packet-level features are implemented, but no CIC-IDS-2018 PCAP is

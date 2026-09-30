@@ -1,0 +1,67 @@
+.what-if-panel {
+  margin-top: 1rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid rgba(51, 201, 255, 0.3);
+  border-radius: 4px;
+  background: rgba(51, 201, 255, 0.05);
+}
+
+.what-if-title {
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  color: #33c9ff;
+  margin-bottom: 0.5rem;
+}
+
+.what-if-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.what-if-select {
+  background: #0d0d0d;
+  color: #e0e0e0;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.7rem;
+}
+
+.what-if-scale-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.66rem;
+  color: #999999;
+}
+
+.what-if-run,
+.what-if-clear {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.05em;
+  border-radius: 3px;
+  cursor: pointer;
+  border: 1px solid rgba(51, 201, 255, 0.4);
+  background: transparent;
+  color: #33c9ff;
+}
+
+.what-if-run:disabled,
+.what-if-clear:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.what-if-clear {
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #999999;
+}
+
+.what-if-error {
+  margin-top: 0.4rem;
+  font-size: 0.66rem;
+  color: #e53935;
+}

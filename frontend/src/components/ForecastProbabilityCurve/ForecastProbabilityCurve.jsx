@@ -26,7 +26,12 @@ const ForecastProbabilityCurve = ({
   stage_is_heuristic = false,
   isLoading = false,
   error = null,
-  title = "K-STEP INFILTRATION PROBABILITY CURVE"
+  title = "K-STEP INFILTRATION PROBABILITY CURVE",
+  // Competitive-parity item 4 (2026-09-30): counterfactual "what-if" overlay. Optional -- when
+  // absent the component renders exactly as before. Same length as `probabilities` when present.
+  counterfactualProbabilities = null,
+  counterfactualLabel = null,
+  counterfactualCaveat = null,
 }) => {
   const [hoveredPoint, setHoveredPoint] = useState(null);
 
@@ -104,6 +109,16 @@ const ForecastProbabilityCurve = ({
   }, '');
 
   const areaPath = `${linePath} L ${points[points.length - 1].x} ${padding.top + graphHeight} L ${points[0].x} ${padding.top + graphHeight} Z`;
+
+  const hasCounterfactual = Array.isArray(counterfactualProbabilities)
+    && counterfactualProbabilities.length === probabilities.length;
+  const counterfactualLinePath = hasCounterfactual
+    ? counterfactualProbabilities.reduce((acc, prob, idx) => {
+        const x = points[idx].x;
+        const y = padding.top + graphHeight * (1 - Math.max(0, Math.min(1, prob)));
+        return idx === 0 ? `M ${x} ${y}` : `${acc} L ${x} ${y}`;
+      }, '')
+    : '';
 
   const peakProb = Math.max(...probabilities);
   const getRiskLabel = (val) => {
@@ -188,6 +203,16 @@ const ForecastProbabilityCurve = ({
 
           <path d={areaPath} fill="url(#forecastAreaGrad)" />
           <path d={linePath} fill="none" stroke="url(#forecastLineGrad)" strokeWidth="3" strokeLinecap="round" />
+          {hasCounterfactual && (
+            <path
+              d={counterfactualLinePath}
+              fill="none"
+              stroke="#33c9ff"
+              strokeWidth="2.5"
+              strokeDasharray="6 4"
+              strokeLinecap="round"
+            />
+          )}
 
           {points.map((pt) => {
             const risk = getRiskLabel(pt.prob);
@@ -289,6 +314,15 @@ const ForecastProbabilityCurve = ({
           {notes.map((n) => (
             <div key={n}>⚠ {n}</div>
           ))}
+        </div>
+      )}
+
+      {hasCounterfactual && (
+        <div className="forecast-disclosure font-mono counterfactual-legend">
+          <div>
+            <span className="counterfactual-swatch" /> {counterfactualLabel || 'What-if scenario'}
+          </div>
+          {counterfactualCaveat && <div>ⓘ {counterfactualCaveat}</div>}
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 """Template-based, fully offline "attack story" generation from the forecast's own outputs.
 
-No LLM call — this project runs with zero cloud API calls by design (see app/streamlit_app.py's
-module docstring), and a templated narrative built directly from the model's own numeric outputs
+No LLM call — this project runs with zero cloud API calls by design (see README, "What this
+system does not do", and app/server.py's module docstring), and a templated narrative built directly from the model's own numeric outputs
 (infiltration curve, predicted stage per step, attention weights, predicted state deltas) stays
 exactly as trustworthy/explainable as those outputs already are. This turns "the model says 87%"
 into a short paragraph a non-ML analyst can read directly, then pairs it with a recommended first

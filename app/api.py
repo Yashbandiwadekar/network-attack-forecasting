@@ -1,8 +1,8 @@
 """Optional, ONLINE SIEM/SOAR webhook integration (audit H1/W13).
 
 This is not part of the offline demo. The project's core claim ("everything runs offline, no
-network calls at inference time" -- README) is about `models/`, `pipeline/`, and
-`app/streamlit_app.py`; this module is a separate, opt-in component that a deployer can run
+network calls at inference time" -- README) is about `models/`, `pipeline/`, `app/service.py`
+and `app/server.py`; this module is a separate, opt-in component that a deployer can run
 alongside the offline system to relay alerts to an external SIEM/SOAR, and it never starts by
 accident:
 

@@ -5,8 +5,9 @@ import TelemetryStrip from '../components/TelemetryStrip/TelemetryStrip';
 import ForecastTimeline from '../components/ForecastTimeline/ForecastTimeline';
 import ThreatScoreGauge from '../components/ThreatScoreGauge/ThreatScoreGauge';
 import ForecastProbabilityCurve from '../components/ForecastProbabilityCurve/ForecastProbabilityCurve';
+import WhatIfPanel from '../components/WhatIfPanel/WhatIfPanel';
 import AuditLedger from '../components/AuditLedger/AuditLedger';
-import { systemApi, datasetApi, forecastApi, explainApi, analysisApi, reportApi, evalApi } from '../api';
+import { systemApi, datasetApi, forecastApi, explainApi, analysisApi, reportApi, evalApi, responseApi } from '../api';
 import { UploadCloud, CheckCircle, AlertTriangle, FileText, Activity, ShieldCheck, Database, RefreshCw } from 'lucide-react';
 import './Dashboard.css';
 
@@ -26,6 +27,9 @@ const Dashboard = () => {
   const [reportResult, setReportResult] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [whatIfResult, setWhatIfResult] = useState(null);
+  const [isolationResult, setIsolationResult] = useState(null);
+  const [isolationLoading, setIsolationLoading] = useState(false);
 
   // Initial load & 5-second polling loop
   useEffect(() => {
@@ -42,6 +46,8 @@ const Dashboard = () => {
     if (selectedHostIp) {
       fetchHostDetails(selectedHostIp);
     }
+    setWhatIfResult(null); // a counterfactual from a different host is meaningless here
+    setIsolationResult(null);
   }, [selectedHostIp]);
 
   const fetchInitialData = async () => {
@@ -144,6 +150,19 @@ const Dashboard = () => {
       setReportResult(res);
     } catch (err) {
       console.error('Report error:', err);
+    }
+  };
+
+  const handleSimulateIsolation = async () => {
+    if (!selectedHostIp) return;
+    setIsolationLoading(true);
+    try {
+      const res = await responseApi.simulateIsolation(selectedHostIp);
+      setIsolationResult(res);
+    } catch (err) {
+      console.error('Simulate isolation error:', err);
+    } finally {
+      setIsolationLoading(false);
     }
   };
 
@@ -364,7 +383,11 @@ const Dashboard = () => {
                       Upload PCAP, PCAPNG, or Flow CSV File
                     </h3>
                     <p style={{ color: '#888888', fontSize: '0.85rem', textAlign: 'center', maxWidth: '500px' }}>
-                      Drag & drop network captures or click to select file. Supported: .pcap, .pcapng, .csv
+                      Drag &amp; drop network captures or click to select file. Supported: .pcap, .pcapng, .csv
+                    </p>
+                    <p style={{ color: '#888888', fontSize: '0.78rem', textAlign: 'center', maxWidth: '520px', marginTop: '0.5rem', fontFamily: 'var(--font-mono)' }}>
+                      Needs at least 2 minutes of traffic from the same source IP (12 consecutive
+                      10s windows). CSVs must use the CICFlowMeter schema.
                     </p>
                   </div>
                   <input type="file" onChange={handleFileUpload} style={{ display: 'none' }} accept=".pcap,.pcapng,.csv" />
@@ -394,6 +417,19 @@ const Dashboard = () => {
                   disclosureNotes={forecastData?.stage_disclosure_notes}
                   horizonSeconds={forecastData?.horizon_seconds}
                   title={`INFILTRATION FORECAST — ${selectedHostIp || 'SELECT HOST'}`}
+                  counterfactualProbabilities={whatIfResult?.counterfactual_infiltration_probs}
+                  counterfactualLabel={
+                    whatIfResult
+                      ? `What-if: ${whatIfResult.feature_label} × ${whatIfResult.scale}`
+                      : null
+                  }
+                  counterfactualCaveat={whatIfResult?.caveat}
+                />
+
+                <WhatIfPanel
+                  hostIp={selectedHostIp}
+                  onResult={setWhatIfResult}
+                  onClear={() => setWhatIfResult(null)}
                 />
 
                 {forecastData && forecastData.infiltration_probs && (
@@ -492,6 +528,32 @@ const Dashboard = () => {
                     <span style={{ fontSize: '0.85rem', color: '#f5f5f5' }}>
                       {narrativeData.recommended_action?.action}
                     </span>
+
+                    {isolationResult ? (
+                      <div style={{ marginTop: '0.8rem', padding: '0.6rem 0.8rem', border: '1px solid #33c9ff', borderRadius: '4px', background: 'rgba(51,201,255,0.08)' }}>
+                        <strong style={{ color: '#33c9ff', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', letterSpacing: '0.04em' }}>
+                          ISOLATED (SIMULATED)
+                        </strong>
+                        <div style={{ fontSize: '0.72rem', color: '#a0d8ea', marginTop: '0.3rem' }}>
+                          {isolationResult.note}
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSimulateIsolation}
+                        disabled={isolationLoading || !selectedHostIp}
+                        style={{
+                          marginTop: '0.8rem', fontFamily: 'var(--font-mono)', fontSize: '0.7rem',
+                          letterSpacing: '0.04em', padding: '0.4rem 0.8rem', borderRadius: '4px',
+                          border: '1px solid #33c9ff', background: 'transparent', color: '#33c9ff',
+                          cursor: isolationLoading || !selectedHostIp ? 'not-allowed' : 'pointer',
+                          opacity: isolationLoading || !selectedHostIp ? 0.5 : 1,
+                        }}
+                      >
+                        {isolationLoading ? 'SIMULATING…' : 'SIMULATE ISOLATION'}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

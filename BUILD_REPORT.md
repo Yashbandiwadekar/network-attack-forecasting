@@ -1010,3 +1010,131 @@ W13-W19.
 `configs/real_data_v2.yaml` is kept (LOFO needs it) but given a header explaining it no longer
 represents a standalone, reproducible v2 checkpoint result and pointing to
 `real_data_v2_converged.yaml` for that purpose.
+
+
+## W21 — Frozen-state rollout ablation (2026-09-30) — DONE, negative result
+
+Work order: `WORK_ORDER-2026-09-30.md`. Script: `scripts/ablate_frozen_state.py`.
+Report: `docs/04-evaluation-frozen-state-ablation.md`. Raw: `docs/frozen_state_ablation.json`.
+
+Acceptance asked for the conclusion "in whichever direction the numbers land". It landed negative.
+
+```
+  step   seconds           genuine AUROC            frozen AUROC     delta
+     1       10s      0.7937 +/- 0.0349       0.7937 +/- 0.0349    +0.0000
+     2       20s      0.7823 +/- 0.0443       0.7917 +/- 0.0360    -0.0094
+     3       30s      0.7725 +/- 0.0510       0.7894 +/- 0.0352    -0.0170
+     4       40s      0.7663 +/- 0.0545       0.7876 +/- 0.0358    -0.0213
+     5       50s      0.7602 +/- 0.0581       0.7868 +/- 0.0346    -0.0267
+     6       60s      0.7549 +/- 0.0608       0.7853 +/- 0.0335    -0.0303
+```
+
+- k=1 is identical by construction (sanity check passed) and reproduces the published headline
+  AUROC to the digit: 0.7937 here vs 0.794 in `docs/04-evaluation-real-v2-seeds.md`.
+- Advancing the world model's state makes infiltration ranking **worse**, monotonically with
+  horizon. AUPRC and F1@0.5 at k=6 agree (0.5714 vs 0.6214, 0.4121 vs 0.4735).
+- All 15 paired comparisons (3 seeds x k=2..6) are negative, but |t| ~ 1.56 at df=2 against the
+  4.303 needed. Reported as "no evidence the rollout adds value, consistent evidence of a small
+  penalty" -- not as proof of harm.
+- Side finding, arguably the more important one: **the published headline is a t+1 (10-second)
+  measurement.** `eval/lofo.py::_predict_infiltration` runs a single forward pass and scores
+  `infiltration[:, 0]`; the K-step rollout had never been evaluated. Any claim that F1 0.481 /
+  AUROC 0.794 describe a 60-second forecast is overstating them.
+
+Seeds 1/2/3 at k=6: genuine 0.7743 / 0.6728 / 0.8178 vs frozen 0.7930 / 0.7409 / 0.8218.
+
+
+## W22 / W23 (2026-09-30) — DONE
+
+### W23 — measured latency, on real traffic
+
+`scripts/benchmark_latency.py`, report `docs/04-latency-benchmark.md`, raw
+`docs/latency_benchmark.json`. Input is a real CIC-IDS-2018 slice (Friday 02-03-2018, 120,000
+flows: 99,707 Bot / 20,293 Benign), never generated noise. Windows 10, CUDA.
+
+```
+stage                                         P50        P95        mean+/-sd    n
+ingestion (parse + windowing + features)  2004.4ms   2112.3ms   2037.5+/-64.9    3
+score_all_hosts (batched rollout)            7.1ms      7.3ms      7.1+/-0.1    20
+single-host K=6 rollout                      6.6ms      6.9ms      6.6+/-0.1    20
+explainability (gradient x input)            3.4ms      3.9ms      3.4+/-0.2    20
+
+interactive drill-down (rollout + explain) P50: 9.9 ms
+batch scaling (replicated real sequence):
+     1 host   6.2ms   |   100   7.0ms   |   1000  13.0ms   |   5000  60.1ms (0.012 ms/host)
+```
+
+Scoring 5,000 hosts in 60 ms means a full K=6 forecast for every host on a mid-sized network
+finishes inside one 10-second window. Not compared against ShadowCat's 1,630 ms: theirs is CPU,
+bundles a 37-fold ensemble and graph traversal, and uses a different denominator. Stated in the
+report rather than converted into a speedup claim.
+
+Limitations recorded: CUDA only (no CPU figure), one capture/day/machine, no concurrency or
+cold-start measurement, and the batch-scaling rows replicate one real sequence rather than
+scoring N distinct hosts.
+
+### W22 — limitations moved next to the results
+
+New `## What this system does not do` section in `README.md`, placed with the results instead of
+60 lines below them: recall 0.325 (misses ~2 in 3 attack windows), lead time -0.5s mean / +0.0s
+median over 628 transitions, the headline being a t+1 (10-second) number, the frozen-state
+result, no demonstrated generalisation, single dataset. Each line carries its measured figure and
+its source file.
+
+Two stale bullets in the existing `Known limitations` were corrected while doing it, both of
+which understated the project:
+
+- "Split reuses attack sessions ... cut per host in time order" described the **v1** split. The
+  headline has used the day-disjoint split since W7; the bullet now says so and explains that the
+  old split is what produced the withdrawn 0.917.
+- "32 benign-to-attack transitions from 2 pseudo-hosts" predates the day-disjoint re-measure,
+  which covers **628** transitions across 3 pseudo-hosts (96% from one day), with false alarms
+  now counted per E3.
+
+
+## W24 / W25 (2026-09-30) — DONE
+
+### W24 — the "no competitor publishes a negative result" claim, retracted for the second time
+
+`docs/05-related-work-and-competitive-landscape.md`. The 09-29 pass had already narrowed this
+once (from "no repo reports a negative result" to "none about its own *model*"); the narrowed
+version is also false. Both counter-examples read at source:
+
+- **ShadowCat** ran a 37-fold Leave-One-Entity-Out evaluation of its GraphSAGE fusion, found
+  F1 0.0000 in 3 of 18 DDOS-LOIC-UDP folds (macro 0.9157 vs 0.9971 for plain stacked LSTM),
+  attributed it to over-smoothing in dense bipartite subgraphs, and issued a NO-GO retiring the
+  architecture. It also retired its own latency benchmark for timing an untrained model on
+  `np.random.randn`.
+- **CyberPulse** states in its README summary that it is not a demonstrated early-warning system,
+  that its GRU loses to logistic regression, and that its "t+1 to t+4" horizons are dataset rows
+  rather than time.
+
+Recorded with the caveat that ShadowCat's folds appear to withhold one *episode* while training
+on other episodes of the same attack type — not leave-one-family-out — so 0.9971 and this
+project's 0.53–0.82 LOFO figures measure different difficulties and must not be compared. That
+reading is from fold naming and per-category reporting, not from their split code.
+
+The paragraph now also cites this project's own new negative result (W21), so the section states
+a symmetric position rather than an unmatched claim.
+
+Acceptance: `grep -nE "[Nn]o (surveyed |other )?(repo|team|competitor)...(publishes|describes|
+reports|has)"` returns only the sentence performing the retraction.
+
+### W25 — the "Feature #4" citation
+
+The `raushankumarsah07` row claimed "this project independently built the same capability, see
+Feature #4". When the last-minute build order raised this as item 0 the capability did not exist
+at all; it does now (`2c4474b`, `93f6bcc`). Two defects remained:
+
+- there is no "Feature #4" anywhere in the repository — a dangling reference in the one document
+  whose whole value is its accuracy;
+- "independently" was unsupportable: the capability was built *after* this competitor was
+  surveyed and explicitly in response to it (build-order item 4).
+
+Replaced with the real endpoint and the true chronology: "built ... on 2026-09-30,
+`POST /api/v1/forecast/what-if` in `app/server.py`, *after* and in response to this survey — not
+independently". Verified the cited endpoint exists (`app/server.py:476`).
+
+Acceptance: `grep -c "Feature #4" docs/05-related-work-and-competitive-landscape.md` returns 0.
+
+**W21–W25 of `WORK_ORDER-2026-09-30.md` are now all closed.**
