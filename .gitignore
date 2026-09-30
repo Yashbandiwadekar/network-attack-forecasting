@@ -39,3 +39,7 @@ checkpoints*/audit_ledger.jsonl
 
 # Run logs, collected under logs/ rather than scattered across the repo root
 logs/
+
+# Demo capture: 14 MB of redistributed CIC-IDS-2018. Regenerate with
+# `python -m scripts.make_demo_capture` rather than committing it.
+demo/
