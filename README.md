@@ -1,9 +1,10 @@
 # AI-Based Network Attack Forecasting
 
-A world-model AI system that learns network traffic dynamics from flow and packet telemetry,
-forecasts attacker progression K steps ahead, maps predicted behaviour to MITRE ATT&CK stages,
-and explains every prediction — built for SIH problem statement 26153 (full text in
-`docs/problem-statement.md`, project framing in `docs/00-project-overview.md`).
+A world-model AI system — a digital twin of network behaviour — that learns network traffic
+dynamics from flow and packet telemetry, forecasts attacker progression K steps ahead, maps
+predicted behaviour to MITRE ATT&CK stages, and explains every prediction — built for SIH problem
+statement 26153 (full text in `docs/problem-statement.md`, project framing in
+`docs/00-project-overview.md`).
 
 Rather than classifying each flow in isolation (the traditional approach the problem statement
 explicitly wants moved beyond), the core model learns `P(S_t+1 | S_t-L..S_t)` over windowed
@@ -111,7 +112,7 @@ python -m eval.benchmark --train-config configs/real_data.yaml \
 | `models/baseline_lr.py`, `models/lstm_model.py`, `models/markov_baseline.py` | Baselines: last-window LR, stacked-window LR, LSTM, Markov chain, label persistence |
 | `models/world_model_joint.py`, `models/train_joint.py`, `models/graph_encoder.py` | Jointly-trained GNN variant (negative result — see `docs/06-gnn-ablation.md`) |
 | `models/narrative.py`, `models/response.py` | Template-based attack narrative and MITRE-stage → first-response playbook |
-| `models/audit_ledger.py` | Hash-chained, tamper-evident log of dashboard alerts |
+| `models/audit_ledger.py` | Blockchain-style SHA-256 hash chain, tamper-evident log of dashboard alerts. Same core tamper-evidence primitive as a blockchain (each entry's hash depends on the previous entry's, so altering or deleting a past entry breaks every hash after it, detectably) — a single-writer chain rather than a distributed ledger, which was the deliberate scope for an offline demo. |
 | `models/compliance.py`, `models/cve_lookup.py` | CERT-In-style incident report generator and offline CVE/NVD enrichment |
 | `eval/metrics.py`, `eval/benchmark.py` | F1/precision/recall/FPR, fixed-FPR thresholds, lead-time metric, single- and cross-dataset benchmarks |
 | `app/server.py`, `app/service.py` | REST API for the React dashboard (forecast, explainability, narrative, CERT-In report, audit ledger) and the headless pipeline behind it |

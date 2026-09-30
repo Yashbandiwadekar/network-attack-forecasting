@@ -1,5 +1,8 @@
 # Architecture
 
+A digital twin of network behaviour: the world model learns `P(S_t+1 | S_t-L..S_t)` over windowed
+network state and rolls it forward K steps, rather than classifying each flow in isolation.
+
 ## System overview
 
 ```mermaid
