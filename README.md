@@ -186,15 +186,52 @@ build that no longer exist and is withdrawn (see `docs/AUDIT.md` G1). The model 
 domain shift between the datasets' fundamental feature scales -- generalising across different
 network topologies and packet-capture tools remains a significant challenge.
 
+## What this system does not do
+
+Stated here, next to the results, rather than only in `docs/AUDIT.md`. Every figure is measured
+and links to the report it comes from.
+
+- **It misses most attacks.** Recall 0.325 ± 0.029 at the 0.5 threshold — roughly two in three
+  attack windows go unflagged. Precision is the strong side (0.931 ± 0.024): what it flags is
+  almost always real. Use it as a second signal beside existing detection, not as sole coverage.
+  (`docs/04-evaluation-real-v2-seeds.md`)
+- **It does not warn early.** Measured lead time over 628 benign-to-attack transitions is
+  **−0.5 s mean, +0.0 s median** — it alarms *at* onset, fractionally late, not before. 93.5% of
+  transitions are missed entirely and alarm precision at that operating point is 1.5%.
+  (`docs/04-evaluation-real-v2.md`)
+- **The headline is a t+1 number.** F1 0.481 / AUROC 0.794 measure **one step — 10 seconds —
+  ahead**, not 60. The evaluation path runs a single forward pass.
+  (`docs/04-evaluation-frozen-state-ablation.md`)
+- **The 60-second rollout is not better than reusing the first step.** Holding the t+1 estimate
+  for the whole minute scores *higher* than advancing the model's state (AUROC 0.785 vs 0.755 at
+  t+60s, consistent across three seeds, not statistically established at n=3). The rollout
+  produces the trajectory, stages and what-if path; it does not improve infiltration ranking.
+  (`docs/04-evaluation-frozen-state-ablation.md`)
+- **No demonstrated generalisation to unseen attack families or datasets.** Leave-one-family-out
+  is chance-level on three of four families; zero-shot CTU-13 is AUROC 0.517.
+  (`docs/04-evaluation-lofo-seeds.md`, `docs/AUDIT.md` G1)
+- **Single dataset, single network.** Trained on CIC-IDS-2018 only. Cross-network transfer is a
+  known-hard problem in this literature and this project is a textbook instance of the collapse,
+  not an exception (`docs/05-related-work-and-competitive-landscape.md`).
+
+Speed is not the constraint: interactive drill-down is **9.9 ms** and scoring 5,000 hosts takes
+**60 ms** (`docs/04-latency-benchmark.md`).
+
 ## Known limitations
 
 These are documented rather than hidden. `docs/AUDIT.md` is the full list with measurements.
 
-- **Split reuses attack sessions.** Train/val/test are cut per host in time order, so test windows
-  come from the same attack sessions as training. The project cannot yet claim generalisation to
-  unseen attack patterns on CIC-IDS-2018; the CTU-13 cross-dataset run is the only out-of-distribution evidence.
-- **Lead-time metric rests on few events.** The reported 32 benign-to-attack transitions come from
-  2 network-wide pseudo-hosts, mostly re-onsets of one DDoS run, and the metric doesn't count false alarms.
+- **The v1 per-host split leaked; the headline no longer uses it.** The original split cut
+  train/val/test per host in time order, so test windows came from the same attack sessions as
+  training — data snooping in the sense of Arp et al. That is what produced the withdrawn F1
+  0.917. The reported headline is now the **day-disjoint** split (no attack session appears in
+  both), which is where F1 0.481 / AUROC 0.794 come from. The older split survives only in
+  `docs/04-evaluation-real.md`, marked as superseded.
+- **Lead-time metric rests on narrow events.** The day-disjoint re-measure covers 628
+  benign-to-attack transitions (the earlier "32 transitions" figure predates it), but they come
+  from 3 network-wide pseudo-hosts with 96% from a single day, so the sample is wide in count and
+  narrow in origin. False alarms are now counted (audit E3): 93.5% of transitions missed, 1.5%
+  alarm precision.
 - **3 of 5 MITRE stages on real data.** CIC-IDS-2018 has no Reconnaissance or Exfiltration labels.
   DoS/DDoS is mapped to `impact`, which is excluded from the 5-way stage task.
 - **Flow-only in practice.** Packet-level features are implemented, but no CIC-IDS-2018 PCAP is

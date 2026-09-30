@@ -1042,3 +1042,51 @@ Acceptance asked for the conclusion "in whichever direction the numbers land". I
   AUROC 0.794 describe a 60-second forecast is overstating them.
 
 Seeds 1/2/3 at k=6: genuine 0.7743 / 0.6728 / 0.8178 vs frozen 0.7930 / 0.7409 / 0.8218.
+
+
+## W22 / W23 (2026-09-30) — DONE
+
+### W23 — measured latency, on real traffic
+
+`scripts/benchmark_latency.py`, report `docs/04-latency-benchmark.md`, raw
+`docs/latency_benchmark.json`. Input is a real CIC-IDS-2018 slice (Friday 02-03-2018, 120,000
+flows: 99,707 Bot / 20,293 Benign), never generated noise. Windows 10, CUDA.
+
+```
+stage                                         P50        P95        mean+/-sd    n
+ingestion (parse + windowing + features)  2004.4ms   2112.3ms   2037.5+/-64.9    3
+score_all_hosts (batched rollout)            7.1ms      7.3ms      7.1+/-0.1    20
+single-host K=6 rollout                      6.6ms      6.9ms      6.6+/-0.1    20
+explainability (gradient x input)            3.4ms      3.9ms      3.4+/-0.2    20
+
+interactive drill-down (rollout + explain) P50: 9.9 ms
+batch scaling (replicated real sequence):
+     1 host   6.2ms   |   100   7.0ms   |   1000  13.0ms   |   5000  60.1ms (0.012 ms/host)
+```
+
+Scoring 5,000 hosts in 60 ms means a full K=6 forecast for every host on a mid-sized network
+finishes inside one 10-second window. Not compared against ShadowCat's 1,630 ms: theirs is CPU,
+bundles a 37-fold ensemble and graph traversal, and uses a different denominator. Stated in the
+report rather than converted into a speedup claim.
+
+Limitations recorded: CUDA only (no CPU figure), one capture/day/machine, no concurrency or
+cold-start measurement, and the batch-scaling rows replicate one real sequence rather than
+scoring N distinct hosts.
+
+### W22 — limitations moved next to the results
+
+New `## What this system does not do` section in `README.md`, placed with the results instead of
+60 lines below them: recall 0.325 (misses ~2 in 3 attack windows), lead time -0.5s mean / +0.0s
+median over 628 transitions, the headline being a t+1 (10-second) number, the frozen-state
+result, no demonstrated generalisation, single dataset. Each line carries its measured figure and
+its source file.
+
+Two stale bullets in the existing `Known limitations` were corrected while doing it, both of
+which understated the project:
+
+- "Split reuses attack sessions ... cut per host in time order" described the **v1** split. The
+  headline has used the day-disjoint split since W7; the bullet now says so and explains that the
+  old split is what produced the withdrawn 0.917.
+- "32 benign-to-attack transitions from 2 pseudo-hosts" predates the day-disjoint re-measure,
+  which covers **628** transitions across 3 pseudo-hosts (96% from one day), with false alarms
+  now counted per E3.
