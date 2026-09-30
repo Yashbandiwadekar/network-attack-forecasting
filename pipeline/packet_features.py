@@ -12,8 +12,9 @@ PCAPNG note: scapy's `PcapReader` class dispatches on the file's magic bytes, no
 it already reads both classic pcap (`\\xd4\\xc3\\xb2\\xa1` et al.) and pcapng (`\\x0a\\x0d\\x0d\\x0a`)
 transparently (see scapy.utils.rdpcap, which relies on the same dispatch). Verified against a real
 PcapNgWriter-produced file. The historical ".pcapng rejected" behaviour (audit S4) was the
-Streamlit uploader's `type="pcap"` restriction, not a parsing limitation here — fixed in
-app/streamlit_app.py by accepting both extensions.
+uploader's `type="pcap"` restriction in the since-retired Streamlit UI, not a parsing limitation
+here — both extensions are accepted by the current upload path
+(`app/server.py::upload_file`, which allows .pcap/.pcapng/.csv).
 """
 from __future__ import annotations
 

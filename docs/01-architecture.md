@@ -21,8 +21,9 @@ flowchart LR
     WM --> ROLL[K-step autoregressive<br/>rollout]
     ROLL --> OUT[Infiltration probability curve<br/>+ predicted MITRE stage per step]
     WM --> EXPL[Explainability<br/>attention + SHAP]
-    OUT --> DEMO[Streamlit demo]
-    EXPL --> DEMO
+    OUT --> API[REST API<br/>app/server.py]
+    EXPL --> API
+    API --> UI[React dashboard<br/>frontend/]
 ```
 
 ## 1. Network state representation
@@ -80,7 +81,10 @@ history in, take the predicted next state, drop the oldest window, append the pr
 `K=6` times (1 minute ahead at 10s windows). Each step yields an infiltration probability, a
 predicted MITRE stage, and the attention pattern that produced it — a full trajectory, not a
 single score. This autoregressive rollout, not the training objective, is what makes the system a
-world model rather than a one-shot classifier.
+world model rather than a one-shot classifier — structurally. **Measured, it does not make the
+later steps more accurate:** see the frozen-state ablation in section 6. What the rollout
+uniquely provides is the trajectory itself — per-step stages, `transition_magnitude`, and the
+what-if counterfactual path — none of which a single score can express.
 
 ## 4. Explainability — three views, plus two unsupervised signals
 
@@ -126,12 +130,25 @@ oracles, with a deployable counterpart alongside (E6).
 
 Measured, not estimated; evidence and finding IDs in `docs/AUDIT.md`.
 
-- **Generalisation is the honest weak point.** Day-disjoint, the model scores F1 0.370 / AUROC 0.706
-  (t+1, 7,191 real test sequences). The earlier 0.917 came from a per-host split that shared attack
-  sessions between train and test (E1) — data snooping, found by audit and corrected.
-  Leave-one-attack-family-out is negative for three of four families (AUROC 0.612 / 0.432 / 0.531)
-  and positive only for DDoS (0.872); zero-shot transfer to CTU-13 is chance (0.517). No claim is
-  made to generalise to unseen attacks — the claim is that this was measured and published.
+- **Generalisation is the honest weak point.** Day-disjoint over three seeds, the model scores
+  **F1 0.481 ± 0.033 / AUROC 0.794 ± 0.043** (t+1, 7,191 real test sequences;
+  `docs/04-evaluation-real-v2-seeds.md`). The earlier 0.917 came from a per-host split that shared
+  attack sessions between train and test (E1) — data snooping, found by audit and corrected.
+  Leave-one-attack-family-out, also three seeds, is indistinguishable from chance for three of
+  four families (AUROC 0.685 ± 0.087 initial_access, 0.528 ± 0.129 lateral_movement,
+  0.646 ± 0.131 command_and_control) and only marginally above it for DDoS (0.819 ± 0.128);
+  zero-shot transfer to CTU-13 is chance (0.517). No claim is made to generalise to unseen attacks
+  — the claim is that this was measured and published.
+  *(Corrected 2026-09-30: this bullet previously quoted the single unseeded run, F1 0.370 / AUROC
+  0.706, and the single-seed LOFO figures including the **0.432 "worse than chance" value that was
+  withdrawn** — see `docs/04-evaluation-lofo-seeds.md`.)*
+- **The headline is a t+1 measurement, and the rollout does not improve on it.** F1 0.481 / AUROC
+  0.794 describe **one step — 10 seconds — ahead**: the evaluation path runs a single forward pass.
+  A frozen-state ablation (`docs/04-evaluation-frozen-state-ablation.md`) shows that holding that
+  t+1 estimate for the whole minute scores *higher* than advancing the model's state
+  (AUROC 0.785 vs 0.755 at t+60s, same direction in all three seeds, not statistically established
+  at n=3). The rollout produces the trajectory, the per-step stages and the counterfactual path;
+  it does not improve infiltration ranking at longer horizons.
 - **The data sets that ceiling.** Nine of ten CIC-IDS-2018 days ship without Src/Dst IP and collapse
   to one pseudo-host per day; the only day with real per-host structure is DDoS, and the three
   families LOFO fails on are exactly those without per-host data. CIC-IDS-2017, which keeps the
