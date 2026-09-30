@@ -1,6 +1,7 @@
 # Related Work & Competitive Landscape
 
-Research survey compiled 2026-09-17; **Section 4 (competing teams) re-surveyed 2026-09-27**, and
+Research survey compiled 2026-09-17; **Section 4 (competing teams) re-surveyed 2026-09-27, then
+again 2026-09-30**, and
 the project's own self-assessment throughout corrected on the same date to match `docs/AUDIT.md`
 Part G (the cross-dataset generalisation claim this document previously leaned on is withdrawn).
 Covers three questions: what does the open academic
@@ -238,6 +239,72 @@ Everything below is **self-described from repo metadata, plus two READMEs read d
 (`ShadowCat`, `TheRedKeep`) — not independently verified**. Descriptions are paraphrased, and a
 claim in a README is a claim, not a working feature.
 
+### Field size, re-measured 2026-09-30
+
+Same method, same 10 queries, via the GitHub REST search API. Raw query hits jumped from 335 (sum
+across all 10 queries, 09-27) to considerably more this pass -- e.g. `"attack forecasting"` alone
+now returns 120 items vs a smaller count three days ago -- but after dedup, exclusion of this
+project's own repo, off-topic keyword collisions, and pre-2026-06-01 repos, the field is:
+
+| Measure | 09-27 | 09-30 | Change |
+|---|---|---|---|
+| Repos in the field | 123 | **146** | +23 |
+| Distinct owners | 116 | **138** | +22 |
+| Repos pushed to since the prior survey | 40 (in 10 days) | **36 (in 3 days)** | activity rate roughly tripled |
+| Repos created since the prior survey | 27 (in 10 days) | **19 (in 3 days)** | creation rate also roughly tripled |
+| High-confidence (SIH/26153/NTRO in name or description) | 52 | **58** | +6 |
+
+**Off-topic collisions this pass (excluded):** two more Global-Terrorism-Database dashboards
+(`AnkushKr836/AI_Military_Intelligence_Dashboard`, `Nithyasri31/MILITARY-INTELLIGENCE-DASHBOARD`,
+alongside the previously-found `AdityaSinghO/GTD-Dashboard`), a second cardiac/steering-wheel
+"attack forecasting" hit (`AnanyaShirshi/Smart-Steering-Wheel`), and a Pokemon battle-stats
+notebook that matched on "attack progression" (`Aditya-xcity/BattleDataExplorer`).
+
+**Continuity check:** all 24 of the 25 individually-named repos from the 09-17/09-27 passes were
+re-checked directly. 24 still exist and are unchanged in identity; the 25th,
+`reginaroselin0223-spec/Peri-Tech-Titans`, was confirmed via the GitHub API to be a **rename**
+(GitHub redirects the old URL) to `reginaroselin0223-spec/NetGuard-AI` -- already tracked under
+that name in the 09-27 list, not a disappearance.
+
+**Most active since 09-27** (pushed in the 3 days since the last survey): `ErenSnowh/Argus`
+(09-29), `muthukkumaranb/ShadowCat` (09-29, still the most direct competitor by claimed feature
+overlap), `Impala04/sih26153-attack-chain-detection` (09-29), `ShipraSharma08/AI-Network-Attack-Forecasting`
+(09-29, gained its first star), `SuhithZ-dreambot/Precursor` (09-23),
+`mithun-afk/ST-WM-Cyber` (09-24), `cyber-laboratory/Visual_Analytics_Tool` (09-28).
+
+**19 genuinely new repos, created 2026-09-27 through 2026-09-29** (field growth over 3 days, not a
+method artefact -- these did not exist at the last survey). Most (13 of 19) carry no description or
+a generic one; the ones with a specific technical claim:
+
+| Repo | Created | Why it's worth noting |
+|---|---|---|
+| **[shonaxx/sih-26153-cyberpulse](https://github.com/shonaxx/sih-26153-cyberpulse)** | 09-28 | "Autonomous SOC & Multi-Horizon Threat Forecasting" -- PyTorch GRU world model with Input×Gradient XAI, and an **explicit multi-step horizon claim (t+1 to t+4)** stated in the description itself, plus "automate network defense". Closest new entrant to Argus's "autonomous SOC" framing. |
+| **[axorarbxy/sentinel-network-defense](https://github.com/axorarbxy/sentinel-network-defense)** | 09-28 | Forecasts attack progression AND explicitly claims **automatic or administrator-approved device isolation** -- an active-response capability beyond forecasting/alerting, which this project and most of the field stop short of. Same owner as `axorarbxy/network-digital-twin` (09-18); likely a second attempt by the same team rather than a second team. |
+| **[TARUN-AM/cybera-ai](https://github.com/TARUN-AM/cybera-ai)** | 09-27 | "Simulates the impact of defensive actions" -- a third team (after this project and `raushankumarsah07`) independently building counterfactual/what-if rollout simulation. |
+| **[HimasreeMaryada08/cyber-world-model](https://github.com/HimasreeMaryada08/cyber-world-model)** | 09-29 | Uses **Zeek** for traffic monitoring rather than CICFlowMeter/PCAP -- the first entrant found using a different telemetry source/tool than the CIC-IDS-2018 ecosystem the rest of the field (including this project) builds on. |
+| **[SaarthakManocha/DRISHTI](https://github.com/SaarthakManocha/DRISHTI--Dynamic-Real-Time-Intelligence-for-Security-via-Heterogenous-Topology-Inference)** | 09-27 | Full name emphasizes "**Heterogenous Topology Inference**" -- a graph/topology framing, joining `raghuraj72/Vanguard-GWM` and `mithun-afk/ST-WM-Cyber` as a third team favoring graph-based over pure sequence modelling. |
+
+**Also new, no distinguishing technical claim in the description (14):**
+`anshuman2810/Neural_StealthOps_SIH26153` · `buildwithanish2/GuardianX-AI-Network-Attack-Forecasting` ·
+`bikram-341/AI-Based-Network-Attack-Forecasting-from-Network-Traffic-Data-` ·
+`priyagautam18/network-attack-forecasting` ·
+`NAMAN-THAKUR-1944/SIH2026-SIH26153-VIGHNAX` (same team/name "VIGHNAX (127364)" as the
+already-tracked `SIH26-127364`, likely a repo restart) ·
+`Raunakgupta2264/SIH26153_NeuroShield` · `Meetvirugama/Attack_Forecasting` ·
+`AbdulBaseer-01/SIH-26153` · `Sankrityayana/AI-Based-Network-Attack-Forecasting` ·
+`riomorii/network-attack-forecasting` · `pranavsalve08/JASPIRE-SIH26153` (1 star already) ·
+`ranaprathap-codes/sentinalx` · `harishruthramurthy2008-tech/AI-Based-Network-Attack-Forecasting-from-Network-Traffic-Data` ·
+`jessica8024/AEGIS-WM`.
+
+**Reading this trend:** the creation rate (19 in 3 days vs 27 in the prior 10) and push rate (36 in
+3 days vs 40 in the prior 10) both roughly tripled. Two explanations are both plausible and not
+mutually exclusive: a submission-deadline effect (more teams starting/pushing as a deadline
+approaches), or this project's queries simply catching a cohort that started slightly later. Either
+way, the field is not shrinking, and the technical convergence pattern from prior passes continues:
+counterfactual/what-if simulation, blockchain or hash-chained audit trails, and graph/topology
+framing each now have 3+ independent teams building them, none of which is unique positioning any
+more (see "Takeaways" at the end of this section for what still is).
+
 ### Most differentiated approaches found (assessed 2026-09-17)
 
 > **Stale-comparison warning.** The "why it stands out" column below was written on 2026-09-17 and
@@ -443,9 +510,11 @@ attack-volume forecasting study on the public Loghub OpenSSH server log corpus, 
 
 ### Takeaways for this project specifically
 
-- **Field size (re-measured 2026-09-27)**: **123 repos across 115 distinct projects**, of which 52
-  explicitly cite SIH / 26153 / NTRO. 27 were created in the 10 days since the previous pass, so the
-  field is still growing by roughly 3 repos a day this close to submission. Treat any
+- **Field size (re-measured 2026-09-30)**: **146 repos across roughly 137 distinct projects**
+  (138 owners, minus the one project published under two accounts), of which 58 explicitly cite
+  SIH / 26153 / NTRO. 19 were created and 36 were pushed to in just the 3 days since the previous
+  pass -- both rates roughly tripled versus the prior 10-day window, whether from a
+  submission-deadline effect or this survey catching a later-starting cohort. Treat any
   single-competitor comparison as necessarily incomplete, and re-run the survey rather than reusing
   these counts.
 - **Most of the field is not a threat; a few are.** A large share is empty scaffolding, and at least
