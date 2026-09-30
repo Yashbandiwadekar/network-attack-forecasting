@@ -48,6 +48,21 @@ The dashboard starts with no hosts: upload a PCAP/PCAPNG or a CICFlowMeter CSV f
 `curl -F "file=@data/raw/flows/synthetic_sample.csv" http://127.0.0.1:8000/api/v1/analysis/upload`)
 and it parses the capture, scores every host and forecasts 60 seconds ahead.
 
+**Two constraints worth knowing before you capture something yourself**, because either one
+produces an upload that succeeds and then shows no hosts:
+
+- **At least 2 minutes of traffic from the same source IP.** A host is scored only once it has
+  12 consecutive 10-second windows (`sequence_length` x `window_seconds`). A 30-second Wireshark
+  capture parses fine and scores nothing; the response says so (`"status": "partial"`).
+- **CSVs must use the CICFlowMeter schema.** The required fields are `dst_port`, `protocol`,
+  `timestamp`, `duration_us`, `fwd_pkts`, `bwd_pkts`, `fwd_bytes`, `bwd_bytes`, `syn_cnt`,
+  `ack_cnt`, `fin_cnt`, `rst_cnt`, `psh_cnt`, `urg_cnt`, `iat_mean`, `iat_std`, `iat_max`,
+  `label` (several common CIC/Zeek spellings are auto-renamed). A CSV with other columns is
+  rejected with 422 and the list of what is missing.
+
+PCAP has no schema requirement -- flow records are derived from the packets directly, so an
+ordinary Wireshark/tcpdump capture works, subject to the 2-minute rule above.
+
 ### Development (hot reload)
 
 For frontend work, run the two halves separately so Vite can hot-reload:

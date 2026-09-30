@@ -383,7 +383,11 @@ const Dashboard = () => {
                       Upload PCAP, PCAPNG, or Flow CSV File
                     </h3>
                     <p style={{ color: '#888888', fontSize: '0.85rem', textAlign: 'center', maxWidth: '500px' }}>
-                      Drag & drop network captures or click to select file. Supported: .pcap, .pcapng, .csv
+                      Drag &amp; drop network captures or click to select file. Supported: .pcap, .pcapng, .csv
+                    </p>
+                    <p style={{ color: '#888888', fontSize: '0.78rem', textAlign: 'center', maxWidth: '520px', marginTop: '0.5rem', fontFamily: 'var(--font-mono)' }}>
+                      Needs at least 2 minutes of traffic from the same source IP (12 consecutive
+                      10s windows). CSVs must use the CICFlowMeter schema.
                     </p>
                   </div>
                   <input type="file" onChange={handleFileUpload} style={{ display: 'none' }} accept=".pcap,.pcapng,.csv" />
