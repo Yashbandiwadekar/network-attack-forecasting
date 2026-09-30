@@ -47,57 +47,57 @@ const ALL_DATASETS = [
   { id: 'CTU-13', name: 'CTU-13', checkpoint_available: false, checkpoint_loaded: false },
 ];
 
-describe('DATA SOURCE CONTEXT Switching Workflow', () => {
+/** A server that also has a second trained model (e.g. a dev machine). */
+const TWO_MODELS = [
+  { id: 'CIC-IDS-2018', name: 'CIC-IDS-2018', checkpoint_available: true, checkpoint_loaded: true },
+  { id: 'UNSW-NB15', name: 'UNSW-NB15', checkpoint_available: true, checkpoint_loaded: true },
+  { id: 'CTU-13', name: 'CTU-13', checkpoint_available: false, checkpoint_loaded: false },
+];
+
+const renderDashboard = () =>
+  render(
+    <MemoryRouter>
+      <Dashboard />
+    </MemoryRouter>
+  );
+
+describe('ACTIVE MODEL selector', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Default: CIC-IDS-2018 is active
-    api.datasetApi.getDatasets.mockResolvedValue({
-      active_dataset: 'CIC-IDS-2018',
-      datasets: ALL_DATASETS,
-    });
+    api.datasetApi.getDatasets.mockResolvedValue({ active_dataset: 'CIC-IDS-2018', datasets: ALL_DATASETS });
     api.systemApi.getStatus.mockResolvedValue({ status: 'healthy', active_model: 'Transformer' });
     api.forecastApi.getHosts.mockResolvedValue({ hosts: [] });
     api.evalApi.getMetrics.mockResolvedValue({ n_seeds: 3, split: 'test', macro_f1: 0.91 });
   });
 
-  it('renders all configured datasets in the selector dropdown', async () => {
-    render(
-      <MemoryRouter>
-        <Dashboard />
-      </MemoryRouter>
-    );
+  it('shows a plain label, not a dropdown, when only one model exists on the server', async () => {
+    renderDashboard();
 
-    await waitFor(() => {
-      const select = screen.getByRole('combobox');
-      expect(select).toBeInTheDocument();
-      expect(screen.getByRole('option', { name: /CIC-IDS-2018/i })).toBeInTheDocument();
-      expect(screen.getByRole('option', { name: /UNSW-NB15/i })).toBeInTheDocument();
-      expect(screen.getByRole('option', { name: /CTU-13/i })).toBeInTheDocument();
-    });
+    const label = await screen.findByTestId('active-model-label');
+    expect(label).toHaveTextContent('CIC-IDS-2018');
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    // Models that are not deployed here are not offered at all.
+    expect(screen.queryByText(/UNSW-NB15/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/CTU-13/i)).not.toBeInTheDocument();
   });
 
-  it('switches dataset successfully when selecting an available dataset', async () => {
-    render(
-      <MemoryRouter>
-        <Dashboard />
-      </MemoryRouter>
-    );
+  it('lists only models whose checkpoint is present when there is more than one', async () => {
+    api.datasetApi.getDatasets.mockResolvedValue({ active_dataset: 'CIC-IDS-2018', datasets: TWO_MODELS });
+    renderDashboard();
 
-    // Wait for initial render to complete and dropdown to appear
+    await screen.findByRole('combobox');
+    expect(screen.getByRole('option', { name: 'CIC-IDS-2018' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'UNSW-NB15' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /CTU-13/i })).not.toBeInTheDocument();
+  });
+
+  it('switches model successfully when two are available', async () => {
+    api.datasetApi.getDatasets.mockResolvedValue({ active_dataset: 'CIC-IDS-2018', datasets: TWO_MODELS });
+    renderDashboard();
+
     const select = await screen.findByRole('combobox');
-    await screen.findByRole('option', { name: /UNSW-NB15/i });
-
-    // After a successful selectDataset, fetchInitialData will re-call getDatasets.
-    // We must update the mock BEFORE the change event so the re-fetch reflects the new state.
-    api.datasetApi.selectDataset.mockResolvedValueOnce({
-      status: 'success',
-      active_dataset: 'UNSW-NB15',
-    });
-    api.datasetApi.getDatasets.mockResolvedValue({
-      active_dataset: 'UNSW-NB15',
-      datasets: ALL_DATASETS,
-    });
+    api.datasetApi.selectDataset.mockResolvedValueOnce({ status: 'success', active_dataset: 'UNSW-NB15' });
+    api.datasetApi.getDatasets.mockResolvedValue({ active_dataset: 'UNSW-NB15', datasets: TWO_MODELS });
 
     await act(async () => {
       fireEvent.change(select, { target: { value: 'UNSW-NB15' } });
@@ -109,20 +109,14 @@ describe('DATA SOURCE CONTEXT Switching Workflow', () => {
     });
   });
 
-  it('retains previous dataset and displays informative error banner when switch fails', async () => {
-    // Simulate the backend rejecting a switch because the checkpoint is missing
+  it('keeps the previous model and shows an error banner when a switch fails', async () => {
+    api.datasetApi.getDatasets.mockResolvedValue({ active_dataset: 'CIC-IDS-2018', datasets: TWO_MODELS });
     api.datasetApi.selectDataset.mockRejectedValueOnce(
-      new Error('HTTP 409: UNSW-NB15 could not be activated because its forecasting checkpoint is not available on this installation.')
+      new Error('HTTP 409: UNSW-NB15 could not be activated because its forecasting checkpoint failed to load.')
     );
-
-    render(
-      <MemoryRouter>
-        <Dashboard />
-      </MemoryRouter>
-    );
+    renderDashboard();
 
     const select = await screen.findByRole('combobox');
-    await screen.findByRole('option', { name: /UNSW-NB15/i });
     expect(select.value).toBe('CIC-IDS-2018');
 
     await act(async () => {
@@ -131,11 +125,8 @@ describe('DATA SOURCE CONTEXT Switching Workflow', () => {
 
     await waitFor(() => {
       expect(api.datasetApi.selectDataset).toHaveBeenCalled();
-      // The error banner must contain the stripped message
       expect(screen.getByText(/could not be activated/i)).toBeInTheDocument();
     });
-
-    // The selector must retain the previous valid dataset (not roll forward to UNSW-NB15)
     expect(select.value).toBe('CIC-IDS-2018');
   });
 });

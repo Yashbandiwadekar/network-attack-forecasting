@@ -188,6 +188,8 @@ const Dashboard = () => {
     }
   };
 
+  const availableDatasets = (datasetsData?.datasets || []).filter((d) => d.checkpoint_available);
+
   return (
     <div className="gpf-dashboard-page">
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
@@ -200,20 +202,32 @@ const Dashboard = () => {
           <div className="dashboard-status-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.2rem', padding: '0.8rem 1.2rem', background: '#080808', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
               <Database size={16} className="text-orange" />
-              <span className="font-mono" style={{ fontSize: '0.8rem', color: '#a0a0a0' }}>DATA SOURCE CONTEXT:</span>
-              {/* BUG-006: disabled while switching, spinner visible during transition */}
-              <select
-                value={activeDataset}
-                onChange={handleDatasetChange}
-                disabled={datasetSwitching}
-                style={{ background: '#121212', color: datasetSwitching ? '#666' : '#ff6a00', border: `1px solid ${datasetSwitching ? 'rgba(255,106,0,0.2)' : 'rgba(255,106,0,0.4)'}`, borderRadius: '4px', padding: '0.3rem 0.8rem', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', cursor: datasetSwitching ? 'wait' : 'pointer' }}
-              >
-                {datasetsData?.datasets?.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}{!d.checkpoint_available ? ' (Model checkpoint unavailable)' : ''}
-                  </option>
-                ))}
-              </select>
+              <span className="font-mono" style={{ fontSize: '0.8rem', color: '#a0a0a0' }}>ACTIVE MODEL:</span>
+              {/* The server ships model checkpoints, not raw datasets (those are large and git-ignored),
+                  so only models actually present here are offered. With a single model there is nothing
+                  to switch, so it is shown as a plain label rather than a one-item dropdown. Analysis
+                  data comes from the capture the user uploads under Ingestion & Flows. */}
+              {availableDatasets.length > 1 ? (
+                <select
+                  value={activeDataset}
+                  onChange={handleDatasetChange}
+                  disabled={datasetSwitching}
+                  style={{ background: '#121212', color: datasetSwitching ? '#666' : '#ff6a00', border: `1px solid ${datasetSwitching ? 'rgba(255,106,0,0.2)' : 'rgba(255,106,0,0.4)'}`, borderRadius: '4px', padding: '0.3rem 0.8rem', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', cursor: datasetSwitching ? 'wait' : 'pointer' }}
+                >
+                  {availableDatasets.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <span
+                  className="font-mono"
+                  data-testid="active-model-label"
+                  style={{ fontSize: '0.8rem', color: '#ff6a00', border: '1px solid rgba(255,106,0,0.4)', borderRadius: '4px', padding: '0.3rem 0.8rem' }}
+                >
+                  {availableDatasets[0]?.name || activeDataset}
+                  <span style={{ color: '#888888' }}> · trained model loaded · upload a capture to analyse</span>
+                </span>
+              )}
               {/* BUG-006: spinner while switching datasets */}
               {datasetSwitching && (
                 <span style={{ fontSize: '0.75rem', color: '#f59e0b', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>

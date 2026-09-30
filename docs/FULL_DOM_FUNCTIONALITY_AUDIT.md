@@ -10,7 +10,7 @@
 - **Local Backend URL**: `http://127.0.0.1:8000/`
 - **Production Reference URL**: `https://phoenixidps.dpdns.org/`
 - **Audit Environment**: Windows 11 AMD64, Headless Google Chrome 154.0.8037.58 via Chrome DevTools Protocol (CDP), Node.js v24.13.0
-- **Evidence Directory**: `docs/audit-evidence/` (26 artifacts: screenshots, JSON execution logs)
+- **Evidence Directory**: `docs/audit-evidence/` (JSON execution logs only). The PNG screenshots this report cites by filename (e.g. `PHASE-4-landing-hero.png`) were removed from the repository to keep it small; those filenames are now historical references, not files you can open. The JSON logs remain the machine-readable evidence.
 
 ---
 
