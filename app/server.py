@@ -24,7 +24,7 @@ from typing import Any, Optional
 import numpy as np
 from fastapi import Depends, FastAPI, File, HTTPException, Security, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -34,9 +34,12 @@ from common.config import load_config, resolve_path
 from models.audit_ledger import AuditLedger
 from models.compliance import generate_cert_in_report
 from models.cve_lookup import related_capec, related_cves, snapshot_metadata
-from models.explain import gradient_input_attribution, summarize_attention
+from models.explain import (
+    PROVENANCE_NOTE, gradient_input_attribution, split_attribution, summarize_attention,
+)
 from models.forecast import ForecastEngine
 from models.narrative import generate_attack_narrative
+from models.report_pdf import build_incident_pdf
 from models.response import recommended_action
 from pipeline.mitre_mapping import CIC_LABEL_TO_STAGE, STAGE_CLASSIFICATION_LABELS
 
@@ -635,25 +638,16 @@ def get_attribution(req: PredictRequest):
     attn_pairs = summarize_attention(np.asarray(result.attentions)[0], int(config["windowing"]["sequence_length"]))
     values = np.asarray(attribution["attribution"], dtype=float)
     names = list(attribution["feature_names"])
-    order = np.argsort(-np.abs(values))[:10]
-    ranked = [(names[i], float(values[i])) for i in order]
-    # `share` is each feature's fraction of the TOTAL absolute attribution across all features, so
-    # it reads as "how much of the explanation is this feature" (0-1). `contribution` keeps the
-    # raw signed value; `direction` says whether the feature pushes the score up or down.
-    total_abs = float(np.abs(values).sum())
+    # Behavioural drivers and provenance artefacts (has_ip_data, ...) are reported separately, with
+    # shares taken over ALL features so a provenance flag's weight is shown, not hidden.
+    split = split_attribution(names, values, top_n=10)
     return {
         "host_ip": req.host_ip,
         "method": "gradient x input (on the infiltration logit)",
-        "attribution_total_abs": total_abs,
-        "feature_attributions": [
-            {
-                "feature": name,
-                "contribution": float(f"{value:.6g}"),
-                "share": round(abs(value) / total_abs, 4) if total_abs > 0 else 0.0,
-                "direction": "raises" if value > 0 else "lowers" if value < 0 else "neutral",
-            }
-            for name, value in ranked
-        ],
+        "attribution_total_abs": split["attribution_total_abs"],
+        "feature_attributions": split["behavioural"],
+        "provenance_attributions": split["provenance"],
+        "provenance_share_total": split["provenance_share_total"],
         "attention_weights": [round(float(w), 4) for _, w in attn_pairs],
         "attention_windows": [label for label, _ in attn_pairs],
     }
@@ -907,6 +901,78 @@ def simulate_isolation(req: SimulateIsolationRequest):
         "note": "This is a UI simulation. No real network or firewall change was made.",
         "timestamp": time.time(),
     }
+
+
+@app.get("/api/v1/reports/pdf/{host_ip}", dependencies=[Depends(_require_token)])
+def download_report_pdf(host_ip: str):
+    """The incident report for a host as a PDF.
+
+    Built from the host's most recent EXISTING ledger entry (so the PDF matches the report the user
+    generated, and its hashes are that entry's) -- this endpoint never appends to the ledger, so
+    downloading a PDF cannot alter the tamper-evident chain. Generate a report first.
+    """
+    import re
+
+    _require_data()
+    ledger = AuditLedger.load_or_create(_ledger_path())
+    entries = [e for e in ledger.entries if e.host == host_ip]
+    if not entries:
+        raise HTTPException(status_code=404, detail=f"No ledger entry for {host_ip}. Generate a report first.")
+    entry = entries[-1]
+    intact, _ = ledger.verify_integrity()
+
+    engine, config = _engine()
+    _, model, scaler, _ = _backend()
+    seq = _sequence_for(host_ip, config)
+    result = engine.rollout(seq)
+    feature_cols = service.feature_cols_for(config)
+    window_seconds = int(config["windowing"]["window_seconds"])
+    probs = [float(p) for p in result.infiltration_probs]
+    stages = list(result.stage_predictions)
+    heur = list(result.stage_is_heuristic) or [False] * len(stages)
+    peak_step = int(np.argmax(probs))
+    peak_stage = stages[peak_step]
+
+    narrative = _strip_markup(generate_attack_narrative(
+        host_ip, result, feature_cols, window_seconds, current_stage=_observed_stage(host_ip),
+    ))
+    action = recommended_action(peak_stage)
+    attribution = gradient_input_attribution(model, scaler.transform(seq[None, ...])[0], feature_cols, target="logit")
+    split = split_attribution(list(attribution["feature_names"]), attribution["attribution"], top_n=8)
+    detected_at = datetime.fromisoformat(entry.timestamp)
+    report = generate_cert_in_report(
+        host=host_ip, detected_at=detected_at, peak_stage=peak_stage, peak_infiltration_prob=probs[peak_step],
+        recommended_action=action["action"], narrative=narrative, ledger_hash=entry.record_hash,
+    )
+
+    pdf = build_incident_pdf({
+        "host": host_ip,
+        "generated_at": entry.timestamp,
+        "dataset_source": STATE.source_name or STATE.dataset_id,
+        "peak_prob": probs[peak_step],
+        "peak_stage": _display(peak_stage),
+        "horizon_seconds": len(probs) * window_seconds,
+        "forecast": [
+            {"seconds": (i + 1) * window_seconds, "prob": probs[i], "stage": _display(stages[i]), "heuristic": bool(heur[i])}
+            for i in range(len(probs))
+        ],
+        "compliance": {
+            "is_reportable": report.is_reportable, "category": report.category,
+            "detected_at": report.detected_at.isoformat(), "reporting_deadline": report.reporting_deadline.isoformat(),
+            "hours_remaining": report.hours_remaining,
+        },
+        "narrative": narrative,
+        "recommended_action": action,
+        "attributions": split["behavioural"],
+        "provenance_share_total": split["provenance_share_total"],
+        "provenance_note": PROVENANCE_NOTE,
+        "ledger": {"index": entry.index, "prev_hash": entry.prev_hash, "record_hash": entry.record_hash, "intact": intact},
+    })
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", host_ip)
+    return Response(
+        content=pdf, media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="incident-report-{safe}.pdf"'},
+    )
 
 
 @app.get("/api/v1/reports/download/{filename}", dependencies=[Depends(_require_token)])

@@ -12,7 +12,7 @@ import './AuditLedger.css';
  *
  * `report` is a /api/v1/reports/generate payload; `status` is /api/v1/system/status.
  */
-const AuditLedger = ({ report = null, status = null, onDownload = null }) => {
+const AuditLedger = ({ report = null, status = null, onDownload = null, onDownloadPdf = null }) => {
   const compliance = report?.compliance;
   const intact = status?.ledger_intact;
   const entries = status?.ledger_entries;
@@ -92,6 +92,12 @@ const AuditLedger = ({ report = null, status = null, onDownload = null }) => {
                   ' This capture is historical, so no live countdown is shown rather than a misleading one.'}
               </span>
             </div>
+          )}
+
+          {onDownloadPdf && (
+            <button type="button" className="ledger-download" onClick={onDownloadPdf}>
+              Download incident report (PDF)
+            </button>
           )}
 
           {onDownload && (

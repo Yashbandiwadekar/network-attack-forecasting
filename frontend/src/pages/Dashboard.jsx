@@ -588,6 +588,29 @@ const Dashboard = () => {
                     </div>
                   );
                 })()}
+
+                {/* Provenance flags (has_ip_data, ...) describe where the capture came from, not what
+                    the traffic did. The model does read them, so they are shown -- but apart from the
+                    behavioural drivers and with an explicit warning, never as attack evidence. */}
+                {attributionData?.provenance_attributions?.length > 0
+                  && attributionData.provenance_share_total >= 0.01 && (
+                  <div
+                    data-testid="provenance-callout"
+                    style={{ marginTop: '1.2rem', padding: '0.8rem 1rem', border: '1px solid rgba(250,178,25,0.5)', borderLeft: '3px solid #fab219', background: 'rgba(250,178,25,0.07)', borderRadius: '4px' }}
+                  >
+                    <div className="font-mono" style={{ fontSize: '0.72rem', letterSpacing: '0.04em', color: '#fab219', marginBottom: '0.4rem' }}>
+                      DATASET ARTEFACT — NOT ATTACK EVIDENCE ({(attributionData.provenance_share_total * 100).toFixed(1)}% OF THIS EXPLANATION)
+                    </div>
+                    {attributionData.provenance_attributions.filter((a) => a.share >= 0.005).map((a) => (
+                      <div key={a.feature} className="font-mono" style={{ fontSize: '0.75rem', color: '#e0e0e0', marginBottom: '0.3rem' }}>
+                        {a.feature}: {a.direction === 'lowers' ? '−' : '+'}{(a.share * 100).toFixed(1)}%
+                      </div>
+                    ))}
+                    <div style={{ fontSize: '0.72rem', color: '#a0a0a0', lineHeight: 1.5, marginTop: '0.3rem' }}>
+                      {attributionData.provenance_attributions[0].note}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {narrativeData && (
@@ -679,6 +702,19 @@ const Dashboard = () => {
                   <AuditLedger
                     report={reportResult}
                     status={systemStatus}
+                    onDownloadPdf={async () => {
+                      try {
+                        const { blob, filename } = await reportApi.downloadReportPdf(reportResult.host_ip);
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = filename || `incident-report-${reportResult.host_ip}.pdf`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                      } catch (err) {
+                        console.error('PDF report download failed:', err);
+                      }
+                    }}
                     onDownload={async () => {
                       try {
                         const doc = await reportApi.downloadReport(`${reportResult.host_ip}.json`);

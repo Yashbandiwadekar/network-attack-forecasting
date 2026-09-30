@@ -71,6 +71,53 @@ def gradient_input_attribution(
     }
 
 
+# Features that record where a capture CAME FROM, not what the traffic DID. `has_ip_data` is 0 for the
+# CIC-IDS-2018 days that strip real IP addresses (windowing then aggregates the whole day into one
+# "NETWORK-<date>" pseudo-host) and 1 for days/datasets that keep them; `has_packet_features` is 1
+# only when a PCAP supplied packet-level columns. The trained model genuinely reads them, and in
+# training they correlate with the label through which days had IPs -- a dataset shortcut. They are
+# reported separately so a provenance flag is never presented as evidence of attacker behaviour.
+PROVENANCE_FEATURES = ("has_ip_data", "has_packet_features")
+
+PROVENANCE_NOTE = (
+    "Data-provenance flag, not traffic behaviour. It records whether the capture carried real IP "
+    "addresses (or packet-level data), and the model has learned a shortcut from it because of which "
+    "training days had them. Treat this share as a dataset artefact, not evidence of an attack."
+)
+
+
+def split_attribution(feature_names: list[str], values: np.ndarray, top_n: int = 10) -> dict:
+    """Break a per-feature attribution into behavioural drivers and provenance artefacts.
+
+    `share` is each feature's fraction of the TOTAL absolute attribution over ALL features, so the
+    provenance features are not hidden and the behavioural shares do not silently re-normalise to
+    100% -- if a provenance flag holds 20% of the explanation, that is reported as 20%.
+    """
+    values = np.asarray(values, dtype=float)
+    total_abs = float(np.abs(values).sum())
+
+    def entry(i: int) -> dict:
+        v = float(values[i])
+        return {
+            "feature": feature_names[i],
+            "contribution": float(f"{v:.6g}"),
+            "share": round(abs(v) / total_abs, 4) if total_abs > 0 else 0.0,
+            "direction": "raises" if v > 0 else "lowers" if v < 0 else "neutral",
+        }
+
+    provenance_idx = [i for i, n in enumerate(feature_names) if n in PROVENANCE_FEATURES]
+    behavioural_idx = [i for i, n in enumerate(feature_names) if n not in PROVENANCE_FEATURES]
+    behavioural = sorted(behavioural_idx, key=lambda i: -abs(values[i]))[:top_n]
+    provenance = sorted(provenance_idx, key=lambda i: -abs(values[i]))
+    provenance_entries = [{**entry(i), "note": PROVENANCE_NOTE} for i in provenance]
+    return {
+        "attribution_total_abs": total_abs,
+        "behavioural": [entry(i) for i in behavioural],
+        "provenance": provenance_entries,
+        "provenance_share_total": round(sum(e["share"] for e in provenance_entries), 4),
+    }
+
+
 class ShapExplainer:
     """SHAP attribution for the infiltration-probability head, varying only the most recent
     window's features while holding the preceding L-1 windows of history fixed at their observed

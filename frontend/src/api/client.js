@@ -43,3 +43,26 @@ export async function apiFetch(endpoint, options = {}) {
 
   return response.json();
 }
+
+/* Binary download (e.g. a PDF). apiFetch always parses JSON, so files need their own path; the auth
+   header and error shape are the same. Returns { blob, filename }. */
+export async function apiFetchBlob(endpoint, options = {}) {
+  const token = localStorage.getItem('token') || 'phoenix_demo_jwt_token_2026_secured';
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers },
+  });
+  if (!response.ok) {
+    let detail = 'Download failed';
+    try {
+      const j = await response.json();
+      detail = j.detail || JSON.stringify(j);
+    } catch {
+      detail = await response.text();
+    }
+    throw new Error(`HTTP ${response.status}: ${detail}`);
+  }
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const match = /filename="?([^";]+)"?/.exec(disposition);
+  return { blob: await response.blob(), filename: match ? match[1] : null };
+}
