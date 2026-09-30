@@ -628,18 +628,31 @@ def get_attribution(req: PredictRequest):
     seq = _sequence_for(req.host_ip, config)
     feature_cols = service.feature_cols_for(config)
     scaled = scaler.transform(seq[None, ...])[0]
-    attribution = gradient_input_attribution(model, scaled, feature_cols)
+    # Logit target: a saturated model (peak probability ~0.9997 on the recorded run) has a vanishing
+    # probability gradient, so every attribution rounded to 0.0%. Same ranking, no underflow.
+    attribution = gradient_input_attribution(model, scaled, feature_cols, target="logit")
     result = engine.rollout(seq)
     attn_pairs = summarize_attention(np.asarray(result.attentions)[0], int(config["windowing"]["sequence_length"]))
     values = np.asarray(attribution["attribution"], dtype=float)
     names = list(attribution["feature_names"])
     order = np.argsort(-np.abs(values))[:10]
     ranked = [(names[i], float(values[i])) for i in order]
+    # `share` is each feature's fraction of the TOTAL absolute attribution across all features, so
+    # it reads as "how much of the explanation is this feature" (0-1). `contribution` keeps the
+    # raw signed value; `direction` says whether the feature pushes the score up or down.
+    total_abs = float(np.abs(values).sum())
     return {
         "host_ip": req.host_ip,
-        "method": "gradient x input",
+        "method": "gradient x input (on the infiltration logit)",
+        "attribution_total_abs": total_abs,
         "feature_attributions": [
-            {"feature": name, "contribution": round(float(value), 6)} for name, value in ranked
+            {
+                "feature": name,
+                "contribution": float(f"{value:.6g}"),
+                "share": round(abs(value) / total_abs, 4) if total_abs > 0 else 0.0,
+                "direction": "raises" if value > 0 else "lowers" if value < 0 else "neutral",
+            }
+            for name, value in ranked
         ],
         "attention_weights": [round(float(w), 4) for _, w in attn_pairs],
         "attention_windows": [label for label, _ in attn_pairs],

@@ -27,15 +27,25 @@ def summarize_attention(attention_row: np.ndarray, sequence_length: int) -> list
     return sorted(pairs, key=lambda p: -p[1])
 
 
-def gradient_input_attribution(model: WorldModel, scaled_sequence: np.ndarray, feature_names: list[str]) -> dict:
-    """Gradient x input attribution for the infiltration-probability head, w.r.t. the most recent
+def gradient_input_attribution(
+    model: WorldModel, scaled_sequence: np.ndarray, feature_names: list[str], target: str = "probability",
+) -> dict:
+    """Gradient x input attribution for the infiltration head, w.r.t. the most recent
     window's features only (same "what about the current snapshot" framing as ShapExplainer, held
     to the same last-window scope for a fair side-by-side). One forward + one backward pass —
     orders of magnitude cheaper than SHAP's sampling, at the cost of being a local linear
     approximation rather than a sampled attribution.
 
     scaled_sequence: (L, F) already feature-scaled (same scaler used for training/rollout).
+
+    target: "probability" (default, what ShapExplainer explains) or "logit". When the model is
+    saturated (probability near 0 or 1) the sigmoid's gradient vanishes, so every probability
+    attribution collapses to ~1e-4 and a UI showing it reads 0.0% for every feature. The
+    probability gradient is the logit gradient times the per-sample constant p(1-p), so the two
+    give the SAME ranking and the same relative shares; "logit" simply avoids the underflow.
     """
+    if target not in ("probability", "logit"):
+        raise ValueError(f"target must be 'probability' or 'logit', got {target!r}")
     device = next(model.parameters()).device
     was_training = model.training
     model.eval()
@@ -43,9 +53,9 @@ def gradient_input_attribution(model: WorldModel, scaled_sequence: np.ndarray, f
         x = torch.tensor(scaled_sequence, dtype=torch.float32, device=device).unsqueeze(0)
         x.requires_grad_(True)
         _, _, infiltration_logit = model(x)
-        infiltration_prob = torch.sigmoid(infiltration_logit)
+        output = infiltration_logit if target == "logit" else torch.sigmoid(infiltration_logit)
         model.zero_grad(set_to_none=True)
-        infiltration_prob.backward()
+        output.sum().backward()
     finally:
         model.train(was_training)
 

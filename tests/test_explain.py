@@ -57,3 +57,38 @@ def test_shap_explainer_shape():
 
     assert result["shap_values"].shape == (n_features,)
     assert len(result["top_features"]) == 5
+
+
+def test_logit_target_gives_same_ranking_as_probability_target():
+    """d(prob)/dx = p(1-p) * d(logit)/dx, a per-sample constant, so switching the target must not
+    change which features matter or their relative sizes -- only avoid the saturation underflow."""
+    import pytest
+
+    n_features = 6
+    model = _model(n_features)
+    seq = np.random.RandomState(0).randn(5, n_features).astype(np.float32)
+    names = [f"f{i}" for i in range(n_features)]
+    prob = gradient_input_attribution(model, seq, names, target="probability")["attribution"]
+    logit = gradient_input_attribution(model, seq, names, target="logit")["attribution"]
+    assert list(np.argsort(-np.abs(prob))) == list(np.argsort(-np.abs(logit)))
+    ratio = prob / logit
+    assert np.allclose(ratio, ratio[0], rtol=1e-3)  # one constant across all features
+    with pytest.raises(ValueError):
+        gradient_input_attribution(model, seq, names, target="nonsense")
+
+
+def test_logit_target_survives_a_saturated_model():
+    """The bug this guards: with the infiltration output pushed to saturation the probability
+    gradient collapses toward zero (every UI row read 0.0%) while the logit gradient does not."""
+    import torch
+
+    n_features = 6
+    model = _model(n_features)
+    with torch.no_grad():
+        for p in model.parameters():
+            p.mul_(40.0)  # drive the logit far from 0 so sigmoid saturates
+    seq = np.random.RandomState(1).randn(5, n_features).astype(np.float32)
+    names = [f"f{i}" for i in range(n_features)]
+    prob = np.abs(gradient_input_attribution(model, seq, names, target="probability")["attribution"]).sum()
+    logit = np.abs(gradient_input_attribution(model, seq, names, target="logit")["attribution"]).sum()
+    assert logit > prob * 100

@@ -129,6 +129,29 @@ def test_attribution_contract_uses_real_feature_names(loaded: TestClient):
 
 
 @needs_sample
+def test_attribution_shares_are_a_proper_breakdown_not_raw_gradients(loaded: TestClient):
+    """The UI printed raw gradient x input values as percentages (0.0% everywhere on a saturated
+    host) and drew negative values as negative CSS widths. `share` is the fraction of total
+    attribution, so it must be in [0, 1], sum to at most 1 over the returned top features, and
+    `direction` must agree with the sign of the raw contribution."""
+    ip = _first_host(loaded)
+    body = loaded.post("/api/v1/explainability/attribution", json={"host_ip": ip}).json()
+    attrs = body["feature_attributions"]
+    assert body["attribution_total_abs"] >= 0
+    for a in attrs:
+        assert 0.0 <= a["share"] <= 1.0
+        assert a["direction"] in ("raises", "lowers", "neutral")
+        if a["contribution"] > 0:
+            assert a["direction"] == "raises"
+        if a["contribution"] < 0:
+            assert a["direction"] == "lowers"
+    assert sum(a["share"] for a in attrs) <= 1.0001
+    shares = [a["share"] for a in attrs]
+    assert shares == sorted(shares, reverse=True), "ranked by magnitude"
+    assert max(shares) > 0.01, "a real host must show a measurable top attribution"
+
+
+@needs_sample
 def test_narrative_contract(loaded: TestClient):
     ip = _first_host(loaded)
     body = loaded.get("/api/v1/attacks/narrative", params={"host_ip": ip}).json()

@@ -533,25 +533,61 @@ const Dashboard = () => {
             <div className="tab-content">
               <div className="gpf-panel">
                 <div className="panel-header-mono">
-                  <span>FEATURE IMPORTANCE & SHAP ATTRIBUTION</span>
+                  <span>FEATURE IMPORTANCE · GRADIENT × INPUT</span>
                   <span>TARGET: {selectedHostIp || 'SELECT HOST'}</span>
                 </div>
 
-                {attributionData && attributionData.feature_attributions && (
-                  <div className="attribution-list">
-                    {attributionData.feature_attributions.map((attr, idx) => (
-                      <div key={idx} className="attr-item">
-                        <div className="attr-header">
-                          <span>{attr.feature}</span>
-                          <span style={{ color: '#ff6a00' }}>{(attr.contribution * 100).toFixed(1)}%</span>
+                {attributionData && attributionData.feature_attributions && (() => {
+                  const attrs = attributionData.feature_attributions;
+                  // `share` (fraction of total attribution) comes from the API. Older responses
+                  // only carry the raw signed `contribution`, so fall back to its share of the
+                  // displayed features rather than printing a raw gradient value as a percentage.
+                  const fallbackTotal = attrs.reduce((t, a) => t + Math.abs(a.contribution), 0);
+                  const shareOf = (a) => (typeof a.share === 'number'
+                    ? a.share
+                    : (fallbackTotal > 0 ? Math.abs(a.contribution) / fallbackTotal : 0));
+                  const dirOf = (a) => a.direction || (a.contribution > 0 ? 'raises' : a.contribution < 0 ? 'lowers' : 'neutral');
+                  const maxShare = Math.max(...attrs.map(shareOf), 0);
+                  const hasSignal = maxShare > 0;
+                  return (
+                    <div className="attribution-list">
+                      {!hasSignal && (
+                        <div className="font-mono" style={{ fontSize: '0.75rem', color: '#a0a0a0', marginBottom: '0.8rem' }}>
+                          No measurable attribution for this host.
                         </div>
-                        <div className="attr-bar-bg">
-                          <div className="attr-bar-fill" style={{ width: `${attr.contribution * 100}%` }}></div>
+                      )}
+                      {hasSignal && (
+                        <div className="font-mono" style={{ fontSize: '0.68rem', color: '#888888', marginBottom: '0.8rem' }}>
+                          Share of the explanation per feature. <span style={{ color: '#ff6a00' }}>Orange</span> pushes the
+                          infiltration score up, <span style={{ color: '#33c9ff' }}>blue</span> pushes it down.
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      )}
+                      {attrs.map((attr, idx) => {
+                        const share = shareOf(attr);
+                        const dir = dirOf(attr);
+                        const color = dir === 'lowers' ? '#33c9ff' : '#ff6a00';
+                        return (
+                          <div key={idx} className="attr-item">
+                            <div className="attr-header">
+                              <span>{attr.feature}</span>
+                              <span style={{ color }}>
+                                {dir === 'lowers' ? '−' : dir === 'raises' ? '+' : ''}{(share * 100).toFixed(1)}%
+                              </span>
+                            </div>
+                            <div className="attr-bar-bg">
+                              {/* Width is scaled to the largest share and can never go negative
+                                  (a negative CSS width is invalid, and browsers then fill the track). */}
+                              <div
+                                className="attr-bar-fill"
+                                style={{ width: `${maxShare > 0 ? (share / maxShare) * 100 : 0}%`, background: color }}
+                              ></div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
 
               {narrativeData && (
