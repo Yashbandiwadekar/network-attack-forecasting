@@ -22,8 +22,8 @@
 # depending on how CIC-IDS-2018 itself is split.
 
 paths:
-  raw_flow_dir: "V:/Datasets/UNSW NB15/CSV Files"
-  raw_pcap_dir: "V:/Datasets/UNSW NB15/pcap files"
+  raw_flow_dir: data/raw/unsw_nb15
+  raw_pcap_dir: data/raw/unsw_nb15/pcap
   processed_dir: data/processed_unsw_pkt_flowonly
   checkpoint_dir: checkpoints_unsw_pkt_flowonly
   eval_report: docs/04-evaluation-unsw-pkt-flowonly.md

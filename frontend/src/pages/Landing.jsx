@@ -17,7 +17,7 @@ import './Landing.css';
 const Landing = () => {
   const navigate = useNavigate();
 
-  const { status, predict, hosts, report, capture, narrative } = showcase;
+  const { status, predict, hosts, report, capture } = showcase;
   const topHost = hosts?.[0];
   const provenance = `Recorded run · ${capture.dataset} · ${capture.day} · ${showcase.upload.extracted_flows.toLocaleString()} flows`;
 

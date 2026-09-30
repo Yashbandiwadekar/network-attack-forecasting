@@ -6,7 +6,6 @@ import {
   buildNetworkTopology,
   updateParticlePosAndColor,
   setControls,
-  DEFAULT_DESKTOP_PARTICLE_COUNT,
   getAdaptiveParticleCount
 } from './particleBehavior';
 import './particleStyles.css';
@@ -62,10 +61,23 @@ const NetworkField = ({ particleCount, controlsConfig, isPaused, mode, clickPuls
     setControls(controlsConfig);
   }, [controlsConfig]);
 
-  useFrame((state) => {
+  // BUG-008: manual elapsed-time accumulator using useFrame's delta parameter.
+  // THREE.Clock is deprecated in Three.js >=0.169 — state.clock.getElapsedTime() would
+  // trigger the "THREE.Clock: This module has been deprecated" warning on every frame.
+  // Accumulating delta ourselves produces identical timing without touching THREE.Clock.
+  const elapsedRef = useRef(0);
+
+  // BUG-007 (react/immutability): linePositions, lineColors, and nodeCurrentPositions are
+  // Float32Array buffers that MUST be mutated in-place per frame — this is the required
+  // Three.js/R3F pattern for updating BufferGeometry attributes. Using useState or
+  // useReducer would allocate a new array every frame and thrash the GC. The mutation
+  // happens inside useFrame (outside React's render cycle), so it cannot cause tearing.
+  // eslint-disable-next-line react/immutability -- intentional Three.js buffer mutation
+  useFrame((_state, delta) => {
     if (!meshRef.current || !linesRef.current) return;
 
-    const time = isPaused ? 0 : state.clock.getElapsedTime();
+    if (!isPaused) elapsedRef.current += delta;
+    const time = isPaused ? 0 : elapsedRef.current;
     const activeCount = Math.floor(particleCount * (controlsConfig.density || 0.85));
 
     for (let i = 0; i < particleCount; i++) {
@@ -121,7 +133,6 @@ const NetworkField = ({ particleCount, controlsConfig, isPaused, mode, clickPuls
       const edge = edgesList[e];
       const i = edge[0];
       const j = edge[1];
-      const maxDist = edge[2];
       const edgeType = edge[3];
 
       if (i >= activeCount || j >= activeCount) continue;

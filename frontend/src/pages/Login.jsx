@@ -1,6 +1,6 @@
 import React, { useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, X } from 'lucide-react';
 import { authApi } from '../api';
 import './Login.css';
 
@@ -10,17 +10,18 @@ const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [theme, setTheme] = useState('orange');
-  const [loginError, setLoginError] = useState(null);
+  const theme = 'orange';
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // BUG-005: replaced dead href="#" with an honest modal state
+  const [showForgotModal, setShowForgotModal] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setLoginError(null);
     try {
       const res = await authApi.login(email, password);
       if (res && res.access_token) {
+        // BUG-002 fix: store under canonical key 'token' (client.js reads 'token')
         localStorage.setItem('token', res.access_token);
       }
       localStorage.setItem('auth', 'true');
@@ -45,7 +46,7 @@ const Login = () => {
       if (res && res.access_token) {
         localStorage.setItem('token', res.access_token);
       }
-    } catch (err) {
+    } catch {
       localStorage.setItem('token', 'phoenix_demo_jwt_token_2026_secured');
     } finally {
       localStorage.setItem('auth', 'true');
@@ -100,25 +101,78 @@ const Login = () => {
               />
             </div>
             
-            <button type="submit" className="btn-primary login-btn">Sign In</button>
+            <button type="submit" className="btn-primary login-btn" disabled={isSubmitting}>
+              {isSubmitting ? 'Signing In...' : 'Sign In'}
+            </button>
           </form>
 
           <div className="demo-divider">
             <span>OR</span>
           </div>
 
-          <button onClick={handleDemoAccess} className="btn-demo login-btn">
-            Use Demo Account
+          <button onClick={handleDemoAccess} className="btn-demo login-btn" disabled={isSubmitting}>
+            {isSubmitting ? 'Connecting...' : 'Use Demo Account'}
           </button>
           <div className="demo-notice">
             Demo credential: <code>demo@phoenixidps.local</code>
           </div>
 
           <div className="login-links">
-            <a href="#" className="forgot-password">Forgot Password?</a>
+            {/* BUG-005: replaced dead href="#" with a button that opens an honest modal */}
+            <button
+              type="button"
+              className="forgot-password"
+              onClick={() => setShowForgotModal(true)}
+            >
+              Forgot Password?
+            </button>
           </div>
         </div>
       </div>
+
+      {/* BUG-005: Honest "Forgot Password" modal — no fake reset email is sent */}
+      {showForgotModal && (
+        <div
+          className="forgot-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Password information"
+          onClick={() => setShowForgotModal(false)}
+        >
+          <div
+            className="forgot-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="forgot-modal-close"
+              aria-label="Close"
+              onClick={() => setShowForgotModal(false)}
+            >
+              <X size={16} />
+            </button>
+            <h3>Password Recovery</h3>
+            <p>
+              Phoenix IDPS is a <strong>demo application</strong>. There is no persistent
+              user database or password-reset email system.
+            </p>
+            <p>
+              To access the dashboard, use the demo credentials below or click{' '}
+              <strong>Use Demo Account</strong>.
+            </p>
+            <div className="forgot-modal-creds">
+              <div><span>Email:</span> <code>demo@phoenixidps.local</code></div>
+              <div><span>Password:</span> <code>PhoenixDemo@2026!</code></div>
+            </div>
+            <button
+              className="btn-primary"
+              style={{ marginTop: '1rem', width: '100%' }}
+              onClick={() => setShowForgotModal(false)}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

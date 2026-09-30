@@ -94,6 +94,8 @@ const Navbar = () => {
           ) : (
             <button className="btn-ghost" onClick={() => {
               localStorage.removeItem('auth');
+              localStorage.removeItem('token');
+              localStorage.removeItem('access_token');
               navigate('/');
             }}>
               Logout

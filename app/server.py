@@ -30,7 +30,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app import service
-from common.config import resolve_path
+from common.config import load_config, resolve_path
 from models.audit_ledger import AuditLedger
 from models.compliance import generate_cert_in_report
 from models.cve_lookup import related_capec, related_cves, snapshot_metadata
@@ -277,9 +277,9 @@ def read_root():
 
 
 def _dataset_registry() -> list[dict[str, Any]]:
-    """Only configs that actually exist on disk, with sizes read from each processed
-    metadata.json. Datasets without a built dataset are listed as unavailable rather than
-    given invented sequence counts."""
+    """Exposes explicit dataset and checkpoint capability information.
+    Separates dataset availability (processed data / metadata) from model checkpoint availability,
+    and returns machine-independent path and capability data."""
     out: list[dict[str, Any]] = []
     for ds_id, cfg_name in (("CIC-IDS-2018", "real_data.yaml"),
                             ("UNSW-NB15", "unsw_nb15.yaml"),
@@ -287,25 +287,81 @@ def _dataset_registry() -> list[dict[str, Any]]:
         cfg_path = PROJECT_ROOT / "configs" / cfg_name
         if not cfg_path.exists():
             continue
-        entry: dict[str, Any] = {
-            "id": ds_id,
-            "name": ds_id,
-            "config": f"configs/{cfg_name}",
-            "status": "Unavailable",
-            "total_sequences": None,
-            "features": None,
-        }
         try:
-            config, model, _, _ = service.load_backend(f"configs/{cfg_name}")
-            meta_path = resolve_path(config, "processed_dir") / "metadata.json"
-            if meta_path.exists():
-                meta = json.loads(meta_path.read_text(encoding="utf-8"))
-                entry["total_sequences"] = meta.get("num_sequences")
-                entry["features"] = len(meta.get("feature_columns", [])) or None
-                entry["status"] = "Available" if model is not None else "No checkpoint"
-            entry["checkpoint_loaded"] = model is not None
+            config = load_config(f"configs/{cfg_name}")
+            checkpoint_dir = resolve_path(config, "checkpoint_dir")
+            checkpoint_path = checkpoint_dir / "world_model_best.pt"
+            processed_dir = resolve_path(config, "processed_dir")
+            meta_path = processed_dir / "metadata.json"
+            scaler_path = processed_dir / "scaler.npz"
+
+            meta_exists = meta_path.exists()
+            checkpoint_exists = checkpoint_path.exists()
+            scaler_exists = scaler_path.exists()
+
+            total_sequences = None
+            features_count = None
+            if meta_exists:
+                try:
+                    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                    total_sequences = meta.get("num_sequences")
+                    features_count = len(meta.get("feature_columns", [])) or None
+                except Exception:
+                    pass
+
+            config_obj, model, scaler, _ = service.load_backend(f"configs/{cfg_name}")
+            model_loaded = (model is not None and scaler is not None)
+
+            # Audit Section 6 & 15: explicit separation of dataset vs model capability
+            if model_loaded:
+                status = "Available"
+                reason = None
+            elif meta_exists and not checkpoint_exists:
+                status = "Model checkpoint unavailable"
+                reason = f"Forecasting checkpoint not found at {checkpoint_path}."
+            elif not meta_exists and not checkpoint_exists:
+                status = "Dataset and checkpoint unavailable"
+                reason = f"Processed dataset and forecasting checkpoint not found."
+            elif not scaler_exists:
+                status = "Model checkpoint unavailable"
+                reason = f"Feature scaler not found at {scaler_path}."
+            else:
+                status = "Checkpoint unavailable"
+                reason = "Model checkpoint or scaler could not be loaded."
+
+            entry: dict[str, Any] = {
+                "id": ds_id,
+                "name": ds_id,
+                "config": f"configs/{cfg_name}",
+                "status": status,
+                "total_sequences": total_sequences,
+                "features": features_count,
+                "checkpoint_loaded": model_loaded,
+                "dataset_available": meta_exists,
+                "checkpoint_available": model_loaded,
+                "can_select": True,
+                "can_forecast": model_loaded,
+                "reason": reason,
+                "checkpoint_path": str(checkpoint_path),
+                "processed_dir": str(processed_dir),
+            }
         except Exception as exc:
-            entry["status"] = f"Unreadable: {type(exc).__name__}"
+            entry = {
+                "id": ds_id,
+                "name": ds_id,
+                "config": f"configs/{cfg_name}",
+                "status": f"Unreadable: {type(exc).__name__}",
+                "total_sequences": None,
+                "features": None,
+                "checkpoint_loaded": False,
+                "dataset_available": False,
+                "checkpoint_available": False,
+                "can_select": True,
+                "can_forecast": False,
+                "reason": str(exc),
+                "checkpoint_path": "",
+                "processed_dir": "",
+            }
         out.append(entry)
     return out
 
@@ -316,11 +372,31 @@ def get_datasets():
     meta_path = resolve_path(config, "processed_dir") / "metadata.json"
     real_metadata = {}
     if meta_path.exists():
-        real_metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+        try:
+            real_metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
     return {
         "active_dataset": STATE.dataset_id,
         "datasets": _dataset_registry(),
         "real_metadata": real_metadata,
+    }
+
+
+@app.get("/api/v1/datasets/diagnostics", dependencies=[Depends(_require_token)])
+def get_dataset_diagnostics():
+    """Developer diagnostics endpoint exposing discovered dataset and checkpoint locations."""
+    return {
+        "active_dataset": STATE.dataset_id,
+        "active_config": STATE.config_path,
+        "project_root": str(PROJECT_ROOT),
+        "environment_overrides": {
+            k: os.environ[k]
+            for k in ("PHOENIX_DATA_DIR", "PHOENIX_MODEL_DIR", "PHOENIX_CHECKPOINTS_DIR",
+                      "PHOENIX_RAW_FLOW_DIR", "PHOENIX_PROCESSED_DIR", "PHOENIX_CHECKPOINT_DIR")
+            if k in os.environ
+        },
+        "datasets": _dataset_registry(),
     }
 
 
@@ -329,11 +405,25 @@ def select_dataset(req: SelectDatasetRequest):
     ds = next((d for d in _dataset_registry() if d["id"] == req.dataset_id), None)
     if not ds:
         raise HTTPException(status_code=404, detail="Dataset not found")
-    if not ds.get("checkpoint_loaded"):
+    if not ds.get("checkpoint_available"):
+        missing_msg = ds.get("reason") or "forecasting checkpoint is not available on this installation"
         raise HTTPException(
             status_code=409,
-            detail=f"{req.dataset_id} has no trained checkpoint, so it cannot be made active.",
+            detail=f"{req.dataset_id} could not be activated because its {missing_msg}",
         )
+
+    # Atomic validation: ensure model checkpoint and scaler can load before changing active state
+    try:
+        new_config, new_model, new_scaler, _ = service.load_backend(ds["config"])
+        if new_model is None or new_scaler is None:
+            raise ValueError(f"Failed to load checkpoint or scaler for {req.dataset_id}.")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=f"{req.dataset_id} failed to activate: {exc}",
+        )
+
+    # Commit state change atomically
     STATE.config_path = ds["config"]
     STATE.dataset_id = ds["id"]
     STATE.reset_data()  # scores from another model/dataset must not survive the switch

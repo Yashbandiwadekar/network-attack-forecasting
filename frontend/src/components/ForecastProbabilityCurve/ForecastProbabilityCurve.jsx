@@ -22,7 +22,10 @@ const ForecastProbabilityCurve = ({
   heuristicFlags = [],
   disclosureNotes = [],
   horizonSeconds = null,
-  currentStep = 1,
+  // BUG-007: prefixed with _ — prop is part of the external API but not consumed in render
+  // (the curve renders all steps simultaneously rather than a single "current" pointer)
+  currentStep: _currentStep = 1,
+
   stage_is_heuristic = false,
   isLoading = false,
   error = null,

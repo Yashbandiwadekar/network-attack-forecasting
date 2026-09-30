@@ -7,6 +7,7 @@ const Header = ({ systemStatus, selectedHost }) => {
   
   const handleLogout = () => {
     localStorage.removeItem('auth');
+    localStorage.removeItem('token');
     localStorage.removeItem('access_token');
     navigate('/login');
   };

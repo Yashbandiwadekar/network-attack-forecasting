@@ -23,8 +23,8 @@
 # depending on how CIC-IDS-2018 itself is split.
 
 paths:
-  raw_flow_dir: "V:/Datasets/CIC-IDS-2018/Wednesday-14-02-2018/pcap"
-  raw_pcap_dir: "V:/Datasets/CIC-IDS-2018/Wednesday-14-02-2018/pcap"
+  raw_flow_dir: data/raw/cic_pkt/pcap
+  raw_pcap_dir: data/raw/cic_pkt/pcap
   processed_dir: data/processed_cic_pkt_flowonly
   checkpoint_dir: checkpoints_cic_pkt_flowonly
   eval_report: docs/04-evaluation-cic-pkt-flowonly.md
