@@ -35,7 +35,7 @@ const Hero = () => {
 
   return (
     <div className="hero-section">
-      <Suspense fallback={<div className="particle-container" style={{ background: '#000000' }} />}>
+      <Suspense fallback={<div className="particle-container" style={{ background: 'var(--bg-void)' }} />}>
         <ParticleNetwork
           controlsConfig={particleConfig}
           isPaused={isPaused}

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from models.explain import summarize_attention
+from models.explain import PROVENANCE_FEATURES, summarize_attention
 from models.forecast import ForecastResult
 from models.response import recommended_action
 from pipeline.mitre_mapping import BENIGN
@@ -53,7 +53,11 @@ def generate_attack_narrative(
     attn_pairs = summarize_attention(result.attentions[0], result.attentions.shape[1])
     top_window, top_weight = attn_pairs[0]
 
-    delta_order = np.argsort(-np.abs(result.state_deltas[0]))[:3]
+    # Provenance flags (has_ip_data, ...) describe the capture, not the traffic, so they are never
+    # named as a behavioural shift -- see models/explain.py::PROVENANCE_FEATURES.
+    behavioural = [i for i, n in enumerate(feature_cols) if n not in PROVENANCE_FEATURES]
+    delta_abs = np.abs(result.state_deltas[0])
+    delta_order = sorted(behavioural, key=lambda i: -delta_abs[i])[:3]
     top_delta_features = ", ".join(feature_cols[i] for i in delta_order)
 
     action = recommended_action(peak_stage)

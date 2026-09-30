@@ -68,7 +68,7 @@ const ForecastTimeline = ({
               <span className="card-stage">{item.stage}</span>
               <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                 {item.isHeuristic && (
-                  <span className="badge-risk low" style={{ background: 'rgba(255, 170, 0, 0.2)', color: '#ffaa00', borderColor: '#ffaa00' }}>
+                  <span className="badge-risk low" style={{ background: 'rgba(255, 170, 0, 0.2)', color: 'var(--c-amber-2)', borderColor: 'var(--c-amber-2)' }}>
                     RULE-BASED
                   </span>
                 )}

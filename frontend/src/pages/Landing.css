@@ -1,19 +1,19 @@
 .landing-page {
   position: relative;
-  background-color: #000000;
-  color: #f5f5f5;
+  background-color: var(--bg-void);
+  color: var(--text-1);
   min-height: 100vh;
 }
 
 .section-technical {
   scroll-margin-top: 80px;
   padding: 5rem 10%;
-  background: #000000;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-void);
+  border-top: 1px solid var(--line-08);
 }
 
 .section-technical.alt-bg {
-  background: #050505;
+  background: var(--bg-base);
 }
 
 .section-header {
@@ -27,7 +27,7 @@
   font-family: var(--font-mono);
   font-size: 0.72rem;
   font-weight: 600;
-  color: #ff6a00;
+  color: var(--c-orange);
   letter-spacing: 0.1em;
   margin-bottom: 0.6rem;
 }
@@ -35,14 +35,14 @@
 .section-header h2 {
   font-size: 2rem;
   font-weight: 600;
-  color: #f5f5f5;
+  color: var(--text-1);
   margin-bottom: 0.8rem;
   letter-spacing: -0.01em;
 }
 
 .section-desc {
   font-size: 0.95rem;
-  color: #a0a0a0;
+  color: var(--text-2);
   line-height: 1.6;
 }
 
@@ -55,8 +55,8 @@
 }
 
 .deployment-panel {
-  background: #0a0a0a;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--line-12);
   border-radius: 8px;
   padding: 1.5rem;
 }
@@ -65,20 +65,20 @@
   display: block;
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  color: #888888;
+  color: var(--text-3);
   letter-spacing: 0.08em;
   margin-bottom: 0.6rem;
 }
 
 .deployment-panel h3 {
   font-size: 1.1rem;
-  color: #f5f5f5;
+  color: var(--text-1);
   margin-bottom: 0.6rem;
 }
 
 .deployment-panel p {
   font-size: 0.85rem;
-  color: #a0a0a0;
+  color: var(--text-2);
   line-height: 1.5;
   margin: 0;
 }
@@ -96,8 +96,8 @@
 }
 
 .footer-technical {
-  background: #080808;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-panel);
+  border-top: 1px solid var(--line-10);
   padding: 3rem 10% 2rem 10%;
 }
 
@@ -121,14 +121,14 @@
   font-family: var(--font-main);
   font-size: 1.1rem;
   font-weight: 700;
-  color: #ff6a00;
+  color: var(--c-orange);
   letter-spacing: 0.08em;
 }
 
 .footer-desc {
   font-family: var(--font-main);
   font-size: 0.8rem;
-  color: #888888;
+  color: var(--text-3);
 }
 
 .footer-right {
@@ -140,18 +140,18 @@
 .footer-right a {
   font-family: var(--font-mono);
   font-size: 0.8rem;
-  color: #a0a0a0;
+  color: var(--text-2);
 }
 
 .footer-right a:hover {
-  color: #ff6a00;
+  color: var(--c-orange);
 }
 
 .footer-sub {
   text-align: center;
   font-size: 0.75rem;
-  color: #666666;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  color: var(--text-5);
+  border-top: 1px solid var(--line-05);
   padding-top: 1.5rem;
 }
 
@@ -165,7 +165,7 @@
   font-family: var(--font-mono);
   font-size: 0.68rem;
   line-height: 1.6;
-  color: #888888;
+  color: var(--text-3);
   text-align: center;
 }
 
@@ -179,5 +179,5 @@
 
 .showcase-forecast .forecast-curve-card,
 .showcase-ledger .ledger-panel {
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 18px 50px var(--shadow-45);
 }

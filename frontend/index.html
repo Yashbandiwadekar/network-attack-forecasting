@@ -10,6 +10,15 @@
       content="Phoenix IDPS — forecasts network attack progression 60 seconds ahead from PCAP or flow traffic, maps it to MITRE ATT&amp;CK stages, and explains every prediction. Runs fully offline."
     />
     <title>Phoenix IDPS</title>
+    <script>
+      /* Apply the saved theme before first paint (no dark flash). Mirrors src/theme/ThemeContext.jsx. */
+      (function () {
+        try {
+          var t = localStorage.getItem('phoenix-theme');
+          if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -27,15 +27,25 @@ def summarize_attention(attention_row: np.ndarray, sequence_length: int) -> list
     return sorted(pairs, key=lambda p: -p[1])
 
 
-def gradient_input_attribution(model: WorldModel, scaled_sequence: np.ndarray, feature_names: list[str]) -> dict:
-    """Gradient x input attribution for the infiltration-probability head, w.r.t. the most recent
+def gradient_input_attribution(
+    model: WorldModel, scaled_sequence: np.ndarray, feature_names: list[str], target: str = "probability",
+) -> dict:
+    """Gradient x input attribution for the infiltration head, w.r.t. the most recent
     window's features only (same "what about the current snapshot" framing as ShapExplainer, held
     to the same last-window scope for a fair side-by-side). One forward + one backward pass —
     orders of magnitude cheaper than SHAP's sampling, at the cost of being a local linear
     approximation rather than a sampled attribution.
 
     scaled_sequence: (L, F) already feature-scaled (same scaler used for training/rollout).
+
+    target: "probability" (default, what ShapExplainer explains) or "logit". When the model is
+    saturated (probability near 0 or 1) the sigmoid's gradient vanishes, so every probability
+    attribution collapses to ~1e-4 and a UI showing it reads 0.0% for every feature. The
+    probability gradient is the logit gradient times the per-sample constant p(1-p), so the two
+    give the SAME ranking and the same relative shares; "logit" simply avoids the underflow.
     """
+    if target not in ("probability", "logit"):
+        raise ValueError(f"target must be 'probability' or 'logit', got {target!r}")
     device = next(model.parameters()).device
     was_training = model.training
     model.eval()
@@ -43,9 +53,9 @@ def gradient_input_attribution(model: WorldModel, scaled_sequence: np.ndarray, f
         x = torch.tensor(scaled_sequence, dtype=torch.float32, device=device).unsqueeze(0)
         x.requires_grad_(True)
         _, _, infiltration_logit = model(x)
-        infiltration_prob = torch.sigmoid(infiltration_logit)
+        output = infiltration_logit if target == "logit" else torch.sigmoid(infiltration_logit)
         model.zero_grad(set_to_none=True)
-        infiltration_prob.backward()
+        output.sum().backward()
     finally:
         model.train(was_training)
 
@@ -58,6 +68,53 @@ def gradient_input_attribution(model: WorldModel, scaled_sequence: np.ndarray, f
         "feature_names": feature_names,
         "attribution": attribution,
         "top_features": [(feature_names[i], float(attribution[i])) for i in order[:5]],
+    }
+
+
+# Features that record where a capture CAME FROM, not what the traffic DID. `has_ip_data` is 0 for the
+# CIC-IDS-2018 days that strip real IP addresses (windowing then aggregates the whole day into one
+# "NETWORK-<date>" pseudo-host) and 1 for days/datasets that keep them; `has_packet_features` is 1
+# only when a PCAP supplied packet-level columns. The trained model genuinely reads them, and in
+# training they correlate with the label through which days had IPs -- a dataset shortcut. They are
+# reported separately so a provenance flag is never presented as evidence of attacker behaviour.
+PROVENANCE_FEATURES = ("has_ip_data", "has_packet_features")
+
+PROVENANCE_NOTE = (
+    "Data-provenance flag, not traffic behaviour. It records whether the capture carried real IP "
+    "addresses (or packet-level data), and the model has learned a shortcut from it because of which "
+    "training days had them. Treat this share as a dataset artefact, not evidence of an attack."
+)
+
+
+def split_attribution(feature_names: list[str], values: np.ndarray, top_n: int = 10) -> dict:
+    """Break a per-feature attribution into behavioural drivers and provenance artefacts.
+
+    `share` is each feature's fraction of the TOTAL absolute attribution over ALL features, so the
+    provenance features are not hidden and the behavioural shares do not silently re-normalise to
+    100% -- if a provenance flag holds 20% of the explanation, that is reported as 20%.
+    """
+    values = np.asarray(values, dtype=float)
+    total_abs = float(np.abs(values).sum())
+
+    def entry(i: int) -> dict:
+        v = float(values[i])
+        return {
+            "feature": feature_names[i],
+            "contribution": float(f"{v:.6g}"),
+            "share": round(abs(v) / total_abs, 4) if total_abs > 0 else 0.0,
+            "direction": "raises" if v > 0 else "lowers" if v < 0 else "neutral",
+        }
+
+    provenance_idx = [i for i, n in enumerate(feature_names) if n in PROVENANCE_FEATURES]
+    behavioural_idx = [i for i, n in enumerate(feature_names) if n not in PROVENANCE_FEATURES]
+    behavioural = sorted(behavioural_idx, key=lambda i: -abs(values[i]))[:top_n]
+    provenance = sorted(provenance_idx, key=lambda i: -abs(values[i]))
+    provenance_entries = [{**entry(i), "note": PROVENANCE_NOTE} for i in provenance]
+    return {
+        "attribution_total_abs": total_abs,
+        "behavioural": [entry(i) for i in behavioural],
+        "provenance": provenance_entries,
+        "provenance_share_total": round(sum(e["share"] for e in provenance_entries), 4),
     }
 
 

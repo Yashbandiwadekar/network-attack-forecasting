@@ -4,7 +4,7 @@
    No new colours are introduced here. */
 
 .ledger-panel {
-  background: #121212;
+  background: var(--bg-input);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 1.25rem;
@@ -38,7 +38,7 @@
 }
 
 .ledger-badge.ok {
-  color: #0ca30c;
+  color: var(--c-green);
   border-color: rgba(12, 163, 12, 0.3);
   background: rgba(12, 163, 12, 0.15);
 }
@@ -57,7 +57,7 @@
 }
 
 .ledger-stat {
-  background: #0a0a0a;
+  background: var(--bg-panel-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 0.8rem;
@@ -69,30 +69,30 @@
 .ledger-stat-label {
   font-family: var(--font-mono);
   font-size: 0.62rem;
-  color: #888888;
+  color: var(--text-3);
   letter-spacing: 0.08em;
 }
 
 .ledger-stat-val {
   font-family: var(--font-mono);
   font-size: 1.2rem;
-  color: #f5f5f5;
+  color: var(--text-1);
 }
 
 .ledger-stat-note {
   font-family: var(--font-mono);
   font-size: 0.6rem;
-  color: #888888;
+  color: var(--text-3);
   line-height: 1.5;
 }
 
-.ledger-panel .text-ok { color: #0ca30c; }
+.ledger-panel .text-ok { color: var(--c-green); }
 .ledger-panel .text-bad { color: var(--color-accent-red); }
 .ledger-panel .text-amber { color: var(--color-accent-amber); }
 
 /* The hash chain, shown as a chain rather than a pair of opaque strings. */
 .ledger-chain {
-  background: #080808;
+  background: var(--bg-panel);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 0.85rem;
@@ -109,7 +109,7 @@
 .chain-label {
   font-family: var(--font-mono);
   font-size: 0.6rem;
-  color: #888888;
+  color: var(--text-3);
   letter-spacing: 0.08em;
   min-width: 82px;
 }
@@ -121,13 +121,13 @@
   line-height: 1.6;
 }
 
-.chain-hash.prev { color: #888888; }
-.chain-hash.current { color: #ff6a00; }
+.chain-hash.prev { color: var(--text-3); }
+.chain-hash.current { color: var(--c-orange); }
 
 .chain-arrow {
   font-family: var(--font-mono);
   font-size: 0.6rem;
-  color: #888888;
+  color: var(--text-3);
   margin: 0.4rem 0 0.4rem 82px;
 }
 
@@ -168,14 +168,14 @@
 }
 
 .compliance-tag.not-reportable {
-  color: #888888;
+  color: var(--text-3);
   border-color: var(--color-border);
 }
 
 .compliance-category {
   font-family: var(--font-main);
   font-size: 0.82rem;
-  color: #f5f5f5;
+  color: var(--text-1);
   line-height: 1.55;
   margin-bottom: 0.7rem;
 }
@@ -184,7 +184,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  background: #0a0a0a;
+  background: var(--bg-panel-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 0.8rem;
@@ -201,7 +201,7 @@
 
 .deadline-label {
   font-size: 0.62rem;
-  color: #888888;
+  color: var(--text-3);
   letter-spacing: 0.08em;
 }
 
@@ -209,7 +209,7 @@
 .deadline-note {
   font-family: var(--font-mono);
   font-size: 0.6rem;
-  color: #888888;
+  color: var(--text-3);
   line-height: 1.6;
 }
 

@@ -22,4 +22,144 @@
   --z-panel: 10;
   --z-nav: 50;
   --z-modal: 100;
+
+  /* ------------------------------------------------------------------ theme tokens
+     Dark values below are the exact colours the app always used, so dark mode is unchanged.
+     Light values live in [data-theme="light"]. Accent colours used as TEXT get their own tokens
+     because the bright dark-mode oranges/cyans/ambers fail contrast on a white page. */
+  color-scheme: dark;
+
+  --bg-void: #000000;
+  --bg-base: #050505;
+  --bg-panel: #080808;
+  --bg-panel-2: #0a0a0a;
+  --bg-panel-3: #0d0d0d;
+  --bg-input: #121212;
+  --bg-input-2: #181818;
+
+  --glass-1: rgba(5, 5, 5, 0.85);
+  --glass-2: rgba(10, 10, 10, 0.65);
+  --glass-3: rgba(10, 10, 10, 0.75);
+  --glass-4: rgba(10, 10, 10, 0.85);
+  --glass-5: rgba(15, 15, 15, 0.6);
+  --glass-6: rgba(30, 30, 30, 0.9);
+
+  --ov-02: rgba(255, 255, 255, 0.02);
+  --ov-03: rgba(255, 255, 255, 0.03);
+  --ov-05: rgba(255, 255, 255, 0.05);
+  --ov-06: rgba(255, 255, 255, 0.06);
+  --ov-08: rgba(255, 255, 255, 0.08);
+
+  --line-05: rgba(255, 255, 255, 0.05);
+  --line-06: rgba(255, 255, 255, 0.06);
+  --line-08: rgba(255, 255, 255, 0.08);
+  --line-10: rgba(255, 255, 255, 0.1);
+  --line-12: rgba(255, 255, 255, 0.12);
+  --line-15: rgba(255, 255, 255, 0.15);
+  --line-20: rgba(255, 255, 255, 0.2);
+
+  --text-strong: #ffffff;
+  --text-1: #f5f5f5;
+  --text-1-alt: #f0f0f0;
+  --text-1-dim: #e0e0e0;
+  --text-2-hi: #bbbbbb;
+  --text-2: #a0a0a0;
+  --text-3: #888888;
+  --text-3-hi: #999999;
+  --text-4: #777777;
+  --text-5: #666666;
+
+  --c-orange: #ff6a00;
+  --c-orange-2: #ff7b00;
+  --c-red: #e8615a; /* was #c83b32: 3.2-3.9:1 on the near-black panels, too dim for CRITICAL labels */
+  --c-red-2: #e53935;
+  --c-green: #0ca30c;
+  --c-amber: #ffb000;
+  --c-amber-2: #ffaa00;
+  --c-amber-3: #f59e0b;
+  --c-cyan: #33c9ff;
+
+  --on-accent: #000000;
+
+  --shadow-45: rgba(0, 0, 0, 0.45);
+  --shadow-60: rgba(0, 0, 0, 0.6);
+  --shadow-70: rgba(0, 0, 0, 0.7);
+  --shadow-80: rgba(0, 0, 0, 0.8);
+  --shadow-90: rgba(0, 0, 0, 0.9);
+  --shadow-95: rgba(0, 0, 0, 0.95);
+}
+
+/* Light theme. Applied by ThemeProvider via <html data-theme="light">. */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --color-bg: #f3f4f6;
+  --color-bg-panel: rgba(255, 255, 255, 0.85);
+  --color-bg-panel-hover: rgba(255, 255, 255, 1);
+  --color-border: rgba(15, 23, 42, 0.12);
+  --color-border-focus: rgba(194, 65, 12, 0.5);
+  --color-text-main: #14181f;
+  --color-text-muted: #5b6472;
+  --color-accent-orange: #b23a0a;
+  --color-accent-amber: #8a5a00;
+  --color-accent-red: #c62828;
+
+  --bg-void: #ffffff;
+  --bg-base: #f3f4f6;
+  --bg-panel: #ffffff;
+  --bg-panel-2: #ffffff;
+  --bg-panel-3: #f7f8fa;
+  --bg-input: #f0f1f4;
+  --bg-input-2: #e9ebef;
+
+  --glass-1: rgba(255, 255, 255, 0.88);
+  --glass-2: rgba(255, 255, 255, 0.7);
+  --glass-3: rgba(255, 255, 255, 0.78);
+  --glass-4: rgba(255, 255, 255, 0.88);
+  --glass-5: rgba(255, 255, 255, 0.75);
+  --glass-6: rgba(255, 255, 255, 0.96);
+
+  --ov-02: rgba(15, 23, 42, 0.025);
+  --ov-03: rgba(15, 23, 42, 0.04);
+  --ov-05: rgba(15, 23, 42, 0.06);
+  --ov-06: rgba(15, 23, 42, 0.07);
+  --ov-08: rgba(15, 23, 42, 0.09);
+
+  --line-05: rgba(15, 23, 42, 0.08);
+  --line-06: rgba(15, 23, 42, 0.09);
+  --line-08: rgba(15, 23, 42, 0.11);
+  --line-10: rgba(15, 23, 42, 0.14);
+  --line-12: rgba(15, 23, 42, 0.16);
+  --line-15: rgba(15, 23, 42, 0.2);
+  --line-20: rgba(15, 23, 42, 0.26);
+
+  --text-strong: #0b0e14;
+  --text-1: #14181f;
+  --text-1-alt: #1a1f27;
+  --text-1-dim: #2a313c;
+  --text-2-hi: #3a414c;
+  --text-2: #4b5563;
+  --text-3: #5b6472;
+  --text-3-hi: #5b6472;
+  --text-4: #6b7280;
+  --text-5: #8a93a1;
+
+  --c-orange: #b23a0a;
+  --c-orange-2: #b23a0a;
+  --c-red: #b3261e;
+  --c-red-2: #c62828;
+  --c-green: #0a6b0a;
+  --c-amber: #8a5a00;
+  --c-amber-2: #8a5a00;
+  --c-amber-3: #8a5a00;
+  --c-cyan: #095f7d;
+
+  --on-accent: #ffffff;
+
+  --shadow-45: rgba(15, 23, 42, 0.12);
+  --shadow-60: rgba(15, 23, 42, 0.16);
+  --shadow-70: rgba(15, 23, 42, 0.18);
+  --shadow-80: rgba(15, 23, 42, 0.2);
+  --shadow-90: rgba(15, 23, 42, 0.24);
+  --shadow-95: rgba(15, 23, 42, 0.26);
 }

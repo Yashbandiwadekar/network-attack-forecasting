@@ -24,19 +24,22 @@ from typing import Any, Optional
 import numpy as np
 from fastapi import Depends, FastAPI, File, HTTPException, Security, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from app import service
-from common.config import resolve_path
+from common.config import load_config, resolve_path
 from models.audit_ledger import AuditLedger
 from models.compliance import generate_cert_in_report
 from models.cve_lookup import related_capec, related_cves, snapshot_metadata
-from models.explain import gradient_input_attribution, summarize_attention
+from models.explain import (
+    PROVENANCE_NOTE, gradient_input_attribution, split_attribution, summarize_attention,
+)
 from models.forecast import ForecastEngine
 from models.narrative import generate_attack_narrative
+from models.report_pdf import build_incident_pdf
 from models.response import recommended_action
 from pipeline.mitre_mapping import CIC_LABEL_TO_STAGE, STAGE_CLASSIFICATION_LABELS
 
@@ -277,9 +280,9 @@ def read_root():
 
 
 def _dataset_registry() -> list[dict[str, Any]]:
-    """Only configs that actually exist on disk, with sizes read from each processed
-    metadata.json. Datasets without a built dataset are listed as unavailable rather than
-    given invented sequence counts."""
+    """Exposes explicit dataset and checkpoint capability information.
+    Separates dataset availability (processed data / metadata) from model checkpoint availability,
+    and returns machine-independent path and capability data."""
     out: list[dict[str, Any]] = []
     for ds_id, cfg_name in (("CIC-IDS-2018", "real_data.yaml"),
                             ("UNSW-NB15", "unsw_nb15.yaml"),
@@ -287,25 +290,81 @@ def _dataset_registry() -> list[dict[str, Any]]:
         cfg_path = PROJECT_ROOT / "configs" / cfg_name
         if not cfg_path.exists():
             continue
-        entry: dict[str, Any] = {
-            "id": ds_id,
-            "name": ds_id,
-            "config": f"configs/{cfg_name}",
-            "status": "Unavailable",
-            "total_sequences": None,
-            "features": None,
-        }
         try:
-            config, model, _, _ = service.load_backend(f"configs/{cfg_name}")
-            meta_path = resolve_path(config, "processed_dir") / "metadata.json"
-            if meta_path.exists():
-                meta = json.loads(meta_path.read_text(encoding="utf-8"))
-                entry["total_sequences"] = meta.get("num_sequences")
-                entry["features"] = len(meta.get("feature_columns", [])) or None
-                entry["status"] = "Available" if model is not None else "No checkpoint"
-            entry["checkpoint_loaded"] = model is not None
+            config = load_config(f"configs/{cfg_name}")
+            checkpoint_dir = resolve_path(config, "checkpoint_dir")
+            checkpoint_path = checkpoint_dir / "world_model_best.pt"
+            processed_dir = resolve_path(config, "processed_dir")
+            meta_path = processed_dir / "metadata.json"
+            scaler_path = processed_dir / "scaler.npz"
+
+            meta_exists = meta_path.exists()
+            checkpoint_exists = checkpoint_path.exists()
+            scaler_exists = scaler_path.exists()
+
+            total_sequences = None
+            features_count = None
+            if meta_exists:
+                try:
+                    meta = json.loads(meta_path.read_text(encoding="utf-8"))
+                    total_sequences = meta.get("num_sequences")
+                    features_count = len(meta.get("feature_columns", [])) or None
+                except Exception:
+                    pass
+
+            config_obj, model, scaler, _ = service.load_backend(f"configs/{cfg_name}")
+            model_loaded = (model is not None and scaler is not None)
+
+            # Audit Section 6 & 15: explicit separation of dataset vs model capability
+            if model_loaded:
+                status = "Available"
+                reason = None
+            elif meta_exists and not checkpoint_exists:
+                status = "Model checkpoint unavailable"
+                reason = f"Forecasting checkpoint not found at {checkpoint_path}."
+            elif not meta_exists and not checkpoint_exists:
+                status = "Dataset and checkpoint unavailable"
+                reason = f"Processed dataset and forecasting checkpoint not found."
+            elif not scaler_exists:
+                status = "Model checkpoint unavailable"
+                reason = f"Feature scaler not found at {scaler_path}."
+            else:
+                status = "Checkpoint unavailable"
+                reason = "Model checkpoint or scaler could not be loaded."
+
+            entry: dict[str, Any] = {
+                "id": ds_id,
+                "name": ds_id,
+                "config": f"configs/{cfg_name}",
+                "status": status,
+                "total_sequences": total_sequences,
+                "features": features_count,
+                "checkpoint_loaded": model_loaded,
+                "dataset_available": meta_exists,
+                "checkpoint_available": model_loaded,
+                "can_select": True,
+                "can_forecast": model_loaded,
+                "reason": reason,
+                "checkpoint_path": str(checkpoint_path),
+                "processed_dir": str(processed_dir),
+            }
         except Exception as exc:
-            entry["status"] = f"Unreadable: {type(exc).__name__}"
+            entry = {
+                "id": ds_id,
+                "name": ds_id,
+                "config": f"configs/{cfg_name}",
+                "status": f"Unreadable: {type(exc).__name__}",
+                "total_sequences": None,
+                "features": None,
+                "checkpoint_loaded": False,
+                "dataset_available": False,
+                "checkpoint_available": False,
+                "can_select": True,
+                "can_forecast": False,
+                "reason": str(exc),
+                "checkpoint_path": "",
+                "processed_dir": "",
+            }
         out.append(entry)
     return out
 
@@ -316,11 +375,31 @@ def get_datasets():
     meta_path = resolve_path(config, "processed_dir") / "metadata.json"
     real_metadata = {}
     if meta_path.exists():
-        real_metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+        try:
+            real_metadata = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception:
+            pass
     return {
         "active_dataset": STATE.dataset_id,
         "datasets": _dataset_registry(),
         "real_metadata": real_metadata,
+    }
+
+
+@app.get("/api/v1/datasets/diagnostics", dependencies=[Depends(_require_token)])
+def get_dataset_diagnostics():
+    """Developer diagnostics endpoint exposing discovered dataset and checkpoint locations."""
+    return {
+        "active_dataset": STATE.dataset_id,
+        "active_config": STATE.config_path,
+        "project_root": str(PROJECT_ROOT),
+        "environment_overrides": {
+            k: os.environ[k]
+            for k in ("PHOENIX_DATA_DIR", "PHOENIX_MODEL_DIR", "PHOENIX_CHECKPOINTS_DIR",
+                      "PHOENIX_RAW_FLOW_DIR", "PHOENIX_PROCESSED_DIR", "PHOENIX_CHECKPOINT_DIR")
+            if k in os.environ
+        },
+        "datasets": _dataset_registry(),
     }
 
 
@@ -329,11 +408,25 @@ def select_dataset(req: SelectDatasetRequest):
     ds = next((d for d in _dataset_registry() if d["id"] == req.dataset_id), None)
     if not ds:
         raise HTTPException(status_code=404, detail="Dataset not found")
-    if not ds.get("checkpoint_loaded"):
+    if not ds.get("checkpoint_available"):
+        missing_msg = ds.get("reason") or "forecasting checkpoint is not available on this installation"
         raise HTTPException(
             status_code=409,
-            detail=f"{req.dataset_id} has no trained checkpoint, so it cannot be made active.",
+            detail=f"{req.dataset_id} could not be activated because its {missing_msg}",
         )
+
+    # Atomic validation: ensure model checkpoint and scaler can load before changing active state
+    try:
+        new_config, new_model, new_scaler, _ = service.load_backend(ds["config"])
+        if new_model is None or new_scaler is None:
+            raise ValueError(f"Failed to load checkpoint or scaler for {req.dataset_id}.")
+    except Exception as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=f"{req.dataset_id} failed to activate: {exc}",
+        )
+
+    # Commit state change atomically
     STATE.config_path = ds["config"]
     STATE.dataset_id = ds["id"]
     STATE.reset_data()  # scores from another model/dataset must not survive the switch
@@ -538,19 +631,23 @@ def get_attribution(req: PredictRequest):
     seq = _sequence_for(req.host_ip, config)
     feature_cols = service.feature_cols_for(config)
     scaled = scaler.transform(seq[None, ...])[0]
-    attribution = gradient_input_attribution(model, scaled, feature_cols)
+    # Logit target: a saturated model (peak probability ~0.9997 on the recorded run) has a vanishing
+    # probability gradient, so every attribution rounded to 0.0%. Same ranking, no underflow.
+    attribution = gradient_input_attribution(model, scaled, feature_cols, target="logit")
     result = engine.rollout(seq)
     attn_pairs = summarize_attention(np.asarray(result.attentions)[0], int(config["windowing"]["sequence_length"]))
     values = np.asarray(attribution["attribution"], dtype=float)
     names = list(attribution["feature_names"])
-    order = np.argsort(-np.abs(values))[:10]
-    ranked = [(names[i], float(values[i])) for i in order]
+    # Behavioural drivers and provenance artefacts (has_ip_data, ...) are reported separately, with
+    # shares taken over ALL features so a provenance flag's weight is shown, not hidden.
+    split = split_attribution(names, values, top_n=10)
     return {
         "host_ip": req.host_ip,
-        "method": "gradient x input",
-        "feature_attributions": [
-            {"feature": name, "contribution": round(float(value), 6)} for name, value in ranked
-        ],
+        "method": "gradient x input (on the infiltration logit)",
+        "attribution_total_abs": split["attribution_total_abs"],
+        "feature_attributions": split["behavioural"],
+        "provenance_attributions": split["provenance"],
+        "provenance_share_total": split["provenance_share_total"],
         "attention_weights": [round(float(w), 4) for _, w in attn_pairs],
         "attention_windows": [label for label, _ in attn_pairs],
     }
@@ -804,6 +901,78 @@ def simulate_isolation(req: SimulateIsolationRequest):
         "note": "This is a UI simulation. No real network or firewall change was made.",
         "timestamp": time.time(),
     }
+
+
+@app.get("/api/v1/reports/pdf/{host_ip}", dependencies=[Depends(_require_token)])
+def download_report_pdf(host_ip: str):
+    """The incident report for a host as a PDF.
+
+    Built from the host's most recent EXISTING ledger entry (so the PDF matches the report the user
+    generated, and its hashes are that entry's) -- this endpoint never appends to the ledger, so
+    downloading a PDF cannot alter the tamper-evident chain. Generate a report first.
+    """
+    import re
+
+    _require_data()
+    ledger = AuditLedger.load_or_create(_ledger_path())
+    entries = [e for e in ledger.entries if e.host == host_ip]
+    if not entries:
+        raise HTTPException(status_code=404, detail=f"No ledger entry for {host_ip}. Generate a report first.")
+    entry = entries[-1]
+    intact, _ = ledger.verify_integrity()
+
+    engine, config = _engine()
+    _, model, scaler, _ = _backend()
+    seq = _sequence_for(host_ip, config)
+    result = engine.rollout(seq)
+    feature_cols = service.feature_cols_for(config)
+    window_seconds = int(config["windowing"]["window_seconds"])
+    probs = [float(p) for p in result.infiltration_probs]
+    stages = list(result.stage_predictions)
+    heur = list(result.stage_is_heuristic) or [False] * len(stages)
+    peak_step = int(np.argmax(probs))
+    peak_stage = stages[peak_step]
+
+    narrative = _strip_markup(generate_attack_narrative(
+        host_ip, result, feature_cols, window_seconds, current_stage=_observed_stage(host_ip),
+    ))
+    action = recommended_action(peak_stage)
+    attribution = gradient_input_attribution(model, scaler.transform(seq[None, ...])[0], feature_cols, target="logit")
+    split = split_attribution(list(attribution["feature_names"]), attribution["attribution"], top_n=8)
+    detected_at = datetime.fromisoformat(entry.timestamp)
+    report = generate_cert_in_report(
+        host=host_ip, detected_at=detected_at, peak_stage=peak_stage, peak_infiltration_prob=probs[peak_step],
+        recommended_action=action["action"], narrative=narrative, ledger_hash=entry.record_hash,
+    )
+
+    pdf = build_incident_pdf({
+        "host": host_ip,
+        "generated_at": entry.timestamp,
+        "dataset_source": STATE.source_name or STATE.dataset_id,
+        "peak_prob": probs[peak_step],
+        "peak_stage": _display(peak_stage),
+        "horizon_seconds": len(probs) * window_seconds,
+        "forecast": [
+            {"seconds": (i + 1) * window_seconds, "prob": probs[i], "stage": _display(stages[i]), "heuristic": bool(heur[i])}
+            for i in range(len(probs))
+        ],
+        "compliance": {
+            "is_reportable": report.is_reportable, "category": report.category,
+            "detected_at": report.detected_at.isoformat(), "reporting_deadline": report.reporting_deadline.isoformat(),
+            "hours_remaining": report.hours_remaining,
+        },
+        "narrative": narrative,
+        "recommended_action": action,
+        "attributions": split["behavioural"],
+        "provenance_share_total": split["provenance_share_total"],
+        "provenance_note": PROVENANCE_NOTE,
+        "ledger": {"index": entry.index, "prev_hash": entry.prev_hash, "record_hash": entry.record_hash, "intact": intact},
+    })
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", host_ip)
+    return Response(
+        content=pdf, media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="incident-report-{safe}.pdf"'},
+    )
 
 
 @app.get("/api/v1/reports/download/{filename}", dependencies=[Depends(_require_token)])

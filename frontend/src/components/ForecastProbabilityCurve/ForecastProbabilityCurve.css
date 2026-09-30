@@ -1,6 +1,6 @@
 .forecast-curve-card {
-  background: var(--color-bg-panel, rgba(15, 15, 15, 0.6));
-  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+  background: var(--color-bg-panel, var(--glass-5));
+  border: 1px solid var(--color-border, var(--line-10));
   border-radius: var(--radius-md, 8px);
   padding: 1.25rem;
   box-sizing: border-box;
@@ -28,13 +28,13 @@
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 0.05em;
-  color: var(--color-text-main, #f0f0f0);
+  color: var(--color-text-main, var(--text-1-alt));
 }
 
 .heuristic-badge {
   background: rgba(255, 170, 0, 0.15);
   border: 1px solid rgba(255, 170, 0, 0.5);
-  color: #ffaa00;
+  color: var(--c-amber-2);
   font-family: var(--font-mono, monospace);
   font-size: 0.7rem;
   padding: 0.2rem 0.5rem;
@@ -45,7 +45,7 @@
   display: flex;
   gap: 1rem;
   font-size: 0.75rem;
-  color: var(--color-text-muted, #999999);
+  color: var(--color-text-muted, var(--text-3-hi));
 }
 
 .forecast-svg-wrapper {
@@ -61,7 +61,7 @@
 
 .svg-label {
   font-size: 10px;
-  fill: #888888;
+  fill: var(--text-3);
 }
 
 .data-node {
@@ -71,11 +71,11 @@
 .forecast-tooltip {
   position: absolute;
   transform: translate(-50%, -120%);
-  background: #080808;
-  border: 1px solid var(--color-border, rgba(255, 255, 255, 0.2));
+  background: var(--bg-panel);
+  border: 1px solid var(--color-border, var(--line-20));
   padding: 0.4rem 0.7rem;
   border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 4px 12px var(--shadow-70);
   pointer-events: none;
   z-index: 20;
   font-size: 0.75rem;
@@ -83,7 +83,7 @@
 }
 
 .tooltip-step {
-  color: #a0a0a0;
+  color: var(--text-2);
   font-size: 0.68rem;
 }
 
@@ -93,7 +93,7 @@
 }
 
 .tooltip-risk {
-  color: #777777;
+  color: var(--text-4);
   font-size: 0.68rem;
 }
 
@@ -103,13 +103,13 @@
   align-items: center;
   justify-content: center;
   min-height: 180px;
-  color: var(--color-text-muted, #999999);
+  color: var(--color-text-muted, var(--text-3-hi));
   font-family: var(--font-mono, monospace);
   font-size: 0.85rem;
 }
 
 .forecast-curve-placeholder.error-text {
-  color: var(--color-accent-red, #e53935);
+  color: var(--color-accent-red, var(--c-red-2));
 }
 
 .spinner {
@@ -136,7 +136,7 @@
 }
 
 .forecast-meta-summary .peak-at {
-  color: #888888;
+  color: var(--text-3);
   font-weight: 400;
 }
 
@@ -161,7 +161,7 @@
 .forecast-disclosure.counterfactual-legend {
   border-left-color: #33c9ff;
   background: rgba(51, 201, 255, 0.08);
-  color: #33c9ff;
+  color: var(--c-cyan);
 }
 
 .counterfactual-swatch {

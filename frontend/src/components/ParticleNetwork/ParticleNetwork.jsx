@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useRef, useMemo, useEffect, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
@@ -6,7 +7,6 @@ import {
   buildNetworkTopology,
   updateParticlePosAndColor,
   setControls,
-  DEFAULT_DESKTOP_PARTICLE_COUNT,
   getAdaptiveParticleCount
 } from './particleBehavior';
 import './particleStyles.css';
@@ -37,7 +37,7 @@ function CameraController({ resetTrigger }) {
   );
 }
 
-const NetworkField = ({ particleCount, controlsConfig, isPaused, mode, clickPulse, formationIndex }) => {
+const NetworkField = ({ particleCount, controlsConfig, isPaused, mode, clickPulse, formationIndex, isLight = false }) => {
   const meshRef = useRef();
   const linesRef = useRef();
 
@@ -62,10 +62,23 @@ const NetworkField = ({ particleCount, controlsConfig, isPaused, mode, clickPuls
     setControls(controlsConfig);
   }, [controlsConfig]);
 
-  useFrame((state) => {
+  // BUG-008: manual elapsed-time accumulator using useFrame's delta parameter.
+  // THREE.Clock is deprecated in Three.js >=0.169 — state.clock.getElapsedTime() would
+  // trigger the "THREE.Clock: This module has been deprecated" warning on every frame.
+  // Accumulating delta ourselves produces identical timing without touching THREE.Clock.
+  const elapsedRef = useRef(0);
+
+  // BUG-007 (react/immutability): linePositions, lineColors, and nodeCurrentPositions are
+  // Float32Array buffers that MUST be mutated in-place per frame — this is the required
+  // Three.js/R3F pattern for updating BufferGeometry attributes. Using useState or
+  // useReducer would allocate a new array every frame and thrash the GC. The mutation
+  // happens inside useFrame (outside React's render cycle), so it cannot cause tearing.
+  // eslint-disable-next-line react/immutability -- intentional Three.js buffer mutation
+  useFrame((_state, delta) => {
     if (!meshRef.current || !linesRef.current) return;
 
-    const time = isPaused ? 0 : state.clock.getElapsedTime();
+    if (!isPaused) elapsedRef.current += delta;
+    const time = isPaused ? 0 : elapsedRef.current;
     const activeCount = Math.floor(particleCount * (controlsConfig.density || 0.85));
 
     for (let i = 0; i < particleCount; i++) {
@@ -121,7 +134,6 @@ const NetworkField = ({ particleCount, controlsConfig, isPaused, mode, clickPuls
       const edge = edgesList[e];
       const i = edge[0];
       const j = edge[1];
-      const maxDist = edge[2];
       const edgeType = edge[3];
 
       if (i >= activeCount || j >= activeCount) continue;
@@ -226,8 +238,8 @@ const NetworkField = ({ particleCount, controlsConfig, isPaused, mode, clickPuls
         <lineBasicMaterial
           vertexColors={true}
           transparent={true}
-          opacity={0.75}
-          blending={THREE.AdditiveBlending}
+          opacity={isLight ? 0.38 : 0.75}
+          blending={isLight ? THREE.NormalBlending : THREE.AdditiveBlending}
           depthWrite={false}
         />
       </lineSegments>
@@ -236,6 +248,11 @@ const NetworkField = ({ particleCount, controlsConfig, isPaused, mode, clickPuls
 };
 
 const ParticleNetwork = ({ controlsConfig, isPaused, mode, resetTrigger, onCanvasClick, clickPulse, formationIndex = 0 }) => {
+  // Read the theme here, not inside <Canvas>: R3F renders in its own reconciler, so React context does
+  // not cross the Canvas boundary and the scene has to be handed the value as a prop.
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
+  const canvasBg = isLight ? '#f3f4f6' : '#000000';
   const [particleCount, setParticleCount] = useState(() => getAdaptiveParticleCount());
 
   useEffect(() => {
@@ -257,8 +274,8 @@ const ParticleNetwork = ({ controlsConfig, isPaused, mode, resetTrigger, onCanva
         gl={{ alpha: false, antialias: true, powerPreference: "high-performance" }}
         dpr={[1, 2]}
       >
-        <color attach="background" args={['#000000']} />
-        <fog attach="fog" args={['#000000', 30, 95]} />
+        <color attach="background" args={[canvasBg]} />
+        <fog attach="fog" args={[canvasBg, 30, 95]} />
 
         <NetworkField
           particleCount={particleCount}
@@ -267,6 +284,7 @@ const ParticleNetwork = ({ controlsConfig, isPaused, mode, resetTrigger, onCanva
           mode={mode}
           clickPulse={clickPulse}
           formationIndex={formationIndex}
+          isLight={isLight}
         />
 
         <CameraController resetTrigger={resetTrigger} />

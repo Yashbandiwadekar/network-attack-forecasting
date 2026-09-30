@@ -1,4 +1,4 @@
-import { apiFetch } from './client';
+import { apiFetch, apiFetchBlob } from './client';
 
 export const authApi = {
   login: (email, password) => apiFetch('/api/v1/auth/login', {
@@ -65,6 +65,7 @@ export const reportApi = {
     body: JSON.stringify({ host_ip: hostIp, format }),
   }),
   downloadReport: (filename) => apiFetch(`/api/v1/reports/download/${filename}`),
+  downloadReportPdf: (hostIp) => apiFetchBlob(`/api/v1/reports/pdf/${encodeURIComponent(hostIp)}`),
 };
 
 export const evalApi = {

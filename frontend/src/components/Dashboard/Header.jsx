@@ -1,12 +1,14 @@
 import React from 'react';
 import { ShieldCheck, LogOut, Radio } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import ThemeToggle from '../ThemeToggle/ThemeToggle';
 
 const Header = ({ systemStatus, selectedHost }) => {
   const navigate = useNavigate();
   
   const handleLogout = () => {
     localStorage.removeItem('auth');
+    localStorage.removeItem('token');
     localStorage.removeItem('access_token');
     navigate('/login');
   };
@@ -36,6 +38,8 @@ const Header = ({ systemStatus, selectedHost }) => {
             Model: <strong className="text-white">{systemStatus?.model_loaded ? 'CHECKPOINT LOADED' : 'READY (447 KB)'}</strong>
           </span>
         </div>
+
+        <ThemeToggle />
 
         <button className="logout-btn font-mono" onClick={handleLogout} title="Logout Session">
           <LogOut size={16} />

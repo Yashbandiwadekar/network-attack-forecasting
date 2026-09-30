@@ -64,17 +64,21 @@ def stage_disclosure_note(stage: str, is_heuristic: bool) -> str:
     return ""
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=8)
 def load_backend(config_path: str):
     """(config, model, scaler, shap_background). model/scaler are None when no checkpoint is
     present -- callers must handle that rather than substituting invented output."""
     config = load_config(config_path)
     checkpoint_dir = resolve_path(config, "checkpoint_dir")
     checkpoint_path = checkpoint_dir / "world_model_best.pt"
-    if not checkpoint_path.exists():
+    scaler_path = resolve_path(config, "processed_dir") / "scaler.npz"
+    if not checkpoint_path.exists() or not scaler_path.exists():
         return config, None, None, None
-    model, _ = load_world_model(checkpoint_path)
-    scaler = FeatureScaler.load(resolve_path(config, "processed_dir") / "scaler.npz")
+    try:
+        model, _ = load_world_model(checkpoint_path)
+        scaler = FeatureScaler.load(scaler_path)
+    except Exception:
+        return config, None, None, None
 
     background = None
     shap_path = resolve_path(config, "processed_dir") / "shap_background.npy"
@@ -90,6 +94,11 @@ def load_backend(config_path: str):
             background = full_background[indices]
             np.save(shap_path, background)
     return config, model, scaler, background
+
+
+def clear_backend_cache() -> None:
+    """Clear cached model and scaler instances."""
+    load_backend.cache_clear()
 
 
 def is_flow_only_model(config: dict) -> bool:

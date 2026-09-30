@@ -9,7 +9,10 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 export async function apiFetch(endpoint, options = {}) {
-  const token = localStorage.getItem('access_token') || 'phoenix_demo_jwt_token_2026_secured';
+  // Canonical key: 'token' — matches what Login.jsx stores via setItem('token', ...).
+  // Using 'access_token' here caused a silent fallback to the hardcoded demo JWT on every
+  // authenticated request even after a successful login (BUG-002).
+  const token = localStorage.getItem('token') || 'phoenix_demo_jwt_token_2026_secured';
   
   const headers = {
     'Content-Type': 'application/json',
@@ -32,11 +35,34 @@ export async function apiFetch(endpoint, options = {}) {
     try {
       const errJson = await response.json();
       errorDetail = errJson.detail || JSON.stringify(errJson);
-    } catch (e) {
+    } catch {
       errorDetail = await response.text();
     }
     throw new Error(`HTTP ${response.status}: ${errorDetail}`);
   }
 
   return response.json();
+}
+
+/* Binary download (e.g. a PDF). apiFetch always parses JSON, so files need their own path; the auth
+   header and error shape are the same. Returns { blob, filename }. */
+export async function apiFetchBlob(endpoint, options = {}) {
+  const token = localStorage.getItem('token') || 'phoenix_demo_jwt_token_2026_secured';
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    ...options,
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers },
+  });
+  if (!response.ok) {
+    let detail = 'Download failed';
+    try {
+      const j = await response.json();
+      detail = j.detail || JSON.stringify(j);
+    } catch {
+      detail = await response.text();
+    }
+    throw new Error(`HTTP ${response.status}: ${detail}`);
+  }
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const match = /filename="?([^";]+)"?/.exec(disposition);
+  return { blob: await response.blob(), filename: match ? match[1] : null };
 }

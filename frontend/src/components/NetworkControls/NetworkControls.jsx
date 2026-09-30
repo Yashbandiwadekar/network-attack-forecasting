@@ -3,10 +3,10 @@ import './NetworkControls.css';
 
 const NetworkControls = ({ mode, onModeChange, density, onDensityChange }) => {
   const modes = [
-    { id: 'threat', label: 'Threat', color: '#c83b32' },
-    { id: 'activity', label: 'Activity', color: '#ff6a00' },
-    { id: 'forecast', label: 'Forecast', color: '#ffb000' },
-    { id: 'network', label: 'Network', color: '#888888' },
+    { id: 'threat', label: 'Threat', color: 'var(--c-red)' },
+    { id: 'activity', label: 'Activity', color: 'var(--c-orange)' },
+    { id: 'forecast', label: 'Forecast', color: 'var(--c-amber)' },
+    { id: 'network', label: 'Network', color: 'var(--text-3)' },
   ];
 
   return (

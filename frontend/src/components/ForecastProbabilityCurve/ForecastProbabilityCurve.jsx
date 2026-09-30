@@ -22,7 +22,10 @@ const ForecastProbabilityCurve = ({
   heuristicFlags = [],
   disclosureNotes = [],
   horizonSeconds = null,
-  currentStep = 1,
+  // BUG-007: prefixed with _ — prop is part of the external API but not consumed in render
+  // (the curve renders all steps simultaneously rather than a single "current" pointer)
+  currentStep: _currentStep = 1,
+
   stage_is_heuristic = false,
   isLoading = false,
   error = null,
@@ -122,9 +125,9 @@ const ForecastProbabilityCurve = ({
 
   const peakProb = Math.max(...probabilities);
   const getRiskLabel = (val) => {
-    if (val >= 0.65) return { label: 'CRITICAL', color: '#e53935' };
-    if (val >= 0.35) return { label: 'ELEVATED', color: '#ff7b00' };
-    return { label: 'LOW', color: '#ffaa00' };
+    if (val >= 0.65) return { label: 'CRITICAL', color: 'var(--c-red-2)' };
+    if (val >= 0.35) return { label: 'ELEVATED', color: 'var(--c-orange-2)' };
+    return { label: 'LOW', color: 'var(--c-amber-2)' };
   };
 
   const peakRisk = getRiskLabel(peakProb);
@@ -181,7 +184,7 @@ const ForecastProbabilityCurve = ({
                   y1={y}
                   x2={width - padding.right}
                   y2={y}
-                  stroke={val === 0.35 || val === 0.65 ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)'}
+                  stroke={val === 0.35 || val === 0.65 ? 'var(--line-15)' : 'var(--line-06)'}
                   strokeDasharray={val === 0.35 || val === 0.65 ? '3 3' : 'none'}
                 />
                 <text x={padding.left - 8} y={y + 4} textAnchor="end" className="svg-label font-mono">
@@ -196,7 +199,7 @@ const ForecastProbabilityCurve = ({
             y1={padding.top + graphHeight * (1 - 0.65)}
             x2={width - padding.right}
             y2={padding.top + graphHeight * (1 - 0.65)}
-            stroke="#e53935"
+            stroke="var(--c-red-2)"
             strokeDasharray="4 4"
             strokeOpacity="0.4"
           />
@@ -207,7 +210,7 @@ const ForecastProbabilityCurve = ({
             <path
               d={counterfactualLinePath}
               fill="none"
-              stroke="#33c9ff"
+              stroke="var(--c-cyan)"
               strokeWidth="2.5"
               strokeDasharray="6 4"
               strokeLinecap="round"
@@ -226,7 +229,7 @@ const ForecastProbabilityCurve = ({
                     y1={pt.y}
                     x2={pt.x}
                     y2={padding.top + graphHeight}
-                    stroke="rgba(255,255,255,0.10)"
+                    stroke="var(--line-10)"
                     strokeWidth="1"
                   />
                 )}
@@ -235,7 +238,7 @@ const ForecastProbabilityCurve = ({
                   cx={pt.x}
                   cy={pt.y}
                   r={isSelected ? 8 : 5}
-                  fill="#080808"
+                  fill="var(--bg-panel)"
                   stroke={risk.color}
                   strokeWidth={isSelected ? 3 : 2}
                   style={{ transition: 'all 0.15s ease' }}
@@ -249,7 +252,7 @@ const ForecastProbabilityCurve = ({
                   y={padding.top + graphHeight + 18}
                   textAnchor="middle"
                   className="svg-label font-mono"
-                  fill={isSelected ? '#ffffff' : '#999999'}
+                  fill={isSelected ? 'var(--text-strong)' : 'var(--text-3-hi)'}
                 >
                   {pt.seconds ? `t+${pt.seconds}s` : `K=${pt.step}`}
                 </text>
@@ -261,7 +264,7 @@ const ForecastProbabilityCurve = ({
                       y={padding.top + graphHeight + 38}
                       textAnchor="middle"
                       className="svg-stage-label font-mono"
-                      fill={pt.prob >= 0.65 ? '#ff6a00' : '#888888'}
+                      fill={pt.prob >= 0.65 ? 'var(--c-orange)' : 'var(--text-3)'}
                     >
                       {String(pt.stage).length > 12 ? `${String(pt.stage).slice(0, 11)}…` : pt.stage}
                     </text>
@@ -271,7 +274,7 @@ const ForecastProbabilityCurve = ({
                         y={padding.top + graphHeight + 52}
                         textAnchor="middle"
                         className="svg-stage-label font-mono"
-                        fill="#ffaa00"
+                        fill="var(--c-amber-2)"
                       >
                         ⚠ rule
                       </text>
@@ -283,7 +286,7 @@ const ForecastProbabilityCurve = ({
           })}
 
           {!hasSeconds && (
-            <text x={width / 2} y={height - 6} textAnchor="middle" className="svg-label font-mono" fill="#888888">
+            <text x={width / 2} y={height - 6} textAnchor="middle" className="svg-label font-mono" fill="var(--text-3)">
               forecast step
             </text>
           )}

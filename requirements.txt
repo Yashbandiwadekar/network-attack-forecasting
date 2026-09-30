@@ -18,6 +18,12 @@ python-multipart>=0.0.9
 pydantic>=2.6
 uvicorn>=0.29
 requests>=2.31
+# models/report_pdf.py -- the incident report PDF download (pure Python, no system libraries)
+reportlab>=4.0
+# httpx is required by FastAPI's TestClient (used in 4 API test files). Without it,
+# pytest collection fails for test_server_contract.py and related API tests (BUG-004).
+httpx>=0.27
+
 
 # scripts/visualize_topology.py (pyvis is optional -- the script degrades gracefully without it,
 # see its own install message)

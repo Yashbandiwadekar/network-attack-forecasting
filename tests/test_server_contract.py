@@ -129,6 +129,69 @@ def test_attribution_contract_uses_real_feature_names(loaded: TestClient):
 
 
 @needs_sample
+def test_attribution_shares_are_a_proper_breakdown_not_raw_gradients(loaded: TestClient):
+    """The UI printed raw gradient x input values as percentages (0.0% everywhere on a saturated
+    host) and drew negative values as negative CSS widths. `share` is the fraction of total
+    attribution, so it must be in [0, 1], sum to at most 1 over the returned top features, and
+    `direction` must agree with the sign of the raw contribution."""
+    ip = _first_host(loaded)
+    body = loaded.post("/api/v1/explainability/attribution", json={"host_ip": ip}).json()
+    attrs = body["feature_attributions"]
+    assert body["attribution_total_abs"] >= 0
+    for a in attrs:
+        assert 0.0 <= a["share"] <= 1.0
+        assert a["direction"] in ("raises", "lowers", "neutral")
+        if a["contribution"] > 0:
+            assert a["direction"] == "raises"
+        if a["contribution"] < 0:
+            assert a["direction"] == "lowers"
+    assert sum(a["share"] for a in attrs) <= 1.0001
+    shares = [a["share"] for a in attrs]
+    assert shares == sorted(shares, reverse=True), "ranked by magnitude"
+    assert max(shares) > 0.01, "a real host must show a measurable top attribution"
+
+
+@needs_sample
+def test_attribution_separates_provenance_flags_from_behavioural_drivers(loaded: TestClient):
+    """has_ip_data records where a capture came from, not what the traffic did. It must never be in
+    the behavioural ranking, but must be reported (with a warning) rather than hidden."""
+    from models.explain import PROVENANCE_FEATURES
+
+    ip = _first_host(loaded)
+    body = loaded.post("/api/v1/explainability/attribution", json={"host_ip": ip}).json()
+    assert not any(a["feature"] in PROVENANCE_FEATURES for a in body["feature_attributions"])
+    assert {a["feature"] for a in body["provenance_attributions"]} == set(PROVENANCE_FEATURES)
+    assert all("not traffic behaviour" in a["note"].lower() for a in body["provenance_attributions"])
+    total = sum(a["share"] for a in body["feature_attributions"]) + body["provenance_share_total"]
+    assert total <= 1.0001
+
+
+@needs_sample
+def test_pdf_report_downloads_and_does_not_touch_the_ledger(loaded: TestClient):
+    """The PDF is built from the host's existing ledger entry. Downloading it must not append a new
+    entry, or a harmless click would alter the tamper-evident chain."""
+    ip = _first_host(loaded)
+    assert loaded.post("/api/v1/reports/generate", json={"host_ip": ip}).status_code == 200
+    before = loaded.get("/api/v1/system/status").json()["ledger_entries"]
+
+    resp = loaded.get(f"/api/v1/reports/pdf/{ip}")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+    assert "attachment" in resp.headers["content-disposition"]
+    assert resp.content.startswith(b"%PDF-")
+
+    after = loaded.get("/api/v1/system/status").json()["ledger_entries"]
+    assert after == before, "downloading a PDF must not append to the audit ledger"
+
+
+@needs_sample
+def test_pdf_report_requires_a_generated_report_first(loaded: TestClient):
+    resp = loaded.get("/api/v1/reports/pdf/10.99.99.99")
+    assert resp.status_code == 404
+    assert "generate a report first" in resp.json()["detail"].lower()
+
+
+@needs_sample
 def test_narrative_contract(loaded: TestClient):
     ip = _first_host(loaded)
     body = loaded.get("/api/v1/attacks/narrative", params={"host_ip": ip}).json()
