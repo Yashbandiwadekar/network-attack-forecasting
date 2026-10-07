@@ -150,7 +150,7 @@ if __name__ == "__main__":
     parser.add_argument("--config", default="configs/default.yaml")
     parser.add_argument("--arch", default="transformer", choices=["transformer", "lstm"],
                          help="Sequence encoder to train: the world model's Transformer (default) "
-                              "or the LSTM baseline (see docs/05-related-work-and-competitive-landscape.md).")
+                              "or the LSTM baseline.")
     parser.add_argument("--seed", type=int, default=None,
                         help="Seed the RNGs and save checkpoints under checkpoint_dir/seed<N> (audit E10). Default: unseeded, as before.")
     args = parser.parse_args()

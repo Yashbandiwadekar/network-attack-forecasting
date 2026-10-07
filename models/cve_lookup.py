@@ -1,9 +1,7 @@
 """CVE/NVD threat-intel enrichment: attaches real, notable CVEs to a forecasted MITRE stage.
 
-Competitor differentiation (see docs/05-related-work-and-competitive-landscape.md Section 4):
-`ErenSnowh/Argus` is the only other SIH26153 team found integrating CVE/NVD data into its
-output. This module closes that gap without adding a live network dependency to the dashboard --
-same "runs fully offline" principle already applied to the audit ledger and compliance report.
+Enrichment is added without a live network dependency in the dashboard -- the same "runs fully
+offline" principle already applied to the audit ledger and compliance report.
 
 Scope, stated honestly (same ethos as models/compliance.py's docstring): CIC-IDS-2018/CTU-13 flow
 records carry no software name or version field, so this system has no way to identify *which*

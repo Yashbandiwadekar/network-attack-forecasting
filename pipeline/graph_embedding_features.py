@@ -17,7 +17,7 @@ but it does mean these columns encode graph *structure* (who talks to whom, how 
 direction) through a fixed lens, not one optimized end-to-end for this forecasting task. Joint
 training would require restructuring models/train.py from precomputed flat tensors
 (models/dataset.py) to on-the-fly per-batch graph construction -- a larger change tracked as a
-follow-up (see docs/05-related-work-and-competitive-landscape.md), not attempted here. The
+follow-up, not attempted here. The
 encoder's weights are re-derived from a fixed seed on every call (`_frozen_encoder`) so this
 feature-engineering step is itself fully reproducible across pipeline runs and processes.
 """

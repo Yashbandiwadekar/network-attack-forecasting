@@ -13,8 +13,8 @@ dashboard renders, and that the phrase "60-second forecast" refers to, had never
 all. Nothing in this repository answered the question "does rolling the world model's state
 forward do anything?"
 
-The experiment is borrowed from a competitor, `ShipraSharma08/AI-Network-Attack-Forecasting`,
-which publishes exactly this ablation (see `docs/05-related-work-and-competitive-landscape.md`).
+This is a standard ablation for sequence world models: hold the observed state fixed and check
+whether rolling the model forward adds anything.
 
 ## Method
 
@@ -80,9 +80,7 @@ of a small penalty"**, not "the rollout is proven harmful". Seed 2 drives most o
    what produces per-step stage predictions, `transition_magnitude` and the what-if
    counterfactual path, none of which a frozen estimate can produce. What it invalidates is the
    narrower claim that rollout improves *infiltration ranking* at longer horizons.
-4. **This is a negative result about this project's own model**, of the kind the competitive survey
-   had claimed no team publishes. Two competitors already do (`ShadowCat`'s GraphSAGE NO-GO,
-   `CyberPulse`'s README). This is ours.
+4. **This is a negative result about this project's own model**, reported as such.
 
 ## Limitations
 

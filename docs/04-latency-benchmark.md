@@ -43,20 +43,16 @@ Cost is dominated by fixed per-call overhead up to ~100 hosts, then scales close
 host on a mid-sized network completes well inside one 10-second window — the batching added under
 audit G10 is what makes this hold.
 
-## How this compares — carefully
+## What this is, and is not
 
-`muthukkumaranb/ShadowCat` publishes 1,630.87 ms P50 per 30-window evaluation. **These numbers are
-not comparable**, and quoting a speedup would be wrong:
+These figures are specific to this project's hardware (CUDA), model and measurement boundaries,
+with the stages named above. They are **not** offered as a comparison with other systems, and quoting
+a speedup would be wrong: published figures elsewhere typically use different hardware (CPU), include
+other stages (feature extraction, ensembles, graph traversal) and use different denominators (per
+evaluation rather than per capture or per host).
 
-- Their measurement is CPU (`PyTorch 2.10.0+cpu`); this one is CUDA.
-- Their P50 bundles feature extraction (561 ms), PCA, a **37-fold LSTM ensemble** (197 ms), graph
-  traversal (367 ms) and lineage hashing. This project runs a single model and has no graph
-  traversal stage.
-- The denominators differ: theirs is per 30-window evaluation, this is per capture (ingestion) and
-  per host (inference).
-
-The honest statement is that this project now publishes measured latency at all, on real traffic,
-with the stages and platform named — not that it is faster than anyone.
+The honest statement is that this project publishes measured latency at all, on real traffic, with
+the stages and platform named.
 
 ## Limitations
 

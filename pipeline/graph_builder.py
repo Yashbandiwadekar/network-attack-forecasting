@@ -5,12 +5,10 @@ pipeline/graph_features.py already computes five *scalar* graph-derived features
 existing flat feature vector the Transformer world model consumes. This module is a different,
 complementary piece: it builds the actual per-window graph *structure* (nodes, edges, edge
 features) that a message-passing GNN encoder needs, rather than pre-summarizing it into a
-handful of scalars. See docs/05-related-work-and-competitive-landscape.md Section 4 for why this
-is worth having (`raghuraj72/Vanguard-GWM`, `mithun-afk/ST-WM-Cyber` — competing teams already
-building graph/spatial-temporal world models) and the follow-up research note in that doc on how
-this integrates with the existing Transformer rollout.
+handful of scalars, so a graph encoder can learn from the structure itself and its embedding can be
+fed back into the existing Transformer rollout.
 
-Design (see that research note for the reasoning): **node = host (IP)**, **edge = one flow**,
+Design: **node = host (IP)**, **edge = one flow**,
 with the flow's own numeric feature vector as the edge attribute (E-GraphSAGE-style — edge
 features carry more signal than node features for flow data, per the current literature this
 project surveyed). Edges are directed (src -> dst): direction is real signal for this domain

@@ -1,5 +1,4 @@
-"""LSTM sequence model: the second leg of the Markov/LSTM/Transformer architecture comparison
-(see docs/05-related-work-and-competitive-landscape.md Section 4).
+"""LSTM sequence model: the second leg of the Markov/LSTM/Transformer architecture comparison.
 
 Deliberately mirrors WorldModel's (models/world_model.py) forward signature and multi-task head
 layout exactly -- same next-state regression / stage classification / infiltration heads, same
