@@ -1,0 +1,9 @@
+Phoenix IDPS
+Copyright 2026 Phoenix IDPS contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+The licence covers the source code in this repository only. It does not cover:
+  - the datasets the models were trained and evaluated on (CIC-IDS-2018, UNSW-NB15, CTU-13),
+    which are distributed under their own terms; and
+  - third-party dependencies, which keep their own licences (see requirements.txt).
