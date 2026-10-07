@@ -6,9 +6,9 @@ real-time?" currently has no answer. This measures the real deployed path -- the
 traffic.
 
 **Real traffic, not generated noise.** The input is a slice of an actual CIC-IDS-2018 capture
-day. A competitor (`muthukkumaranb/ShadowCat`) had to retire its own latency benchmark for
-timing an untrained model on `np.random.randn` inputs; that failure mode is avoided here by
-construction, and the capture's provenance is recorded in the output.
+day. A latency benchmark that times an untrained model on `np.random.randn` inputs measures nothing
+useful; that failure mode is avoided here by construction, and the capture's provenance is recorded
+in the output.
 
 Stages are timed separately because they have wildly different costs and different meanings:
 ingestion happens once per uploaded capture, while the per-host stages run on every dashboard

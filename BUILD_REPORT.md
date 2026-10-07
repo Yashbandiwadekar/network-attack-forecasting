@@ -349,7 +349,7 @@ the regenerated report now sits at the original path with a header explaining th
 `docs/05` now state the model does **not** transfer (F1 0.009, AUROC 0.517, attack-class stage F1
 0.000 -- all read from the regenerated report, not carried from memory).
 
-Acceptance (`grep -rn "0\.534" --include=*.md .`, excluding the auditor's own AUDIT.md/WORK_ORDER.md):
+Acceptance (`grep -rn "0\.534" --include=*.md .`, excluding the auditor's own AUDIT.md):
 ```
 ./docs/04-evaluation-real.md:30:| Baseline (LR, stacked window) | 0.534 | 0.364 | 1.000 | 0.014 |
 ./docs/archive/04-evaluation-ctu13_cross_from_real_data_RETRACTED-2026-09-23.md:1:> **RETRACTED 2026-09-23.** The World Model figures below (including F1 0.534 at the 5% FPR budget)
@@ -1014,7 +1014,7 @@ represents a standalone, reproducible v2 checkpoint result and pointing to
 
 ## W21 — Frozen-state rollout ablation (2026-09-30) — DONE, negative result
 
-Work order: `WORK_ORDER-2026-09-30.md`. Script: `scripts/ablate_frozen_state.py`.
+Script: `scripts/ablate_frozen_state.py`.
 Report: `docs/04-evaluation-frozen-state-ablation.md`. Raw: `docs/frozen_state_ablation.json`.
 
 Acceptance asked for the conclusion "in whichever direction the numbers land". It landed negative.
@@ -1065,9 +1065,8 @@ batch scaling (replicated real sequence):
 ```
 
 Scoring 5,000 hosts in 60 ms means a full K=6 forecast for every host on a mid-sized network
-finishes inside one 10-second window. Not compared against ShadowCat's 1,630 ms: theirs is CPU,
-bundles a 37-fold ensemble and graph traversal, and uses a different denominator. Stated in the
-report rather than converted into a speedup claim.
+finishes inside one 10-second window. Not converted into a speedup claim against other systems, whose
+hardware, stages and denominators differ; stated in the report.
 
 Limitations recorded: CUDA only (no CPU figure), one capture/day/machine, no concurrency or
 cold-start measurement, and the batch-scaling rows replicate one real sequence rather than
@@ -1090,51 +1089,3 @@ which understated the project:
 - "32 benign-to-attack transitions from 2 pseudo-hosts" predates the day-disjoint re-measure,
   which covers **628** transitions across 3 pseudo-hosts (96% from one day), with false alarms
   now counted per E3.
-
-
-## W24 / W25 (2026-09-30) — DONE
-
-### W24 — the "no competitor publishes a negative result" claim, retracted for the second time
-
-`docs/05-related-work-and-competitive-landscape.md`. The 09-29 pass had already narrowed this
-once (from "no repo reports a negative result" to "none about its own *model*"); the narrowed
-version is also false. Both counter-examples read at source:
-
-- **ShadowCat** ran a 37-fold Leave-One-Entity-Out evaluation of its GraphSAGE fusion, found
-  F1 0.0000 in 3 of 18 DDOS-LOIC-UDP folds (macro 0.9157 vs 0.9971 for plain stacked LSTM),
-  attributed it to over-smoothing in dense bipartite subgraphs, and issued a NO-GO retiring the
-  architecture. It also retired its own latency benchmark for timing an untrained model on
-  `np.random.randn`.
-- **CyberPulse** states in its README summary that it is not a demonstrated early-warning system,
-  that its GRU loses to logistic regression, and that its "t+1 to t+4" horizons are dataset rows
-  rather than time.
-
-Recorded with the caveat that ShadowCat's folds appear to withhold one *episode* while training
-on other episodes of the same attack type — not leave-one-family-out — so 0.9971 and this
-project's 0.53–0.82 LOFO figures measure different difficulties and must not be compared. That
-reading is from fold naming and per-category reporting, not from their split code.
-
-The paragraph now also cites this project's own new negative result (W21), so the section states
-a symmetric position rather than an unmatched claim.
-
-Acceptance: `grep -nE "[Nn]o (surveyed |other )?(repo|team|competitor)...(publishes|describes|
-reports|has)"` returns only the sentence performing the retraction.
-
-### W25 — the "Feature #4" citation
-
-The `raushankumarsah07` row claimed "this project independently built the same capability, see
-Feature #4". When the last-minute build order raised this as item 0 the capability did not exist
-at all; it does now (`2c4474b`, `93f6bcc`). Two defects remained:
-
-- there is no "Feature #4" anywhere in the repository — a dangling reference in the one document
-  whose whole value is its accuracy;
-- "independently" was unsupportable: the capability was built *after* this competitor was
-  surveyed and explicitly in response to it (build-order item 4).
-
-Replaced with the real endpoint and the true chronology: "built ... on 2026-09-30,
-`POST /api/v1/forecast/what-if` in `app/server.py`, *after* and in response to this survey — not
-independently". Verified the cited endpoint exists (`app/server.py:476`).
-
-Acceptance: `grep -c "Feature #4" docs/05-related-work-and-competitive-landscape.md` returns 0.
-
-**W21–W25 of `WORK_ORDER-2026-09-30.md` are now all closed.**

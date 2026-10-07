@@ -772,7 +772,7 @@ Listed so their numbers cannot reach a slide on the strength of a commit message
 
 **Date:** 2026-09-29. **Audited state:** `integration/all-branches-2026-09-29` at `e9e9efa`, in sync
 with its own remote, open as **PR #1 → master** (30 commits, MERGEABLE). **Method:** read-only;
-each item checked against the acceptance criterion written for it in `WORK_ORDER-2026-09-29.md`,
+each item checked against the acceptance criterion written for it in the 2026-09-29 work order (removed from the tree; it remains in git history),
 not against `BUILD_REPORT.md`'s status column. Full suite: **290 passed**.
 
 | Item | Builder status | **Audit verdict** | Evidence |
