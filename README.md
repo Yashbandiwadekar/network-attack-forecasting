@@ -227,7 +227,8 @@ and links to the report it comes from.
   (`docs/04-evaluation-lofo-seeds.md`, `docs/AUDIT.md` G1)
 - **Single dataset, single network.** Trained on CIC-IDS-2018 only. Cross-network transfer is a
   known-hard problem in this literature and this project is a textbook instance of the collapse,
-  not an exception (`docs/05-related-work-and-competitive-landscape.md`).
+  not an exception (`docs/04-evaluation-ctu13_cross_from_real_data.md`,
+  `docs/04-evaluation-unsw_cross_from_real_data_v2.md`).
 
 Speed is not the constraint: interactive drill-down is **9.9 ms** and scoring 5,000 hosts takes
 **60 ms** (`docs/04-latency-benchmark.md`).

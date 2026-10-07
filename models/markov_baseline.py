@@ -1,6 +1,5 @@
 """Markov-chain baseline: the simplest possible sequence model, and the third leg of the
-Markov/LSTM/Transformer architecture comparison (see docs/05-related-work-and-competitive-landscape.md
-Section 4 — csxzor-devcs runs this same three-way comparison).
+Markov/LSTM/Transformer architecture comparison.
 
 Unlike BaselineModel (models/baseline_lr.py), which still sees the full dense flow-feature
 vector, this model only ever sees the discrete MITRE stage the current window is already
