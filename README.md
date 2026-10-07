@@ -307,3 +307,15 @@ These are documented rather than hidden. `docs/AUDIT.md` is the full list with m
 - [ ] Demo video (≤2 min) and technical presentation (≤5 slides) — **not produced yet.** A prior
   commit added `docs/demo.mp4` and `docs/presentation.pdf` as 0-byte placeholders and checked this
   item off; both were removed (audit H4/W16) since an empty file makes an open item look closed.
+
+## License
+
+The source code is released under the [Apache License 2.0](LICENSE) (see also [NOTICE](NOTICE)).
+
+Two things the licence does **not** cover:
+
+- **Datasets.** The models were trained and evaluated on CIC-IDS-2018, UNSW-NB15 and CTU-13, which have
+  their own terms. Check them before any use beyond research, especially commercial use.
+- **Dependencies keep their own licences.** In particular, Scapy (used for PCAP parsing) is
+  GPL-2.0-only. This repository only imports it and does not bundle it, but anyone *distributing* a
+  product that includes Scapy needs to comply with the GPL for that component.
