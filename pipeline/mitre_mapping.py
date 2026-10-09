@@ -17,6 +17,11 @@ Unknown labels are mapped to IMPACT instead of silently becoming benign.
 
 from __future__ import annotations
 
+import logging
+
+_log = logging.getLogger(__name__)
+_WARNED_CTU13_LABELS: set[str] = set()
+
 
 # ---------------------------------------------------------------------------
 # Internal stage names
@@ -110,6 +115,17 @@ def ctu13_label_to_stage(raw_label: str) -> str:
     if label.startswith("flow=from-normal"):
         return BENIGN
 
+    # D-1: these were missing and fell through to IMPACT (a positive).
+    if label.startswith("flow=from-background"):
+        return BENIGN
+
+    if label.startswith("flow=to-normal"):
+        return BENIGN
+
+    # Bare "flow=normal" and versioned variants, e.g. flow=Normal-V45-HTTP-windowsupdate.
+    if label.startswith("flow=normal"):
+        return BENIGN
+
     # -----------------------------------------------------------------------
     # Botnet traffic
     # -----------------------------------------------------------------------
@@ -144,7 +160,12 @@ def ctu13_label_to_stage(raw_label: str) -> str:
     # Unknown CTU-13 labels
     # -----------------------------------------------------------------------
 
-    # Never silently classify unknown traffic as benign.
+    # Never silently classify unknown traffic as benign. It stays IMPACT, but
+    # is no longer silent: warn once per distinct label (D-1 root cause was a
+    # silent catch-all).
+    if label not in _WARNED_CTU13_LABELS:
+        _WARNED_CTU13_LABELS.add(label)
+        _log.warning("Unknown CTU-13 label %r mapped to IMPACT (counts as a positive)", label)
     return IMPACT
 
 

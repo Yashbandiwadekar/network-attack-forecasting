@@ -7,6 +7,11 @@ frontend needs no build-time knowledge of the host's address.
     python -m scripts.serve                 # localhost only
     python -m scripts.serve --lan           # bind 0.0.0.0 and print the LAN URL to open
     python -m scripts.serve --lan --port 80 # a port a phone will reach without a suffix
+    python -m scripts.serve --config v1     # serve the v1 (leaky-split) model; default is v2
+
+The model defaults to configs/real_data_v2_converged.yaml (day-disjoint, the README headline).
+--config (or $PHOENIX_CONFIG) takes v1, v2, or a path to a configs/*.yaml file. Startup aborts with
+a clear message if that model's checkpoint or scaler is missing.
 
 For the split development setup (Vite on :5173 with hot reload), run uvicorn and `npm run dev`
 separately instead; frontend/.env.development points the dev server at the API.
@@ -65,8 +70,14 @@ def main() -> None:
     parser.add_argument("--lan", action="store_true", help="bind 0.0.0.0 so other machines can reach it")
     parser.add_argument("--host", default=None, help="explicit bind address (overrides --lan)")
     parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument("--config", default=None,
+                        help="model to serve: v1, v2 (default) or a configs/*.yaml path; "
+                             "also settable via $PHOENIX_CONFIG")
     parser.add_argument("--rebuild", action="store_true", help="rebuild the dashboard even if a build exists")
     args = parser.parse_args()
+
+    if args.config:
+        os.environ["PHOENIX_CONFIG"] = args.config
 
     have_frontend = build_frontend(args.rebuild)
     host = args.host or ("0.0.0.0" if args.lan else "127.0.0.1")
@@ -76,6 +87,15 @@ def main() -> None:
     print(f"  {'dashboard + API' if have_frontend else 'API only (no dashboard build)'} on port {args.port}")
     print()
     print(f"    local   http://127.0.0.1:{args.port}")
+    # Imported here so the banner prints before torch and the checkpoint load.
+    try:
+        from app.server import STATE, check_model_artifacts
+        config_path = STATE.config_path  # resolved (and validated to exist) when app.server is imported
+        check_model_artifacts(config_path)
+    except RuntimeError as exc:  # ModelUnavailableError
+        print(f"[!] {exc}", file=sys.stderr)
+        sys.exit(2)
+    print(f"    model   {config_path}")
     if host == "0.0.0.0":
         ip = lan_ip()
         if ip:
@@ -87,7 +107,6 @@ def main() -> None:
         print(f"  is the usual cause -- allow inbound TCP {args.port}.")
     print()
 
-    # Imported here so the banner prints before torch and the checkpoint load.
     import uvicorn
 
     os.environ.setdefault("PHOENIX_HOST", host)

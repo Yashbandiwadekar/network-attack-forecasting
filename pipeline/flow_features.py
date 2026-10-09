@@ -67,6 +67,14 @@ UDP = 17
 _RELEVANT_RAW_COLUMNS = set(COLUMN_RENAME.keys())
 
 
+def csv_has_label_column(path: str | Path) -> bool:
+    """True when the CSV carries a ground-truth Label column. load_flow_csv(require_label=False)
+    fills a missing one with BENIGN purely so windowing runs; callers use this to know that
+    default is not an observation."""
+    header = pd.read_csv(path, nrows=0).columns
+    return any(COLUMN_RENAME.get(c.strip()) == "label" for c in header)
+
+
 def load_flow_csv(path: str | Path, require_label: bool = True) -> pd.DataFrame:
     """Load one CICFlowMeter CSV and rename to the internal schema.
 

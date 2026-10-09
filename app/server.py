@@ -17,6 +17,7 @@ import os
 import json
 import tempfile
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -125,13 +126,79 @@ def _require_token(authorization: str | None = Security(_api_key_header)) -> Non
 
 # ---------------------------------------------------------------- server state
 
+# Model selection. The day-disjoint v2 checkpoint is the one every README number comes from;
+# v1 (configs/real_data.yaml) was trained on the leaky per-host split whose 0.917 F1 was withdrawn,
+# so it stays selectable but is never the default. Override with PHOENIX_CONFIG (an alias below or
+# a config path) or `python -m scripts.serve --config ...`.
+DEFAULT_CONFIG = "configs/real_data_v2_converged.yaml"
+CONFIG_ALIASES = {
+    "v2": "configs/real_data_v2_converged.yaml",
+    "v1": "configs/real_data.yaml",
+}
+# (dataset id, config, display name) for the dataset registry / dashboard dropdown.
+MODEL_REGISTRY = (
+    ("CIC-IDS-2018", "configs/real_data.yaml", "CIC-IDS-2018 (v1, leaky split)"),
+    ("CIC-IDS-2018-v2", "configs/real_data_v2_converged.yaml", "CIC-IDS-2018 (v2, day-disjoint)"),
+    ("UNSW-NB15", "configs/unsw_nb15.yaml", "UNSW-NB15"),
+    ("CTU-13", "configs/ctu13.yaml", "CTU-13"),
+)
+
+
+class ModelUnavailableError(RuntimeError):
+    """The selected config's checkpoint or scaler is missing."""
+
+
+def resolve_config_choice(choice: str | None = None) -> str:
+    """The config path the server should serve: explicit choice, else $PHOENIX_CONFIG, else the v2
+    default. Accepts the aliases v1/v2 or a path (relative to the project root, or absolute)."""
+    raw = (choice or os.environ.get("PHOENIX_CONFIG") or DEFAULT_CONFIG).strip()
+    raw = CONFIG_ALIASES.get(raw.lower(), raw)
+    path = Path(raw)
+    if not path.is_absolute():
+        path = PROJECT_ROOT / path
+    if not path.is_file():
+        raise ModelUnavailableError(
+            f"Model config not found: {raw!r} (looked for {path}). Use v1, v2, or a path to a "
+            f"configs/*.yaml file."
+        )
+    try:
+        return path.relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def check_model_artifacts(config_path: str) -> None:
+    """Fail loudly, naming the missing file, rather than serving 503s later. Existence check only;
+    the full load happens on first use."""
+    config = load_config(config_path)
+    ckpt = resolve_path(config, "checkpoint_dir") / "world_model_best.pt"
+    scaler = resolve_path(config, "processed_dir") / "scaler.npz"
+    missing = [f"{what} {p}" for what, p in (("checkpoint", ckpt), ("feature scaler", scaler))
+               if not p.exists()]
+    if missing:
+        raise ModelUnavailableError(
+            f"Cannot serve model {config_path}: missing " + " and ".join(missing)
+            + ". Train it, restore the files, or choose another model (PHOENIX_CONFIG / --config)."
+        )
+
+
+def model_info(config_path: str) -> dict[str, Any]:
+    config = load_config(config_path)
+    return {
+        "model_name": Path(config_path).stem,
+        "config_path": config_path,
+        "checkpoint_dir": resolve_path(config, "checkpoint_dir").name,
+    }
+
+
 class _State:
     """What the server currently knows. Populated by /analysis/upload -- nothing is preloaded,
     because the repo ships a checkpoint but no traffic. Empty here means empty in the UI."""
 
     def __init__(self) -> None:
-        self.config_path: str = "configs/real_data.yaml"
-        self.dataset_id: str = "CIC-IDS-2018"
+        self.config_path: str = resolve_config_choice()
+        self.dataset_id: str = next(
+            (i for i, c, _ in MODEL_REGISTRY if c == self.config_path), Path(self.config_path).stem)
         self.flow_df = None
         self.windows = None
         self.batch = None          # BatchForecastResult
@@ -188,6 +255,11 @@ def _observed_stage(host_ip: str) -> str | None:
     rows = STATE.windows[STATE.windows["src_ip"] == host_ip]
     if rows.empty:
         return None
+    # Unlabelled input (no Label column, PCAP, live) has its windowing label defaulted to BENIGN so
+    # the pipeline can run; that default is not an observation. service.process_uploads records
+    # which windows carry real ground truth in `stage_observed`.
+    if "stage_observed" in rows.columns and not bool(rows.iloc[-1]["stage_observed"]):
+        return None
     return str(rows.iloc[-1]["stage"])
 
 
@@ -198,6 +270,15 @@ def _strip_markup(text: str) -> str:
     day someone reaches for dangerouslySetInnerHTML."""
     import re
     return re.sub(r"<[^>]+>", "", text)
+
+
+UNLABELLED = "Unlabelled"
+
+
+def _display_observed(observed: str | None) -> str:
+    """Observed stage for display. With no ground truth we say so; we never substitute the
+    forecast's first step (that is t+1, a prediction, not an observation)."""
+    return _display(observed) if observed is not None else UNLABELLED
 
 
 def _host_row(idx: int) -> dict[str, Any]:
@@ -220,10 +301,10 @@ def _host_row(idx: int) -> dict[str, Any]:
         "peak_prob": round(peak, 4),
         "risk_score": round(peak, 4),
         "severity": service.severity_for(peak),
-        # Observed, not forecast: stages[0] is already t+1. Falls back to the first forecast step
-        # only when the capture carries no labels, and says so via current_stage_observed.
-        "current_stage": _display(observed or stages[0]),
-        "current_stage_id": observed or stages[0],
+        # Observed, not forecast: stages[0] is already t+1. A capture with no labels has no
+        # observed stage: current_stage is "Unlabelled", current_stage_id null, observed false.
+        "current_stage": _display_observed(observed),
+        "current_stage_id": observed,
         "current_stage_observed": observed is not None,
         "predicted_stage": _display(peak_stage),
         "predicted_stage_id": peak_stage,
@@ -266,6 +347,15 @@ class SelectDatasetRequest(BaseModel):
 
 # ---------------------------------------------------------------- endpoints
 
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    check_model_artifacts(STATE.config_path)  # refuse to start on a missing checkpoint/scaler
+    yield
+
+
+app.router.lifespan_context = _lifespan
+
+
 @app.get("/api/v1/health")
 def read_root():
     config, model, _, _ = service.load_backend(STATE.config_path)
@@ -274,7 +364,7 @@ def read_root():
         "status": "online",
         "active_dataset": STATE.dataset_id,
         "checkpoint_loaded": model is not None,
-        "config_path": STATE.config_path,
+        **model_info(STATE.config_path),
         **service.horizon_info(config),
     }
 
@@ -284,9 +374,8 @@ def _dataset_registry() -> list[dict[str, Any]]:
     Separates dataset availability (processed data / metadata) from model checkpoint availability,
     and returns machine-independent path and capability data."""
     out: list[dict[str, Any]] = []
-    for ds_id, cfg_name in (("CIC-IDS-2018", "real_data.yaml"),
-                            ("UNSW-NB15", "unsw_nb15.yaml"),
-                            ("CTU-13", "ctu13.yaml")):
+    for ds_id, cfg_rel, display_name in MODEL_REGISTRY:
+        cfg_name = Path(cfg_rel).name
         cfg_path = PROJECT_ROOT / "configs" / cfg_name
         if not cfg_path.exists():
             continue
@@ -334,7 +423,7 @@ def _dataset_registry() -> list[dict[str, Any]]:
 
             entry: dict[str, Any] = {
                 "id": ds_id,
-                "name": ds_id,
+                "name": display_name,
                 "config": f"configs/{cfg_name}",
                 "status": status,
                 "total_sequences": total_sequences,
@@ -351,7 +440,7 @@ def _dataset_registry() -> list[dict[str, Any]]:
         except Exception as exc:
             entry = {
                 "id": ds_id,
-                "name": ds_id,
+                "name": display_name,
                 "config": f"configs/{cfg_name}",
                 "status": f"Unreadable: {type(exc).__name__}",
                 "total_sequences": None,
@@ -475,6 +564,7 @@ def get_system_status():
         "status": "online",
         "api_connected": True,
         "active_dataset": STATE.dataset_id,
+        **model_info(STATE.config_path),
         "model_loaded": model is not None,
         "data_source": STATE.source_name,
         "active_monitored_hosts": hosts_n,
@@ -542,7 +632,7 @@ def predict_forecast(req: PredictRequest):
         # Observed, like _host_row -- stages[0] is already t+1, so using it here made the
         # forecast panel report "Benign" for a host the table and narrative both showed as
         # Command & Control.
-        "current_stage": _display(_observed_stage(req.host_ip) or stages[0]),
+        "current_stage": _display_observed(_observed_stage(req.host_ip)),
         "current_stage_observed": _observed_stage(req.host_ip) is not None,
         "horizon_note": (
             f"Forecast covers {horizon['horizon_seconds']} seconds "

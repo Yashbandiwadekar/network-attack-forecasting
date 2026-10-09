@@ -228,6 +228,11 @@ const Dashboard = () => {
                   <span style={{ color: 'var(--text-3)' }}> · trained model loaded · upload a capture to analyse</span>
                 </span>
               )}
+              {systemStatus?.config_path && (
+                <span className="font-mono" data-testid="model-config-label" title={`checkpoint: ${systemStatus.checkpoint_dir || ''}`} style={{ fontSize: '0.7rem', color: 'var(--text-3)' }}>
+                  {systemStatus.model_name} ({systemStatus.config_path})
+                </span>
+              )}
               {/* BUG-006: spinner while switching datasets */}
               {datasetSwitching && (
                 <span style={{ fontSize: '0.75rem', color: 'var(--c-amber-3)', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -366,7 +371,10 @@ const Dashboard = () => {
                           <td style={{ color: (h.peak_prob || 0) > 0.7 ? 'var(--c-red)' : 'var(--c-orange)' }}>
                             {((h.peak_prob || 0) * 100).toFixed(1)}%
                           </td>
-                          <td>{h.current_stage || 'ANALYZING'}</td>
+                          <td title={h.current_stage_observed === false ? 'No ground-truth labels in this input; observed stage unknown' : undefined}
+                              style={h.current_stage_observed === false ? { color: 'var(--text-3)', fontStyle: 'italic' } : undefined}>
+                            {h.current_stage || 'ANALYZING'}
+                          </td>
                           <td>{h.predicted_stage || 'FORECASTING'}</td>
                           <td>
                             <span className={`sev-badge ${h.severity || 'HIGH'}`}>{h.severity || 'HIGH'}</span>

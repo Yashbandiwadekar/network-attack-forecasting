@@ -21,7 +21,7 @@ import pandas as pd
 from common.config import feature_columns, load_config, resolve_path
 from models.dataset import FeatureScaler, load_split
 from models.forecast import ForecastEngine, latest_sequences_batch, load_world_model
-from pipeline.flow_features import clean_and_normalize, load_flow_csv, load_flow_dir
+from pipeline.flow_features import clean_and_normalize, csv_has_label_column, load_flow_csv, load_flow_dir
 from pipeline.graph_embedding_features import build_graph_embedding_window_features
 from pipeline.graph_features import build_graph_window_features
 from pipeline.packet_features import build_flow_records, compute_packet_window_features, load_pcap
@@ -136,6 +136,11 @@ def process_uploads(flow_csv_path: Path | None, pcap_path: Path | None, config: 
     embedding_windows = build_graph_embedding_window_features(flow_df, config)
     windows = merge_graph_embedding_features(windows, embedding_windows, config)
     windows = apply_reconnaissance_heuristic(windows, config)
+    # Ground truth exists only for a CSV that carries a Label column. For a CSV without one, or a
+    # PCAP, the BENIGN label above is a placeholder so windowing could run; mark the windows so
+    # consumers (app/server.py::_observed_stage) report the observed stage as unknown, not Benign.
+    labelled = flow_csv_path is not None and csv_has_label_column(flow_csv_path)
+    windows["stage_observed"] = labelled
     return flow_df, windows
 
 

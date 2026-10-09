@@ -1,3 +1,8 @@
+> **PRE-FIX LABELS (defect D-1, noted 2026-10-10).** This report was computed on CTU-13 splits whose labels
+> mapped benign `From-Background`, `To-Normal` and `Normal` flows to a positive (`impact`) label. Its test
+> positives (6,438) and onset windows (551) include those artifacts. Superseded by
+> `docs/04-evaluation-ctu13_cross_from_real_data_v2_postD1.md`. Kept unchanged below for the record.
+
 # Evaluation: World Model vs Baselines
 
 Test set: 223754 sequences. All four models predict the immediate next window (t+1) from
