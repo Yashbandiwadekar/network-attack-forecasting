@@ -102,8 +102,12 @@ def main() -> None:
     #     reported here rather than letting a heuristic label pass as a prediction.
     stage_pred = res.stage_predictions
     stage_heur = getattr(res, "stage_is_heuristic", None)
-    dos_rows = [i for i in range(n) if cur_infil[i] == 1.0]
+    #     Tabulated on rows whose NEXT window is DoS (`nxt_is_dos`), because `stage_pred[i][0]` is
+    #     the forecast for window i+1. Tabulating it on rows where window i itself is under attack
+    #     would compare a prediction against the wrong window, and at the tail of a burst
+    #     "benign" would then be the correct answer being counted as an error.
     import collections
+    dos_rows = [i for i in range(n) if nxt_is_dos[i] == 1]
     named = collections.Counter(stage_pred[i][0] for i in dos_rows) if dos_rows else {}
     named_heur = (collections.Counter(
         stage_pred[i][0] for i in dos_rows if stage_heur and stage_heur[i][0]) if dos_rows else {})
@@ -113,27 +117,46 @@ def main() -> None:
     onsets = [i for i in range(1, n)
               if nxt_is_dos[i] == 1 and cur_infil[i] == 0.0 and nxt_attack[i - 1] == 0]
 
-    # --- Genuine forecast attempts: predict onset o from window o-L, reading rollout step k=L.
-    #     The source window must itself still be benign, otherwise this is detection.
+    # --- Genuine forecast attempts.
+    #     `o` is the last still-benign window, so the FIRST DoS window is t = o+1. From source
+    #     window j, rollout step k=L lands on j+L, so j = t-L and L=1 reads probs[o, 0] -- the
+    #     t+1 forecast made from the last benign window, which is the single most important
+    #     number here. An earlier version of this script used j = o-L, which made every step
+    #     target the benign window W_o instead of the attack; the assert below makes that class
+    #     of off-by-one impossible to reintroduce silently.
     attempts = []
     for o in onsets:
+        t = o + 1
+        if t >= n or cur_infil[t] != 1.0:
+            continue
         for L in range(1, horizon + 1):
-            j = o - L
+            j = t - L
             if j < 0 or cur_infil[j] != 0.0:
-                continue
-            lead_s = int(wend[o].astype("datetime64[s]").astype(np.int64)
+                continue  # source window must itself still be benign, else this is detection
+            assert infil[j, L - 1] == 1.0, (
+                f"target of step k={L} from window {j} is not an attack -- off-by-one")
+            lead_s = int(wend[t].astype("datetime64[s]").astype(np.int64)
                          - wend[j].astype("datetime64[s]").astype(np.int64))
             attempts.append({
-                "onset_index": int(o),
-                "onset_time": str(wend[o]),
+                "onset_index": int(t),
+                "onset_time": str(wend[t]),
+                "source_index": int(j),
                 "steps_ahead": L,
                 "lead_seconds_measured": lead_s,
                 "prob": round(float(probs[j, L - 1]), 4),
             })
 
-    det = np.array([probs[i, 0] for i in range(n) if cur_infil[i] == 1.0], dtype=np.float32)
-    quiet = np.array([probs[i, 0] for i in range(n)
-                      if cur_infil[i] == 0.0 and nxt_attack[i] == 0], dtype=np.float32)
+    # --- Detection and false positives are scored under BOTH rules, because the deployed alert
+    #     rule is the PEAK over all six steps (scripts/live_forecast.py and the dashboard both
+    #     take the max), not the t+1 probability. Reporting only t+1 would understate the live
+    #     false-positive rate, and the later steps are precisely the ones the frozen-state
+    #     ablation shows are worst.
+    det_rows = [i for i in range(n) if cur_infil[i] == 1.0]
+    quiet_rows = [i for i in range(n) if cur_infil[i] == 0.0 and infil[i].sum() == 0]
+    det = np.array([probs[i, 0] for i in det_rows], dtype=np.float32)
+    det_pk = np.array([probs[i].max() for i in det_rows], dtype=np.float32)
+    quiet = np.array([probs[i, 0] for i in quiet_rows], dtype=np.float32)
+    quiet_pk = np.array([probs[i].max() for i in quiet_rows], dtype=np.float32)
     att_p = np.array([a["prob"] for a in attempts], dtype=np.float32)
 
     summary = {
@@ -166,15 +189,25 @@ def main() -> None:
         "thresholds_preregistered": list(THRESHOLDS),
         "forecast_attempts": attempts,
         "forecast_hit_rate": {str(t): _rate(att_p, t) for t in THRESHOLDS},
+        "scoring_rule_note": (
+            "t+1 = probs[:,0]; peak = max over all 6 rollout steps. PEAK is the rule actually "
+            "deployed (scripts/live_forecast.py and the dashboard both take the max), so the "
+            "peak row is the one that describes live behaviour."
+        ),
         "detection_already_under_attack": {
             "n": int(det.size),
-            "mean_prob": round(float(det.mean()), 4) if det.size else None,
-            "fire_rate": {str(t): _rate(det, t) for t in THRESHOLDS},
+            "t1_mean_prob": round(float(det.mean()), 4) if det.size else None,
+            "t1_fire_rate": {str(t): _rate(det, t) for t in THRESHOLDS},
+            "peak_mean_prob": round(float(det_pk.mean()), 4) if det_pk.size else None,
+            "peak_fire_rate": {str(t): _rate(det_pk, t) for t in THRESHOLDS},
         },
         "benign_quiet_windows": {
             "n": int(quiet.size),
-            "mean_prob": round(float(quiet.mean()), 4) if quiet.size else None,
-            "false_positive_rate": {str(t): _rate(quiet, t) for t in THRESHOLDS},
+            "definition": "observed state benign AND no attack anywhere in the 6-step horizon",
+            "t1_mean_prob": round(float(quiet.mean()), 4) if quiet.size else None,
+            "t1_false_positive_rate": {str(t): _rate(quiet, t) for t in THRESHOLDS},
+            "peak_mean_prob": round(float(quiet_pk.mean()), 4) if quiet_pk.size else None,
+            "peak_false_positive_rate": {str(t): _rate(quiet_pk, t) for t in THRESHOLDS},
         },
     }
     OUT_JSON.write_text(json.dumps(summary, indent=1), encoding="utf-8")
