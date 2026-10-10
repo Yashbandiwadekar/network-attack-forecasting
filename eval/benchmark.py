@@ -554,19 +554,19 @@ rollout itself against the baselines).
 | Metric | Value |
 |---|---|
 | Benign-to-attack transitions in test set | {lead_time['n_transitions']} |
-| Missed entirely (never alarmed within horizon) | {lead_time['n_missed']} ({lead_time['miss_rate']:.1%}) |
+| Missed (no alarm strictly before attack onset: never alarmed, on-time or late) | {lead_time['n_missed']} ({lead_time['miss_rate']:.1%}) |
 | Detected *before* the attack actually started | {lead_time['pct_detected_early']:.1%} |
-| Mean lead time (detected cases; + = early, - = late) | {mean_str} |
-| Median lead time (detected cases) | {median_str} |
+| Mean lead time (early detections only) | {mean_str} |
+| Median lead time (early detections only) | {median_str} |
 | False alarms / benign-for-whole-horizon sequences | {far_str} |
 | Alarm precision (true early alarms / all alarms raised) | {ap_str} |
 | Achieved FPR on this test split, at the val-tuned {TARGET_FPR:.0%}-budget threshold | {achieved_fpr_str} |
 
 Lead time is `(actual attack-onset step) - (first step the alarm threshold is crossed)`, in
-seconds. A positive value is a genuine early warning — the alarm fired before the attack window
-it was warning about actually arrived. Missed transitions are excluded from the mean/median (there
-is no lead time to average when the model never alarmed at all) and reported separately as a miss
-rate instead, so a high miss rate can't silently inflate the mean by dropping out of it.
+seconds. Only alarms strictly before the attack onset count as detections (QC-3), so lead time is
+always positive. Transitions whose first alarm is at the onset step or later (or never) are excluded
+from the mean/median and counted in the miss rate instead, so a high miss rate can't silently
+inflate the mean by dropping out of it.
 
 **Audit E3**: the false-alarm rate and alarm precision rows above are the other half of this
 metric that the original version omitted — a threshold low enough to catch every transition early

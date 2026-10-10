@@ -130,15 +130,22 @@ class HeaderInfo:
     second_line: list[str]
     columns: list[str]  # stripped; empty when the file has no header row
     n_fields: int
+    magic: bytes = b""  # first 4 bytes (binary formats such as PCAP)
 
 
 def peek_file(path: Path) -> HeaderInfo:
     with open(path, "rb") as fh:
         raw = fh.read(65536)
+    magic = raw[:4]
+    if raw[:512].count(0):     # binary file (pcap, parquet, ...): never try to parse it as CSV
+        return HeaderInfo(path, [], [], [], 0, magic)
     text = raw.decode("utf-8-sig", errors="replace")
     lines = text.splitlines()
-    first = next(csv.reader([lines[0]])) if lines else []
-    second = next(csv.reader([lines[1]])) if len(lines) > 1 else []
+    try:
+        first = next(csv.reader([lines[0]])) if lines else []
+        second = next(csv.reader([lines[1]])) if len(lines) > 1 else []
+    except csv.Error:
+        return HeaderInfo(path, [], [], [], 0, magic)
     # A header row has no purely-numeric cells; UNSW raw files have no header at all.
     def _num(s: str) -> bool:
         try:
@@ -147,7 +154,7 @@ def peek_file(path: Path) -> HeaderInfo:
         except ValueError:
             return False
     has_header = bool(first) and not any(_num(c.strip()) for c in first)
-    return HeaderInfo(path, first, second, [c.strip() for c in first] if has_header else [], len(first))
+    return HeaderInfo(path, first, second, [c.strip() for c in first] if has_header else [], len(first), magic)
 
 
 # --------------------------------------------------------------------------------------------
@@ -182,6 +189,30 @@ class DatasetAdapter:
     synthetic: ClassVar[bool] = False
     #: how-to / reason when status is stub or unsupported
     howto: ClassVar[str] = ""
+
+    #: optional labels sidecar (pipeline.adapters.sidecar.LabelSidecar): overrides flow labels by rule
+    sidecar: Any = None
+    default_label: ClassVar[str] = "BENIGN"
+    #: True when the format has no label column (labels then come from the sidecar or default_label)
+    unlabelled_format: ClassVar[bool] = False
+
+    def __init_subclass__(cls, **kw):
+        super().__init_subclass__(**kw)
+        for meth in ("iter_flows", "iter_label_chunks"):
+            fn = cls.__dict__.get(meth)
+            if fn is not None and not getattr(fn, "_sidecar_wrapped", False):
+                setattr(cls, meth, _wrap_sidecar(meth, fn))
+
+    def _unlabelled(self, path) -> bool:
+        return bool(self.unlabelled_format)
+
+    def with_sidecar(self, sidecar: Any, default_label: str | None = None) -> "DatasetAdapter":
+        """Return self after attaching a LabelSidecar (or a CSV path)."""
+        from pipeline.adapters.sidecar import LabelSidecar
+        self.sidecar = sidecar if isinstance(sidecar, LabelSidecar) else LabelSidecar.load(sidecar)
+        if default_label:
+            self.default_label = default_label
+        return self
 
     # ---- detection ------------------------------------------------------------------------
     @classmethod
@@ -305,6 +336,31 @@ class DatasetAdapter:
         return out
 
 
+def _wrap_sidecar(meth: str, fn):
+    """Make iter_flows / iter_label_chunks honour `self.sidecar` without every adapter knowing about it."""
+    if meth == "iter_flows":
+        def wrapper(self, path, chunksize=500_000, max_rows=None, stats=None):
+            for ch in fn(self, path, chunksize, max_rows, stats):
+                if self.sidecar is not None:
+                    ch = self.sidecar.apply(ch, self.default_label)
+                elif self._unlabelled(path):
+                    ch = ch.assign(label=self.default_label)
+                yield ch
+    else:
+        def wrapper(self, path, chunksize=1_000_000, max_rows=None):
+            if self.sidecar is None and not self._unlabelled(path):
+                yield from fn(self, path, chunksize, max_rows)
+                return
+            # labels depend on IPs/times: derive them from the (slower) full flow parse
+            for ch in self.iter_flows(path, chunksize=min(chunksize, 500_000), max_rows=max_rows):
+                yield pd.DataFrame({"label": ch["label"].astype(str).to_numpy(),
+                                    "timestamp": ch["timestamp"].iloc[::20].reindex(range(len(ch))).to_numpy()})
+    wrapper._sidecar_wrapped = True
+    wrapper.__name__ = fn.__name__
+    wrapper.__doc__ = fn.__doc__
+    return wrapper
+
+
 def _graph_features() -> list[str]:
     from pipeline.graph_features import GRAPH_FEATURE_NAMES
     return list(GRAPH_FEATURE_NAMES)
@@ -344,7 +400,7 @@ def get_adapter(name: str) -> DatasetAdapter:
     return _REGISTRY[name]()
 
 
-_DATA_SUFFIXES = {".csv", ".binetflow", ".txt", ".tsv"}
+_DATA_SUFFIXES = {".csv", ".binetflow", ".txt", ".tsv", ".pcap", ".pcapng", ".cap"}
 
 
 def detect_file_adapter(path: str | Path) -> tuple[str | None, float, list[str]]:

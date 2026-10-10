@@ -33,6 +33,7 @@ from pipeline.windowing import (
     apply_reconnaissance_heuristic,
     build_flow_windows,
     build_sequences,
+    sequence_gap_stats,
     merge_graph_embedding_features,
     merge_graph_features,
     merge_packet_features,
@@ -97,6 +98,8 @@ def build_unsw_dataset(config_path: str = "configs/unsw_nb15.yaml") -> None:
         "packet_features_available": False,
         "num_windows": int(len(windows)),
         "num_sequences": int(num_sequences),
+        "require_contiguous_windows": bool(config["windowing"].get("require_contiguous_windows", False)),
+        "sequence_gap_stats": sequence_gap_stats(sequences["window_times"], config["windowing"]["window_seconds"]),
         "splits": {name: int(len(data["X"])) for name, data in splits.items()},
         "caveat": (
             "UNSW-NB15 raw CSVs only -- no PCAP downloaded, so packet-level features are "

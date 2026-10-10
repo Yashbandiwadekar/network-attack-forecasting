@@ -475,15 +475,50 @@ def apply_reconnaissance_heuristic(
     return df
 
 
+def sequence_gap_stats(window_times: np.ndarray, window_seconds: int) -> dict[str, Any]:
+    """Gap statistics for a set of sequences (QC-1). Windows exist only for (host, slot) pairs that
+    have flows, so "consecutive" rows of a sequence can be many slots apart in wall-clock time.
+
+    window_times : (N, L) datetime64 array (the `window_times` key of build_sequences).
+    Returns n_sequences, frac_with_gaps (share of sequences with at least one step != window_seconds),
+    median_step_s / max_step_s (over every adjacent-step difference, in seconds), and
+    median_max_step_s (median over sequences of each sequence's largest step).
+    """
+    wt = np.asarray(window_times)
+    n = int(wt.shape[0]) if wt.ndim == 2 else 0
+    if n == 0 or wt.shape[1] < 2:
+        return {"n_sequences": n, "frac_with_gaps": 0.0, "median_step_s": None,
+                "max_step_s": None, "median_max_step_s": None}
+    steps = np.diff(wt.astype("datetime64[ns]"), axis=1).astype("timedelta64[ns]").astype(np.int64) / 1e9
+    has_gap = (steps != float(window_seconds)).any(axis=1)
+    return {
+        "n_sequences": n,
+        "frac_with_gaps": float(has_gap.mean()),
+        "median_step_s": float(np.median(steps)),
+        "max_step_s": float(steps.max()),
+        "median_max_step_s": float(np.median(steps.max(axis=1))),
+    }
+
+
 def build_sequences(
     windows_df: pd.DataFrame,
     feature_cols: list[str],
     config: dict[str, Any],
 ) -> dict[str, np.ndarray]:
-    """Build fixed-length temporal sequences with bounded memory."""
+    """Build fixed-length temporal sequences with bounded memory.
+
+    QC-1: windows exist only where a host had flows, so by default ("consecutive" rows) sequences
+    may span arbitrary wall-clock gaps (82.9% of sampled v1 test sequences, 3.2% of v2). Setting
+    `windowing.require_contiguous_windows: true` (default false, so existing datasets/checkpoints
+    are unchanged) DROPS every sequence whose input windows plus forecast-target windows are not
+    all exactly `window_seconds` apart. Dropping was chosen over zero-filling missing slots because
+    it never invents data or labels. Use `sequence_gap_stats` to report the effect.
+    """
 
     seq_len = config["windowing"]["sequence_length"]
     horizon = config["windowing"]["forecast_horizon"]
+    require_contiguous = bool(config["windowing"].get("require_contiguous_windows", False))
+    window_ns = int(config["windowing"]["window_seconds"]) * 10**9 if require_contiguous else 0
 
     X_parts = []
     next_state_parts = []
@@ -615,6 +650,25 @@ def build_sequences(
         )[:sample_count].copy()
 
         src_ip_value = group["src_ip"].iloc[0]
+
+        if require_contiguous:
+            span = seq_len + horizon  # input steps + forecast-target steps
+            bad = np.diff(times.astype("datetime64[ns]").astype(np.int64)) != window_ns
+            csum = np.concatenate([[0], np.cumsum(bad)])
+            idx = np.arange(sample_count)
+            keep = (csum[idx + span - 1] - csum[idx]) == 0
+            if not keep.all():
+                X_group = X_group[keep]
+                next_state_group = next_state_group[keep]
+                future_stage_group = future_stage_group[keep]
+                infiltration_group = infiltration_group[keep]
+                current_stage_group = current_stage_group[keep]
+                current_infiltration_group = current_infiltration_group[keep]
+                window_end_time_group = window_end_time_group[keep]
+                window_times_group = window_times_group[keep]
+                sample_count = int(keep.sum())
+            if sample_count == 0:
+                continue
 
         X_parts.append(X_group)
         next_state_parts.append(next_state_group)

@@ -39,15 +39,30 @@ from pipeline.mitre_mapping import STAGE_CLASSIFICATION_LABELS
 
 
 class _RestrictedUnpickler(pickle.Unpickler):
-    """Audit G12: only sklearn/numpy/scipy/this-module classes may be reconstructed, so a tampered
-    baseline file cannot import arbitrary callables (os.system etc.)."""
+    """Audit G12 / QC-2: only an exact allowlist of (module, name) globals may be reconstructed, so a
+    tampered baseline file cannot import arbitrary callables (os.system etc.). Names containing '.'
+    are rejected outright: with pickle protocol >= 4 ``find_class`` resolves dotted names via
+    getattr chains, so a prefix-only check on the module would let ('sklearn.datasets._base',
+    'os.getcwd') reach arbitrary callables. The allowlist is exactly what BaselineModel pickles
+    reference (protocols 2-5, numpy 1.x/2.x module paths)."""
 
-    _ALLOWED_PREFIXES = ("sklearn.", "numpy", "scipy.", "models.baseline_lr", "collections.")
-    _ALLOWED_BUILTINS = {"set", "frozenset", "slice", "complex", "list", "dict", "tuple", "bytearray"}
+    _ALLOWED_GLOBALS = frozenset({
+        ("models.baseline_lr", "BaselineModel"),
+        ("sklearn.linear_model._logistic", "LogisticRegression"),
+        ("numpy", "dtype"), ("numpy", "ndarray"),
+        ("numpy._core.multiarray", "_reconstruct"), ("numpy._core.multiarray", "scalar"),
+        ("numpy._core.numeric", "_frombuffer"),
+        ("numpy.core.multiarray", "_reconstruct"), ("numpy.core.multiarray", "scalar"),
+        ("numpy.core.numeric", "_frombuffer"),
+        ("_codecs", "encode"),  # protocol-2 bytes encoding
+        ("collections", "OrderedDict"),
+    })
+    _ALLOWED_BUILTINS = frozenset({"set", "frozenset", "slice", "complex", "list", "dict", "tuple", "bytearray"})
 
     def find_class(self, module, name):
-        if (module == "numpy" or module.startswith(self._ALLOWED_PREFIXES)) or (
-            module == "builtins" and name in self._ALLOWED_BUILTINS
+        if "." not in name and (
+            (module, name) in self._ALLOWED_GLOBALS
+            or (module == "builtins" and name in self._ALLOWED_BUILTINS)
         ):
             return super().find_class(module, name)
         raise pickle.UnpicklingError(f"Blocked global {module}.{name} in baseline file")

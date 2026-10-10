@@ -30,6 +30,7 @@ from pipeline.windowing import (
     apply_reconnaissance_heuristic,
     build_flow_windows,
     build_sequences,
+    sequence_gap_stats,
     merge_graph_embedding_features,
     merge_graph_features,
     merge_packet_features,
@@ -104,6 +105,9 @@ def process_scenario(
     n = len(sequences["X"])
 
     print(f"Sequences: {n:,}")
+    # QC-1: gap statistics recorded in metadata.json's scenario_info.
+    gap_stats = sequence_gap_stats(sequences["window_times"], config["windowing"]["window_seconds"])
+    print(f"  Gap stats: {gap_stats}")
 
     if n == 0:
         print("WARNING: scenario produced no sequences.")
@@ -167,6 +171,7 @@ def process_scenario(
     return {
         "scenario_id": scenario_id,
         "sequences": n,
+        "sequence_gap_stats": gap_stats,
     }
 
 

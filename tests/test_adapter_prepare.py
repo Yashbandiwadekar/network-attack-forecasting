@@ -135,9 +135,8 @@ def test_prepare_refuses_fallthrough_stub_and_experimental(tmp_path):
         P.prepare_dataset(raw, tmp_path / "o", CFG, log=_quiet)
     nf = tmp_path / "nf"
     nf.mkdir()
-    (nf / "a.csv").write_text("IPV4_SRC_ADDR,L4_SRC_PORT,IPV4_DST_ADDR,L4_DST_PORT,PROTOCOL,IN_BYTES,IN_PKTS,Label,Attack\n"
-                              "a,1,b,2,6,1,1,0,Benign\n")
-    with pytest.raises(P.PrepareError, match="stub"):
+    (nf / "a.csv").write_text("flow_duration,Header_Length,Protocol Type,Rate,Srate,label\n1,2,3,4,5,x\n")
+    with pytest.raises(P.PrepareError, match="unsupported"):
         P.prepare_dataset(nf, tmp_path / "o2", CFG, log=_quiet)
     with pytest.raises(P.PrepareError, match="experimental"):
         P.prepare_dataset(raw, tmp_path / "o3", CFG, adapter_name="cicids2017", log=_quiet)

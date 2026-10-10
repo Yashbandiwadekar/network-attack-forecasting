@@ -28,6 +28,7 @@ from pipeline.adapters.registry import get_adapter  # noqa: F401  (registers ada
 
 # ---- thresholds -----------------------------------------------------------------------------
 T_FALLTHROUGH_FAIL_FRAC = 0.01      # >= this share of rows on unmapped labels -> FAIL (any > 0 -> WARN)
+T_ATTACK_DROP_WARN_FRAC = 0.10      # exact pass: >= this share of NON-BENIGN rows lost to cleaning -> WARN (listed first)
 T_DROP_WARN_FRAC = 0.01             # adapter cleaning drops >= this share of sampled rows -> WARN
 T_DROP_FAIL_FRAC = 0.50             # ... >= this share -> FAIL (adapter/format mismatch)
 T_NEGATIVE_WARN_FRAC = 0.001
@@ -119,6 +120,50 @@ def label_table(adapter: DatasetAdapter, counts: dict[str, int], F: _Findings) -
     return {"rows": rows, "stage_counts": {k: int(v) for k, v in stage_counts.items()},
             "fallthrough_labels": fall_labels, "fallthrough_rows": int(fall_rows),
             "fallthrough_fraction": frac, "ignorable_rows": int(ignorable_rows)}
+
+
+def scan_drops(adapter: DatasetAdapter, files: list[Path], scan_counts: dict[str, int], F: _Findings,
+               progress: bool = True, chunksize: int = 500_000) -> dict[str, Any]:
+    """EXACT drop accounting using the adapter's own iter_flows (no mirrored drop rules): kept label counts
+    vs the raw label counts of the label scan. Runs the whole adapter over every row (slow on GB data)."""
+    kept: Counter = Counter()
+    for f in files:
+        t0 = time.time()
+        st = ReadStats()
+        for ch in adapter.iter_flows(f, chunksize=chunksize, stats=st):
+            kept.update(ch["label"].astype(str).str.strip().value_counts().to_dict())
+        if progress:
+            _log(f"  drop scan {f.name}: read {st.rows_read:,}, kept {st.rows_kept:,} in {time.time() - t0:.1f}s")
+    rep, tot_nb, lost_nb, tot_all, lost_all = [], 0, 0, 0, 0
+    for lab, raw_n in scan_counts.items():
+        stage, status = adapter.label_status(lab)
+        if status == "ignorable":
+            continue
+        dropped = max(int(raw_n - kept.get(lab, 0)), 0)
+        tot_all += raw_n
+        lost_all += dropped
+        if stage != "benign":
+            tot_nb += raw_n
+            lost_nb += dropped
+        if dropped > 0:
+            rep.append({"label": lab, "stage": stage, "raw_rows": int(raw_n), "dropped": dropped,
+                        "dropped_fraction": dropped / raw_n})
+    rep.sort(key=lambda r: -r["dropped"])
+    out = {"mode": "exact full pass (adapter.iter_flows over every row)", "rows_raw": int(tot_all),
+           "rows_dropped": int(lost_all), "dropped_fraction": lost_all / tot_all if tot_all else 0.0,
+           "non_benign_rows": int(tot_nb), "non_benign_dropped": int(lost_nb),
+           "non_benign_dropped_fraction": lost_nb / tot_nb if tot_nb else 0.0, "by_label": rep[:40]}
+    if tot_nb and out["non_benign_dropped_fraction"] >= T_ATTACK_DROP_WARN_FRAC:
+        worst = ", ".join(f"{r['label']} {r['dropped_fraction']:.0%}" for r in rep if r["stage"] != "benign")[:300]
+        F.add("WARN", "attack_rows_dropped_full",
+              f"EXACT: the adapter's cleaning drops {out['non_benign_dropped_fraction']:.1%} of NON-BENIGN rows "
+              f"({lost_nb:,}/{tot_nb:,}); per label: {worst}")
+    elif lost_nb and tot_nb:
+        F.add("INFO", "attack_rows_dropped_full", f"exact: {lost_nb:,}/{tot_nb:,} non-benign rows "
+              f"({out['non_benign_dropped_fraction']:.2%}) dropped by the adapter")
+    if lost_all:
+        F.add("INFO", "rows_dropped_full", f"exact: adapter drops {lost_all:,} of {tot_all:,} rows ({out['dropped_fraction']:.2%})")
+    return out
 
 
 # ---- flow-level checks ------------------------------------------------------------------------
@@ -242,11 +287,11 @@ def window_checks(adapter: DatasetAdapter, flows: pd.DataFrame, config: dict[str
     if missing:
         F.add("FAIL", "schema_missing", f"features missing from the built windows: {missing}")
     rows = []
-    groups = {"flow": config["features"]["flow_level"], "graph": config["features"].get("graph_level", []),
+    groups = {"flow": config["features"].get("flow_level", []), "graph": config["features"].get("graph_level", []),
               "graph_embedding": config["features"].get("graph_embedding", []),
               "packet": config["features"]["packet_level"]}
     group_of = {f: g for g, fs in groups.items() for f in fs}
-    unexpected_const, nonfinite_feats, ratio_viol, mismatch_nonzero = [], [], [], []
+    unexpected_const, nonfinite_feats, ratio_viol, mismatch_nonzero, dead_embed = [], [], [], [], []
     for f in feats:
         if f not in windows.columns:
             rows.append({"name": f, "group": group_of.get(f), "present": False})
@@ -266,7 +311,10 @@ def window_checks(adapter: DatasetAdapter, flows: pd.DataFrame, config: dict[str
         if f in ALL_RATIO_FEATURES and len(vv) and (vv.min() < -RATIO_TOL or vv.max() > 1 + RATIO_TOL):
             ratio_viol.append(f"{f}[{vv.min():.3g},{vv.max():.3g}]")
         if row["constant_zero"] and st in (NATIVE, DERIVED, APPROX):
-            unexpected_const.append(f)
+            if group_of.get(f) == "graph_embedding":
+                dead_embed.append(f)      # frozen random encoder: a dead ReLU unit, not a dataset problem
+            else:
+                unexpected_const.append(f)
         if st == ZERO and len(vv) and np.any(vv != 0) and group_of.get(f) != "packet":
             mismatch_nonzero.append(f)
     if nonfinite_feats:
@@ -276,6 +324,9 @@ def window_checks(adapter: DatasetAdapter, flows: pd.DataFrame, config: dict[str
     if unexpected_const:
         F.add("WARN", "unexpected_constant_zero",
               f"{unexpected_const} are constant zero in the sample although the adapter claims they carry data")
+    if dead_embed:
+        F.add("INFO", "dead_embedding_units", f"{dead_embed} are constant zero: dead units of the frozen random-init encoder "
+              "(not a dataset problem)")
     if mismatch_nonzero:
         F.add("WARN", "zero_claim_violated", f"{mismatch_nonzero} are documented zero-filled but have non-zero values")
 
@@ -326,7 +377,9 @@ def validate_dataset(path: str | Path, adapter_name: str | None = None, **kw) ->
 def _validate_dataset(path, adapter_name=None, *, sample_rows: int = 300_000,
                      min_rows_per_file: int = 20_000, max_sample_files: int = 16,
                      label_scan: str = "full", config_path: str = "configs/default.yaml",
-                     embeddings: bool = True, progress: bool = True) -> dict[str, Any]:
+                     embeddings: bool = True, progress: bool = True, drop_scan: str = "auto",
+                     drop_scan_max_bytes: int = 4_000_000_000, sidecar: str | None = None,
+                     default_label: str | None = None) -> dict[str, Any]:
     from common.config import load_config
     F = _Findings()
     path = Path(path)
@@ -341,6 +394,11 @@ def _validate_dataset(path, adapter_name=None, *, sample_rows: int = 300_000,
         report.update(findings=F.items, verdict=F.verdict())
         return report
     adapter = get_adapter(name)
+    if sidecar:
+        adapter.with_sidecar(sidecar, default_label)
+        report["sidecar"] = {"file": str(sidecar), **adapter.sidecar.summary()}
+    elif default_label:
+        adapter.default_label = default_label
     report["adapter"] = adapter.info()
     if adapter_name and det.adapter and adapter_name != det.adapter:
         F.add("WARN", "adapter_override", f"--adapter {adapter_name} overrides auto-detection ({det.adapter})")
@@ -374,6 +432,15 @@ def _validate_dataset(path, adapter_name=None, *, sample_rows: int = 300_000,
         report["label_scan"] = {"mode": "full pass", **{k: v for k, v in scan.items() if k != "counts"}}
         report["labels"] = {"mode": "full pass", **label_table(adapter, scan["counts"], F)}
         report["rows_full_pass"] = scan["rows"]
+        total_bytes = sum(f.stat().st_size for f in files)
+        if drop_scan == "full" or (drop_scan == "auto" and total_bytes <= drop_scan_max_bytes):
+            if progress:
+                _log(f"[{name}] exact drop-accounting pass (adapter over every row) ...")
+            report["drop_scan"] = scan_drops(adapter, files, scan["counts"], F, progress)
+        else:
+            report["drop_scan"] = {"mode": f"skipped (data {total_bytes / 1e9:.1f} GB > {drop_scan_max_bytes / 1e9:.0f} GB; "
+                                           "use --drop-scan full)"}
+            F.add("INFO", "drop_scan_skipped", report["drop_scan"]["mode"])
         if scan["days"]:
             report["days"] = scan["days"]
     else:
@@ -462,7 +529,7 @@ def render_markdown(r: dict[str, Any]) -> str:
     L.append(f"\nDetection: `{det.get('adapter')}` (confidence {det.get('confidence')}); {', '.join(det.get('evidence', []))}")
     L.append("\n## Findings")
     for lvl in ("FAIL", "WARN", "INFO"):
-        for i in r["findings"]:
+        for i in sorted(r["findings"], key=lambda x: 0 if x["code"].startswith("attack_rows_dropped") else 1):
             if i["level"] == lvl:
                 L.append(f"- **{lvl}** `{i['code']}`: {i['message']}")
     if "labels" in r:
@@ -474,6 +541,18 @@ def render_markdown(r: dict[str, Any]) -> str:
         if len(lt["rows"]) > 40:
             L.append(f"| ... {len(lt['rows']) - 40} more | | | | |")
         L.append("\nStage totals: " + ", ".join(f"{k}={v:,}" for k, v in lt["stage_counts"].items()))
+    ds = r.get("drop_scan")
+    if ds and "by_label" in ds:
+        L.append(f"{chr(10)}## Rows lost inside the adapter ({ds['mode']})")
+        L.append(f"{ds['rows_dropped']:,}/{ds['rows_raw']:,} rows dropped ({ds['dropped_fraction']:.2%}); non-benign "
+                 f"{ds['non_benign_dropped']:,}/{ds['non_benign_rows']:,} ({ds['non_benign_dropped_fraction']:.2%})")
+        L.append("")
+        L.append("| label | stage | raw rows | dropped | share lost |")
+        L.append("|---|---|---:|---:|---:|")
+        for d in ds["by_label"][:15]:
+            L.append(f"| {d['label']} | {d['stage']} | {d['raw_rows']:,} | {d['dropped']:,} | {d['dropped_fraction']:.1%} |")
+    elif ds:
+        L.append("Drop accounting: " + ds["mode"])
     ls = r.get("label_scan", {})
     if ls.get("time_min"):
         L.append(f"\nTime range ({ls['mode']}, thinned 1-in-20): {ls['time_min']} .. {ls['time_max']}; days: {', '.join(r.get('days', []))}")

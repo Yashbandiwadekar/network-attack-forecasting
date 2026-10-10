@@ -1,6 +1,5 @@
 """Registered stubs / unsupported formats, so `detect_dataset` recognises them and says WHY they can't run.
 
-* NetFlowV2Stub     -- NF-UNSW-NB15-v2 / NF-CSE-CIC-IDS2018-v2 / NF-ToN-IoT-v2 / NF-BoT-IoT-v2 (skeleton + how-to)
 * CICIoT2023Unsupported -- merged CICIoT2023 CSVs: feature-only rows, no IPs, no timestamps
 * UNSWSplitSetsUnsupported -- UNSW-NB15 'Training and Testing Sets': no srcip/dstip/Stime
 * CICIDS2017MLCVEUnsupported -- CIC-IDS-2017 MachineLearningCVE release: no IPs, no Timestamp
@@ -30,25 +29,6 @@ class _Unrunnable(DatasetAdapter):
 
     def iter_label_chunks(self, *a, **k):
         raise NotImplementedError(f"[{self.name}] {self.status}: {self.howto}")
-
-
-@register_adapter
-class NetFlowV2Stub(_Unrunnable):
-    name = "netflow_v2"
-    version = "0.0.1"
-    status = "stub"
-    description = "NF-*-v2 NetFlow datasets (IPs + FLOW_START_MILLISECONDS present) -- skeleton only."
-    howto = ("Implement iter_flows/iter_label_chunks using NF_V2_COLUMN_MAP (see stubs.py and "
-             "docs/08-dataset-adapter-guide.md). Key traps: durations/IAT are MILLISECONDS, TCP_FLAGS is a bitmask, "
-             "timestamps are epoch milliseconds, 'Attack' strings need explicit mitre_mapping entries.")
-    caveats = ["No NF-* data on disk: column list unverified."]
-
-    @classmethod
-    def detect_file(cls, info: HeaderInfo) -> tuple[float, list[str]]:
-        cols = set(info.columns)
-        if {"IPV4_SRC_ADDR", "IPV4_DST_ADDR", "IN_BYTES", "IN_PKTS"} <= cols:
-            return 0.9, ["NetFlow-v2 header (IPV4_SRC_ADDR, IN_BYTES, ...)"]
-        return 0.0, []
 
 
 @register_adapter

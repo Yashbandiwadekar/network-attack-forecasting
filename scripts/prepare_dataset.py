@@ -38,6 +38,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--max-rows-per-file", type=int, default=None, help="contiguous prefix of each file (memory cap)")
     ap.add_argument("--max-files", type=int, default=None)
     ap.add_argument("--only-units", default=None, help="comma list of unit ids to use (file stems / scenario numbers)")
+    ap.add_argument("--labels-sidecar", default=None, help="CSV src_ip,dst_ip,start,end,label for unlabelled captures")
+    ap.add_argument("--default-label", default=None)
     ap.add_argument("--allow-experimental", action="store_true")
     ap.add_argument("--allow-fallthrough", action="store_true",
                     help="continue although >=1%% of rows have labels with no explicit stage mapping")
@@ -48,8 +50,9 @@ def main(argv: list[str] | None = None) -> int:
                                train_units=_csv(a.train_units), val_units=_csv(a.val_units),
                                test_units=_csv(a.test_units), max_rows_per_file=a.max_rows_per_file,
                                max_files=a.max_files, only_units=_csv(a.only_units), allow_experimental=a.allow_experimental,
-                               allow_fallthrough=a.allow_fallthrough, force=a.force)
-    except PrepareError as e:
+                               allow_fallthrough=a.allow_fallthrough, force=a.force,
+                               sidecar=a.labels_sidecar, default_label=a.default_label)
+    except (PrepareError, ValueError, NotImplementedError) as e:
         print(f"PREPARE FAILED: {e}", file=sys.stderr)
         return 2
     for w in meta["warnings"]:

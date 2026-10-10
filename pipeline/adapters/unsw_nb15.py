@@ -31,6 +31,7 @@ RAW_COLUMNS = [
 ]
 
 PROTO_TO_NUMBER = {"tcp": 6, "udp": 17, "icmp": 1}
+OTHER_PROTOCOL = 255  # any other Argus protocol (unas, arp, ospf, sctp, ...)
 
 
 def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -53,7 +54,12 @@ def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     df["dst_port"] = pd.to_numeric(df["dsport"], errors="coerce")
 
     df["proto"] = df["proto"].astype("string").str.strip().str.lower()
-    df["protocol"] = df["proto"].map(PROTO_TO_NUMBER)
+    # Argus reports ~130 protocols (unas, arp, ospf, sctp, gre, ...). Only tcp/udp/icmp have an entry
+    # in PROTO_TO_NUMBER; the rest used to be NaN and were dropped by the dropna below, silently
+    # removing 91% of Backdoors, 77% of Analysis, 76% of DoS and 36% of Exploits rows. They are now
+    # kept as protocol OTHER_PROTOCOL (255): is_tcp = is_udp = 0, so the feature schema is unchanged
+    # (tcp_ratio/udp_ratio simply do not count them) and no TCP flags are derived for them.
+    df["protocol"] = df["proto"].map(PROTO_TO_NUMBER).fillna(OTHER_PROTOCOL)
 
     # UNSW-NB15's Stime/Ltime are Unix epoch seconds (record start/end).
     df["timestamp"] = pd.to_datetime(

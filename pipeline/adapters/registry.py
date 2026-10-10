@@ -8,6 +8,9 @@ from pipeline.adapters import (  # noqa: F401  (imports register the adapters)
     cicids2017_adapter,
     cicids2018_adapter,
     ctu13_adapter,
+    generic_cicflowmeter_adapter,
+    netflow_v2_adapter,
+    pcap_adapter,
     stubs,
     unsw_nb15_adapter,
 )

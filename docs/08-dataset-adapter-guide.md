@@ -51,36 +51,47 @@ declares, per canonical field, `native | derived | approximated | zero_filled`
 Universal limits (not adapter bugs): the 9 packet-level features are zero-filled for every flow-only dataset, and
 `graph_embed_*` come from a frozen random-init GraphSAGE.
 
-## 2. Adapters
+## 2. Adapters and supported datasets
 
-| name | status | data | units (`prepare`) | default split | notes |
-|---|---|---|---|---|---|
-| `cicids2018` | stable | CICFlowMeter day CSVs (`data/raw/flows_real`) | one per file/day | `by_day` | 9/10 days have no IPs -> pseudo-host; IAT/duration in us (duration converted); `Label` header rows removed |
-| `synthetic` | stable | reduced 21-column CIC-style CSVs (`data/raw/flows`, `flows_real/Synthetic-BenignHighVolume*`) | all | chronological | fabricated; `SYNTH-Exfiltration` is the only exfiltration source |
-| `ctu13` | stable | `*.binetflow` (13 scenarios) | one per scenario | `by_unit` (scenarios 1-9 / 10-11 / 12-13, as `build_ctu13_dataset`) | flags + IAT zero-filled, `bidir_ratio` byte proxy, `scenario_id` set |
-| `unsw_nb15` | stable | raw `UNSW-NB15_1..4.csv` (no header) | all | chronological | flags approximated (0/1), IAT ms->us, `iat_std/max`, PSH, URG zero |
-| `cicids2017` | **experimental** | TrafficLabelling CSVs (`V:\Datasets\CIC-IDS-2017`) | one per file | `by_day` | real IPs; minute-resolution d/m/Y timestamps; labels unmapped (see 6.1) |
-| `netflow_v2` | stub | NF-*-v2 | - | - | detection + column map only |
-| `ciciot2023` | unsupported | merged CICIoT2023 CSVs | - | - | no IP, no timestamp |
-| `unsw_nb15_split_sets` | unsupported | `Training and Testing Sets/*.csv` | - | - | no srcip/dstip/Stime |
-| `cicids2017_mlcve` | unsupported | MachineLearningCVE CSVs | - | - | no IP, no Timestamp |
+| dataset | adapter | tested on real data? | zero-filled features (of the 41) | caveats |
+|---|---|---|---|---|
+| CIC-IDS-2018 CICFlowMeter day CSVs | `cicids2018` (stable) | yes, all 10 days (validated, 16.2M rows; prepare on 4 row-capped days) | 9 packet-level; graph (5) + embedding (8) + `unique_dst_ips` on the 9 IP-less days | 9/10 days have no IPs -> one pseudo-host per day; use a day-disjoint split; 59 repeated header rows removed |
+| Reduced 21-column fabricated CSVs (`data/raw/flows`, `flows_real/Synthetic-*`) | `synthetic` (stable) | yes (synthetic sample, prepare == `build_dataset` array-for-array) | 9 packet-level | not real traffic; 2.4% of flows have flag counts > packets |
+| CTU-13 `.binetflow` | `ctu13` (stable) | yes, 13 scenarios / 19,976,700 rows | 6 flag ratios, 3 IAT, 9 packet-level; `bidir_ratio` is a byte proxy | no flag/IAT data in binetflow; background is unlabelled-as-benign; ICMP rows kept since 2026-10-10 |
+| UNSW-NB15 raw `UNSW-NB15_1..4.csv` | `unsw_nb15` (stable) | yes, 2,540,047 rows | `psh_ratio`, `urg_ratio`, `var_iat`, `max_iat`, 9 packet-level; flags/`mean_iat`/`bidir_ratio` approximated | flags are 0/1 derived from state; non-tcp/udp/icmp protocols kept as protocol 255 since 2026-10-10 |
+| CIC-IDS-2017 TrafficLabelling CSVs | `cicids2017` (experimental) | yes, validated on all 8 files (2.83M rows); not prepared | 9 packet-level | minute-resolution d/m/Y timestamps, AM/PM heuristic (hours 1-7 -> +12h); labels now mapped, PortScan is real recon |
+| NF-*-v2 NetFlow CSVs | `netflow_v2` (experimental) | **no** (no file on disk; synthetic fixtures only) | 9 packet-level; IAT zero if columns absent; flags 0/1 from bitmask | requires `FLOW_START_MILLISECONDS`; keyword-based label map |
+| PCAP / PCAPNG captures | `pcap` (stable on fixtures) | **no** real capture was run end-to-end (fixtures only; the underlying `assemble_flows` is tested in `tests/test_fast_flows.py`) | 9 packet-level; `bwd_pkts/bwd_bytes` zero, `fwd_*` = totals | IPv4 TCP/UDP only; no FIN-termination split; labels only via sidecar |
+| Any CICFlowMeter-style CSV (snake_case, CICFlowMeter-py, ...) | `cicflowmeter_generic` (experimental) | fixtures only | 9 packet-level; IPs optional | header matching is heuristic; unlabelled -> BENIGN or sidecar |
+| CICIoT2023 merged CSVs | `ciciot2023` (unsupported) | header recognised only | - | feature rows with no IP and no timestamp: cannot be windowed per host/time. Use the raw PCAPs through the `pcap` adapter or CICFlowMeter |
+| UNSW `Training and Testing Sets`, CIC-2017 MachineLearningCVE | `unsw_nb15_split_sets`, `cicids2017_mlcve` (unsupported) | header recognised only | - | no IPs / timestamps |
 
-Detection (`detect_dataset(path)`) reads only the first 64 KB of each file (header or first row), asks every adapter
-for `detect_file(info) -> (confidence, evidence)`, and for a folder returns the adapter that claims most files
-(ties prefer a real-data adapter over `synthetic`). `Detection.mixed` and `.per_file` always expose the other
-formats; `adapter.discover_files()` lists what it will read and why other files are skipped.
+Detection (`detect_dataset(path)`) reads only the first 64 KB of each file (header, first row or PCAP magic), asks
+every adapter for `detect_file(info) -> (confidence, evidence)`, and for a folder returns the adapter that claims
+most files (ties prefer a real-data adapter over `synthetic`). `Detection.mixed` and `.per_file` always expose the
+other formats; `adapter.discover_files()` lists what it will read and why other files are skipped. Dedicated adapters
+score 0.95-0.99; the generic CICFlowMeter adapter is capped at 0.6 so it only wins when nothing else matches.
+
+### Labels sidecar (unlabelled captures: lab PCAPs, CICFlowMeter-py output)
+
+`--labels-sidecar rules.csv [--default-label BENIGN]` on both CLIs (or `adapter.with_sidecar(path)`). One rule per
+row: `src_ip,dst_ip,start,end,label[,dst_port]` (aliases `attacker_ip`, `victim_ip`, `start_time`, `end_time`). Empty IP
+= wildcard; times are ISO text or epoch seconds, empty = unbounded; a rule matches a flow whose START time is in
+range and whose IPs match in either direction (`bidirectional=False` in code for strict); later rules override
+earlier ones; unmatched flows get the default label. Labels must be names `label_to_stage` knows (the CIC names);
+the validator reports anything else as `unknown_fallthrough`. Rules with no IP and no time are rejected.
 
 ## 3. Validator
 
 `python -m scripts.validate_dataset <path> [--adapter N] [--sample-rows 300000] [--label-scan full|skip] [--no-embeddings]
-[--report-dir data/adapter_reports] [--name STEM]`. Writes `<stem>.json` and `<stem>.md`; exit code 0 PASS, 1 WARN,
+[--drop-scan auto|full|off] [--labels-sidecar rules.csv] [--default-label L] [--report-dir data/adapter_reports] [--name STEM]`. Writes `<stem>.json` and `<stem>.md`; exit code 0 PASS, 1 WARN,
 2 FAIL, 3 bad path. Every number is tagged **full pass** (every row, label + 1-in-20 timestamp columns only,
 streamed in chunks) or **sampled N rows** (a contiguous prefix of each file run through the adapter and then the real
 windowing / graph / embedding code; random rows would make windows meaningless).
 
 Reported: row count; label distribution with stage and status (`mapped`, `impact_by_design`, `unknown_fallthrough`,
 `ignorable`); stage totals; time range and days; raw-order sortedness; rows dropped by the adapter's cleaning, broken
-down by label; NaN/inf rate; duration / bytes-per-packet / IAT unit plausibility; flag counts vs packets; host and IP
+down by label (sampled, plus EXACT full-pass accounting via `--drop-scan`); NaN/inf rate; duration / bytes-per-packet / IAT unit plausibility; flag counts vs packets; host and IP
 availability; per-feature min/max/mean/zero-fraction for all 41 features with the adapter's declared status.
 
 Verdict policy (thresholds are `T_*` constants in `pipeline/adapters/validation.py`, each branch has a test):
@@ -99,7 +110,7 @@ for adapters that declare IAT zero-filled.
 
 `python -m scripts.prepare_dataset <path> --out data/processed_adapter/<name> --config <yaml> [--adapter N]
 [--split by_day|by_unit|chronological] [--train-units A,B --val-units C --test-units D] [--only-units A,B]
-[--max-rows-per-file N] [--max-files N] [--allow-experimental] [--allow-fallthrough] [--force]`
+[--max-rows-per-file N] [--max-files N] [--labels-sidecar rules.csv] [--default-label L] [--allow-experimental] [--allow-fallthrough] [--force]`
 
 Steps (a mirror of `build_dataset.py` / `build_unsw_dataset.py` / `build_ctu13_dataset.py`, same functions):
 adapter -> `build_flow_windows` -> graph features -> graph embeddings -> packet features (zero-filled) ->
@@ -153,68 +164,111 @@ Safety: `--out` is checked by path components. It is refused if it equals, sits 
 7. Run `python -m scripts.validate_dataset <path>`; fix FAILs; read every WARN. Add fixture tests
    (`tests/adapter_fixtures.py` has builders) for detection, unit conversion, label status and the schema table.
 
-### 5.1 CIC-IDS-2017 (experimental adapter exists)
+### 5.1 CIC-IDS-2017 (experimental adapter, labels mapped)
 
 Verified from a head-read of the files on `V:\Datasets\CIC-IDS-2017`: headers have leading spaces and plural/long
 names; timestamps are `d/m/Y H:MM` without seconds or AM/PM (Monday's file has `03/07/2017 08:55:58`); labels contain
-a cp1252 en-dash. Remaining owner decision: map `FTP-Patator`, `SSH-Patator` (initial_access, like the 2018
-brute-force labels), `PortScan` (reconnaissance), `Web Attack - Brute Force/XSS/Sql Injection` (initial_access, like
-the 2018 web labels) and `Heartbleed` in `pipeline/mitre_mapping.py`; until then `validate_dataset` FAILs it (6.2% of
-rows fall through) and `prepare_dataset` refuses it.
+a cp1252 en-dash. Explicit stage mappings were added to `pipeline/mitre_mapping.py::CIC2017_LABEL_TO_STAGE`
+(additive; CIC-2018 and UNSW behaviour unchanged):
+
+| 2017 label | stage | reason |
+|---|---|---|
+| FTP-Patator, SSH-Patator | initial_access | credential brute force, same as the 2018 FTP-/SSH-Bruteforce |
+| PortScan | **reconnaissance** | real labelled recon traffic (158,930 rows): the only genuine recon ground truth in the CIC data; it is mapped directly, not through the `port_scan_score` heuristic, and the packet-level score that heuristic needs is zero-filled anyway |
+| Web Attack - Brute Force / XSS / Sql Injection | initial_access | same as the 2018 web labels (en-dash, hyphen and U+FFFD spellings accepted) |
+| Heartbleed | initial_access | exploitation of a public-facing service (T1190); it is also data theft, but the label does not say what was read, so the exploit-side stage is used (11 rows in the whole dataset) |
+| Infiltration, Bot | lateral_movement, command_and_control | as in 2018 |
+| DoS Hulk / GoldenEye / slowloris / Slowhttptest, DDoS | impact | as in 2018 |
+
+The adapter stays `experimental` only because the AM/PM heuristic (hours 1-7 -> +12h) is unverified.
 
 ### 5.2 CICIoT2023
 
-The merged CSVs are feature rows with no IP or timestamp: unusable. Use the PCAPs through CICFlowMeter (keeps the
-5-tuple and timestamp) and reuse the `cicids2018` reader, adding a label map for its attack families.
+The merged CSVs are 10-packet feature windows with no IP and no timestamp: there is nothing to window per host/time,
+so it is deliberately NOT implemented (a surrogate clock from row order would fabricate time). Use the raw PCAPs with
+the `pcap` adapter (plus a labels sidecar from the dataset's attack schedule) or CICFlowMeter output.
 
 ### 5.3 NF-*-v2 NetFlow datasets
 
-Start from `NetFlowV2Stub` / `NF_V2_COLUMN_MAP` in `pipeline/adapters/stubs.py` (unverified against a file: no NF-*
-data is on disk). Traps: `FLOW_DURATION_MILLISECONDS` and `*_IAT_*` are **milliseconds**; `FLOW_START_MILLISECONDS`
-is epoch milliseconds; `TCP_FLAGS` is a bitmask; `Attack` strings need `mitre_mapping` entries; `Label` is binary.
-Copy `unsw_nb15_adapter.py` as the template (headered CSV, chunked, declare approximated flags).
+Implemented in `pipeline/adapters/netflow_v2_adapter.py` from the published column names, `experimental` because no
+NF file was on disk. Zero-filled / approximated: TCP flags are 0/1 decoded from the `TCP_FLAGS` bitmask; IAT std/max are
+the max of the two directions; IAT is zero if the `*_IAT_*` columns are absent. It requires `FLOW_START_MILLISECONDS`.
+Labels become `nf=<Attack>` and go through `mitre_mapping.nf_classify` (keyword rules; unknown names are reported as
+fall-through). Run the validator on the first real file and check the IAT ratio and label table before trusting it.
 
-## 6. Findings from the first full run on the data on disk (2026-10-10)
+## 6. Behaviour changes (2026-10-10) -- existing adapters, with before/after numbers
 
-See `data/adapter_reports/*.md|json`. Material surprises, none of which this toolkit changes:
+Both fixes change dataset numbers. Nothing under `data/processed*`, `checkpoints*` or `docs/04-evaluation*` was
+regenerated: those artefacts were built with the OLD behaviour and a rebuild is the owner's call.
 
-* **CTU-13**: the existing adapter drops every ICMP flow (hex `Dport` such as `0x0303` -> NaN -> `dropna`). That is
-  114,997 of 444,699 botnet flows (25.9%) over the 13 scenarios (full pass); all 588,068 dropped rows are 2.9% of the
-  data.
-* **UNSW-NB15**: only tcp/udp/icmp survive the protocol map; Argus protocols `unas`, `arp`, `ospf`, `sctp`, ... are
-  dropped. Full pass: Exploits 36.4%, DoS 76.4%, Analysis 76.8%, Backdoor 82.7%, Backdoors 91.4%, Reconnaissance
-  15.2%, Fuzzers 11.3% of each category's rows are lost; Normal 0.7%.
-* **CIC-IDS-2018**: 59 repeated `Label` header rows (dropped by numeric coercion); 9 of 10 days have no IPs.
-* **Synthetic sample**: 2.4% of flows have a flag count larger than the packet count (window `ack_ratio` reaches 1.33);
-  the validator FAILs it on `ratio_range`.
-* UNSW's first file starts with a BOM; pandas strips it, so no bogus `src_ip` is produced (checked).
+**CTU-13: ICMP rows no longer dropped** (`pipeline/adapters/ctu13.py`). ICMP flows carry a hex type/code in
+`Sport`/`Dport` (`0x0303`); `to_numeric` gave NaN and `dropna(dst_port)` removed the row. Now ICMP ports are 0 and the
+row is kept; non-ICMP rows with an unparsable port are still dropped (as before). Full pass over the 13 scenarios:
 
-## 7. Status and what remains
+| | rows kept | rows dropped | botnet (non-benign) rows dropped |
+|---|---:|---:|---:|
+| before | 19,388,632 | 588,068 (2.94%) | 115,501 of 444,699 (25.97%; 114,997 of them ICMP) |
+| after | 19,884,984 | 91,716 (0.46%) | 504 of 444,699 (0.11%) |
 
-**Done and tested** (85 new tests in `tests/test_adapter_registry.py`, `test_adapter_validation.py`,
-`test_adapter_prepare.py`, all passing on CPU; the 406 pre-existing tests also passed in the same session):
-registry and auto-detection, canonical contract, unit conversion, label status, schema table, every validator
-verdict branch, the output-directory guard, split policy, and array-level equality with `pipeline.build_dataset`
-for a single-unit chronological run on `data/raw/flows`.
+Positive (non-benign) rows reaching windowing: 329,198 before, 444,195 after (+34.9%). Remaining drops are tcp/udp rows
+with a blank port (`Background`, `google-pop`, `From-Botnet-V45-UDP-Attempt` 491 rows).
 
-**Validated with real output** (`data/adapter_reports/*.md|json`): synthetic sample FAIL (flag counts exceed packet
-counts, `ratio_range`); `flows_real` WARN; Tuesday 20-02 with IPs WARN; CTU-13 (19,976,700 rows, zero unknown-fallthrough
-labels) WARN; UNSW-NB15 (2,540,047 rows) WARN; CIC-IDS-2017 FAIL (6.18% of rows on unmapped labels).
-`prepare_dataset` was run only on row-capped prefix demos in `data/processed_adapter/` (CTU 5/7/11, UNSW file 1,
-CIC 4 days). They are not experiment-grade: val/test splits of two of them have zero positives.
+**UNSW-NB15: other protocols no longer dropped** (`pipeline/adapters/unsw_nb15.py`). Argus protocols other than
+tcp/udp/icmp (`unas`, `arp`, `ospf`, `sctp`, `gre`, ...) were NaN and dropped. They are now kept as protocol 255 with
+`is_tcp = is_udp = 0` (so `tcp_ratio`/`udp_ratio` do not count them), no derived flags, and no schema change.
 
-**Untested / not done**
-* Multi-unit `by_day` and `by_unit` paths are not proven array-equal to the existing builders (only a single-unit run is).
-* The advertised `models.train --config <out>/config.yaml` and `models.dataset.build_datasets` were never run on an output.
-* The validator's drop accounting is sample-only. The full-pass numbers in section 6 (CTU ICMP: 25.9% of botnet
-  flows; UNSW per-category losses) came from a one-off script, not from the tool.
-* `cicids2017._parse_ts_series` lacks the seconds fallback, so Monday's timestamps are missed in the full-pass day list.
-* `graph_embed_*` dead units are reported as a WARN rather than INFO.
-* Nothing was run on the full 4 GB Tuesday file through `prepare_dataset`.
+| category | rows | dropped before | dropped after |
+|---|---:|---:|---:|
+| Normal | 2,218,764 | 14,665 (0.7%) | 0 |
+| Exploits | 44,525 | 16,208 (36.4%) | 0 |
+| DoS | 16,353 | 12,490 (76.4%) | 0 |
+| Reconnaissance | 13,987 | 2,132 (15.2%) | 0 |
+| Fuzzers | 24,246 | 2,729 (11.3%) | 0 |
+| Analysis | 2,677 | 2,055 (76.8%) | 0 |
+| Backdoor / Backdoors | 1,795 / 534 | 1,484 (82.7%) / 488 (91.4%) | 0 |
+| Generic | 215,481 | 1,763 (0.8%) | 0 |
+| non-benign total | 321,283 | 39,349 (12.2%) | 0 |
+
+Regression tests: `tests/test_adapter_formats.py::test_ctu_icmp_hex_port_rows_are_kept_with_port_zero_but_bad_tcp_ports_still_dropped`,
+`::test_unsw_other_protocols_are_kept_as_255_without_tcp_udp_flags`, and the exact drop-scan tests in
+`tests/test_adapter_validation.py`. The validator's drop accounting is now exact: `--drop-scan auto` (default) runs the
+adapter's own `iter_flows` over every row when the data is <= 4 GB, compares kept with raw label counts and warns
+(listed first) when >= 10% of non-benign rows are lost; `test_exact_drop_scan_catches_what_the_head_sample_misses`
+proves it sees a loss the head-of-file sample cannot.
+
+## 7. Real-data validator results (2026-10-10, exact drop scan, CPU)
+
+Reports: `data/adapter_reports/*.md|json`.
+
+| dataset | rows (full pass) | verdict | note |
+|---|---:|---|---|
+| `data/raw/flows` synthetic sample | 1,682 | FAIL | `ratio_range`: flag counts > packets in 2.4% of flows |
+| `data/raw/flows_real` (CIC-2018, 10 days + synthetic skipped) | 16,233,002 | WARN | 90% of sampled flows without IPs; 0 rows dropped |
+| Tuesday 20-02 alone (real IPs) | 7,948,748 | WARN | only `fin_ratio` constant zero in the sampled prefix |
+| `data/raw/ctu13` | 19,976,700 | WARN | 9 zero-filled features; 0.46% rows dropped (0.11% of botnet) |
+| UNSW-NB15 `V:\Datasets\UNSW NB15\CSV Files` | 2,540,047 | WARN | flags approximated, 4 zero-filled; 0 rows dropped |
+| CIC-IDS-2017 `V:\Datasets\CIC-IDS-2017` | 2,830,743 | WARN | experimental adapter; 0 unmapped labels; 0 rows dropped |
+
+## 8. Status and what remains
+
+**Done and tested** (tests/test_adapter_registry.py, test_adapter_validation.py, test_adapter_prepare.py,
+test_adapter_formats.py; CPU only): registry and detection (incl. PCAP magic, NF-v2, generic CICFlowMeter, unsupported
+formats), canonical contract and unit conversion, label status, schema table, every validator verdict branch, exact drop
+scan, output-directory guard, split policy, the labels sidecar, both drop-bug regressions, the PCAP adapter on
+scapy-written captures, and array-level equality of `prepare_dataset` with `pipeline.build_dataset` for a single
+chronological unit AND a three-day `by_day` run (including the `window_graphs.pkl` key set). A prepared output was fed
+to `models.dataset.build_datasets` (CPU, scaler fit, `SequenceDataset` of shape (12, 41)) on a copy.
+
+**Not verified**
+* NF-*-v2 and PCAP adapters have only seen synthetic fixtures (no such real data on disk); CICFlowMeter-py output likewise.
+* `models.train` itself was not run (GPU busy); only the data loader was.
+* The CIC-2017 AM/PM timestamp heuristic; `prepare_dataset` on full multi-GB inputs (only row-capped prefixes were prepared).
+* The three `data/processed_adapter/*` outputs (CTU 5/7/11, UNSW file 1, CIC-2018 4 days, CIC-2017 4 files) are row-capped
+  demos, not experiment-grade; some splits have zero positives (the tool warns).
+* Existing `data/processed*` and checkpoints were built before the two drop fixes; their numbers are not comparable
+  with a rebuild.
 
 **Next steps**
-1. Add `--drop-scan full` (stream `adapter.iter_flows`, compare kept vs raw label counts) and re-run CTU and UNSW.
-2. Add a three-day `by_day` fixture test against `build_dataset` (compare arrays and `window_graphs.pkl` keys).
-3. Copy one demo output to a scratch dir and run `build_datasets(load_config(<copy>/config.yaml))` on CPU.
-4. Add the seconds fallback in `cicids2017._parse_ts_series`; downgrade dead embedding units to INFO.
-5. Owner decisions: CIC-2017 label mapping; the CTU ICMP and UNSW protocol row drops; whether the synthetic sample's FAIL is acceptable.
+1. When NF-v2 / new PCAPs land: `validate_dataset <path>` first (add `--labels-sidecar` for PCAPs), read every WARN, then `prepare_dataset`.
+2. Decide whether to rebuild CTU-13 / UNSW processed data with the fixed adapters (CTU rebuild is being done by another agent).
+3. Add a curated day split for CIC-2017 (`--train-units/--val-units/--test-units`) before any training on it.

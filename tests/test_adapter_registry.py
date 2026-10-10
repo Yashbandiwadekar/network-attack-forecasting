@@ -21,7 +21,7 @@ from tests.adapter_fixtures import cic_df, write_cic, write_ctu, write_unsw
 def test_registry_contains_all_adapters():
     names = set(list_adapters())
     assert {"cicids2018", "synthetic", "ctu13", "unsw_nb15", "cicids2017", "netflow_v2", "ciciot2023",
-            "unsw_nb15_split_sets", "cicids2017_mlcve"} <= names
+            "unsw_nb15_split_sets", "cicids2017_mlcve", "pcap", "cicflowmeter_generic"} <= names
     with pytest.raises(KeyError):
         get_adapter("nope")
 
@@ -111,7 +111,8 @@ def test_unsw_units_wrap_and_drop_accounting(tmp_path):
     a = get_adapter("unsw_nb15")
     st = ReadStats()
     df = a.read_flows(p, stats=st)
-    assert st.rows_read == 60 and st.rows_dropped == 6          # arp is not in the protocol map -> dropped
+    assert st.rows_read == 60 and st.rows_dropped == 0          # arp etc. are KEPT as protocol 255 (was dropped before 2026-10-10)
+    assert (df.loc[df['label'].index, 'protocol'] == 255).sum() == 6
     assert (df["iat_mean"] == 2000.0).all()                     # ms -> microseconds
     assert (df["iat_std"] == 0).all() and (df["psh_cnt"] == 0).all()
     assert df["label"].str.startswith("unsw=").all()
@@ -126,7 +127,8 @@ def test_ctu_units_bidir_scenario_and_icmp_drop(tmp_path):
     st = ReadStats()
     df = a.read_flows(p, stats=st)
     assert (df["scenario_id"] == 11).all()
-    assert st.rows_dropped > 0                                  # ICMP rows have hex Dport -> NaN -> dropped (existing behaviour)
+    assert st.rows_dropped == 0                                 # ICMP rows (hex Dport) are KEPT with port 0
+    assert (df.loc[df['protocol'] == 1, 'dst_port'] == 0).all() and (df['protocol'] == 1).any()
     assert (df["iat_mean"] == 0).all() and (df["syn_cnt"] == 0).all()
     assert df["bidir_ratio"].max() > 0                          # add_ctu13_features applied (adapter alone leaves 0.0)
     assert (df["has_ip_data"] == 1.0).all() and check_canonical_frame(df) == []
@@ -175,8 +177,11 @@ def test_feature_status_declares_ctu_and_unsw_gaps():
     ("unsw_nb15", "unsw=Generic", "impact", "impact_by_design"),
     ("unsw_nb15", "unsw=Fuzzers", "impact", "impact_by_design"),
     ("unsw_nb15", "unsw=Brand-New", "impact", "unknown_fallthrough"),
-    ("cicids2017", "FTP-Patator", "impact", "unknown_fallthrough"),   # owner decision pending
-    ("cicids2017", "PortScan", "impact", "unknown_fallthrough"),
+    ("cicids2017", "FTP-Patator", "initial_access", "mapped"),
+    ("cicids2017", "Heartbleed", "initial_access", "mapped"),
+    ("cicids2017", "Web Attack – XSS", "initial_access", "mapped"),
+    ("cicids2017", "Mystery-2017", "impact", "unknown_fallthrough"),
+    ("cicids2017", "PortScan", "reconnaissance", "mapped"),
     ("cicids2017", "DoS Hulk", "impact", "impact_by_design"),
     ("cicids2017", "BENIGN", "benign", "mapped"),
 ])
@@ -193,7 +198,7 @@ def test_every_known_label_in_the_mitre_tables_is_classified_not_fallthrough():
 
 
 # ---- stubs ---------------------------------------------------------------------------------------
-@pytest.mark.parametrize("name", ["netflow_v2", "ciciot2023", "unsw_nb15_split_sets", "cicids2017_mlcve"])
+@pytest.mark.parametrize("name", ["ciciot2023", "unsw_nb15_split_sets", "cicids2017_mlcve"])
 def test_stub_and_unsupported_adapters_refuse_to_read_with_a_howto(name, tmp_path):
     a = get_adapter(name)
     assert a.status in ("stub", "unsupported") and a.howto

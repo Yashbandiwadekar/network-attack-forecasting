@@ -32,6 +32,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--min-rows-per-file", type=int, default=20_000)
     ap.add_argument("--label-scan", choices=["full", "skip"], default="full",
                     help="full = stream every row's label column (exact counts, minutes for GB files)")
+    ap.add_argument("--drop-scan", choices=["auto", "full", "off"], default="auto",
+                    help="exact drop accounting by running the adapter over EVERY row: auto = when data <= 4 GB")
+    ap.add_argument("--labels-sidecar", default=None, help="CSV src_ip,dst_ip,start,end,label for unlabelled captures")
+    ap.add_argument("--default-label", default=None, help="label for flows matching no sidecar rule (default BENIGN)")
     ap.add_argument("--config", default="configs/default.yaml", help="supplies windowing + feature lists only")
     ap.add_argument("--report-dir", default=str(PROJECT_ROOT / "data" / "adapter_reports"))
     ap.add_argument("--name", default=None, help="report file stem (default derived from path)")
@@ -44,7 +48,8 @@ def main(argv: list[str] | None = None) -> int:
         return 3
     report = validate_dataset(args.path, args.adapter, sample_rows=args.sample_rows,
                               min_rows_per_file=args.min_rows_per_file, label_scan=args.label_scan,
-                              config_path=args.config, embeddings=not args.no_embeddings, progress=not args.quiet)
+                              config_path=args.config, embeddings=not args.no_embeddings, progress=not args.quiet,
+                              drop_scan=args.drop_scan, sidecar=args.labels_sidecar, default_label=args.default_label)
     stem = args.name or re.sub(r"[^A-Za-z0-9_.-]+", "_", Path(args.path).resolve().name or "dataset")
     jp, mp = write_report(report, args.report_dir, stem)
     print(render_markdown(report))

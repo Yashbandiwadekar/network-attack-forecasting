@@ -32,7 +32,7 @@ from pydantic import BaseModel
 
 from app import service
 from common.config import load_config, resolve_path
-from models.audit_ledger import AuditLedger
+from models.audit_ledger import AuditLedger, LedgerCorruptError
 from models.compliance import generate_cert_in_report
 from models.cve_lookup import related_capec, related_cves, snapshot_metadata
 from models.explain import (
@@ -551,8 +551,12 @@ def login(credentials: LoginRequest):
 @app.get("/api/v1/system/status", dependencies=[Depends(_require_token)])
 def get_system_status():
     config, model, _, _ = service.load_backend(STATE.config_path)
-    ledger = AuditLedger.load_or_create(_ledger_path())
-    intact, first_bad = ledger.verify_integrity()
+    try:
+        ledger = AuditLedger.load_or_create(_ledger_path())
+        intact, first_bad = ledger.verify_integrity()
+        ledger_entries = len(ledger.entries)
+    except Exception:  # an unreadable ledger must degrade the flag, never 500 the status page
+        intact, first_bad, ledger_entries = False, None, 0
     hosts_n = len(STATE.batch.host_ids) if STATE.batch else 0
     high_risk = 0
     if STATE.batch:
@@ -570,7 +574,7 @@ def get_system_status():
         "active_monitored_hosts": hosts_n,
         "total_active_flows": STATE.ingested_flows,
         "high_risk_hosts": high_risk,
-        "ledger_entries": len(ledger.entries),
+        "ledger_entries": ledger_entries,
         "ledger_intact": intact,
         "ledger_first_bad_index": first_bad,
         **service.horizon_info(config),
@@ -592,6 +596,14 @@ def get_hosts():
             "data_source": STATE.source_name, "timestamp": time.time()}
 
 
+def _append_ledger(host: str, peak_prob: float, peak_stage: str, action: str):
+    """Thread-safe ledger append (QC-5); a corrupt ledger file is a 503, never silently overwritten."""
+    try:
+        return AuditLedger.append_and_save(_ledger_path(), host, peak_prob, peak_stage, action)
+    except LedgerCorruptError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 def _sequence_for(host_ip: str, config: dict[str, Any]) -> np.ndarray:
     from models.forecast import latest_sequence
     feature_cols = service.feature_cols_for(config)
@@ -611,6 +623,7 @@ def predict_forecast(req: PredictRequest):
     60 seconds); a caller-supplied `horizon` is accepted for compatibility but ignored, because
     the model cannot roll out to an arbitrary depth it was not trained for."""
     _require_data()
+    from models.forecast import latest_sequence_is_contiguous
     engine, config = _engine()
     seq = _sequence_for(req.host_ip, config)
     result = engine.rollout(seq)
@@ -634,6 +647,12 @@ def predict_forecast(req: PredictRequest):
         # Command & Control.
         "current_stage": _display_observed(_observed_stage(req.host_ip)),
         "current_stage_observed": _observed_stage(req.host_ip) is not None,
+        # QC-1: False means the host's latest L windows span wall-clock gaps (windows exist only
+        # for slots with flows), so lead-time claims for this host should be qualified.
+        "input_contiguous": latest_sequence_is_contiguous(
+            STATE.windows, req.host_ip, int(config["windowing"]["sequence_length"]),
+            horizon["window_seconds"],
+        ),
         "horizon_note": (
             f"Forecast covers {horizon['horizon_seconds']} seconds "
             f"({horizon['horizon_k']} steps x {horizon['window_seconds']}s)."
@@ -916,10 +935,7 @@ def generate_report(req: ReportRequest):
         int(config["windowing"]["window_seconds"]), current_stage=_observed_stage(req.host_ip),
     ))
 
-    ledger_path = _ledger_path()
-    ledger = AuditLedger.load_or_create(ledger_path)
-    entry = ledger.append(req.host_ip, peak_prob, peak_stage, action["action"])
-    ledger.save(ledger_path)
+    entry = _append_ledger(req.host_ip, peak_prob, peak_stage, action["action"])
 
     report = generate_cert_in_report(
         host=req.host_ip,
@@ -975,13 +991,10 @@ def simulate_isolation(req: SimulateIsolationRequest):
     peak_prob = float(result.infiltration_probs[peak_step])
     peak_stage = result.stage_predictions[peak_step]
 
-    ledger_path = _ledger_path()
-    ledger = AuditLedger.load_or_create(ledger_path)
-    entry = ledger.append(
+    entry = _append_ledger(
         req.host_ip, peak_prob, peak_stage,
         "SIMULATED: host isolated (demo action, no real network change)",
     )
-    ledger.save(ledger_path)
 
     return {
         "status": "simulated",

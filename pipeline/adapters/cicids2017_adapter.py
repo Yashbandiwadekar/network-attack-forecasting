@@ -7,9 +7,8 @@ it can be windowed per host. What is verified from a head-read of Tuesday-Workin
     flow_features.COLUMN_RENAME does NOT cover -> extended map below;
   * Timestamp is "4/7/2017 8:54" = d/m/Y H:MM (4 July 2017, a Tuesday; the Monday file starts "3/7/2017") with NO seconds and NO AM/PM;
   * Label text contains a non-UTF-8 dash ("Web Attack \x96 Brute Force") -> read as cp1252.
-What is NOT decided (owner decision): label -> stage for FTP-Patator, SSH-Patator, PortScan, Web Attack*,
-Heartbleed. mitre_mapping.label_to_stage sends them to IMPACT (silent fall-through), so the validator
-FAILs this dataset on purpose until pipeline/mitre_mapping.py gets explicit entries.
+Labels (mapped 2026-10-10, see mitre_mapping.CIC2017_LABEL_TO_STAGE): FTP-Patator, SSH-Patator, PortScan, Web Attack*,
+Heartbleed now have explicit entries (PortScan is real labelled reconnaissance).
 """
 from __future__ import annotations
 
@@ -35,7 +34,7 @@ class CICIDS2017Adapter(_CICFlowMeterBase):
     name = "cicids2017"
     version = "0.1.0"
     status = "experimental"
-    description = "CIC-IDS-2017 TrafficLabelling CSVs (real IPs every day). Experimental: label mapping undecided."
+    description = "CIC-IDS-2017 TrafficLabelling CSVs (real IPs every day). Experimental only because the AM/PM timestamp heuristic is unverified; labels are mapped (mitre_mapping.CIC2017_LABEL_TO_STAGE)."
     wraps = ["pipeline.flow_features"]
     rename_map = _RENAME_2017
     encoding = "cp1252"
@@ -81,5 +80,7 @@ class CICIDS2017Adapter(_CICFlowMeterBase):
         return raw
 
     def _parse_ts_series(self, s: pd.Series) -> pd.Series:
-        ts = pd.to_datetime(s.astype(str).str.strip(), format="%d/%m/%Y %H:%M", errors="coerce")
+        txt = s.astype(str).str.strip()
+        ts = pd.to_datetime(txt, format="%d/%m/%Y %H:%M", errors="coerce")
+        ts = ts.fillna(pd.to_datetime(txt, format="%d/%m/%Y %H:%M:%S", errors="coerce"))
         return ts.where(~((ts.dt.hour >= 1) & (ts.dt.hour <= 7)), ts + pd.Timedelta(hours=12))

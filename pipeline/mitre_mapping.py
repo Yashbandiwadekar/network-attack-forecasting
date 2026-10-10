@@ -89,6 +89,29 @@ CIC_LABEL_TO_STAGE: dict[str, str] = {
     "SYNTH-Exfiltration": EXFILTRATION,
 }
 
+# ---------------------------------------------------------------------------
+# CIC-IDS-2017 labels (additive; CIC-2018 entries above are unchanged).
+# Web-attack labels contain a Windows-1252 en-dash in the released CSVs
+# (U+2013 after cp1252 decoding); the plain-hyphen and U+FFFD spellings are
+# accepted too so a mis-decoded file does not silently fall through to IMPACT.
+# ---------------------------------------------------------------------------
+_WEB = ("Brute Force", "XSS", "Sql Injection")
+CIC2017_LABEL_TO_STAGE: dict[str, str] = {
+    "FTP-Patator": INITIAL_ACCESS,          # credential brute force == 2018 FTP-BruteForce
+    "SSH-Patator": INITIAL_ACCESS,          # == 2018 SSH-Bruteforce
+    # Real labelled port-scan traffic: the only genuine RECONNAISSANCE ground truth among the CIC
+    # datasets (2018 has none). Mapped directly, not via the port_scan_score heuristic.
+    "PortScan": RECONNAISSANCE,
+    # Heartbleed (CVE-2014-0160) is exploitation of a public-facing service to read memory:
+    # T1190 Initial Access. It is also data theft, but the label says nothing about what was
+    # read, so the conservative exploit-side stage is used (11 rows in the whole dataset).
+    "Heartbleed": INITIAL_ACCESS,
+    "DoS Hulk": IMPACT, "DoS GoldenEye": IMPACT, "DoS slowloris": IMPACT,
+    "DoS Slowhttptest": IMPACT, "DDoS": IMPACT,
+    **{f"Web Attack {dash} {kind}": INITIAL_ACCESS for dash in ("–", "-", "�") for kind in _WEB},
+}
+CIC_LABEL_TO_STAGE.update(CIC2017_LABEL_TO_STAGE)
+
 
 # ---------------------------------------------------------------------------
 # CTU-13 label mapping
@@ -196,6 +219,10 @@ def label_to_stage(raw_label: str) -> str:
     if normalized.startswith("flow="):
         return ctu13_label_to_stage(label)
 
+    # NetFlow-v2 datasets (pipeline/adapters/netflow_v2_adapter.py) use "nf=<Attack>".
+    if normalized.startswith("nf="):
+        return nf_classify(label)[0]
+
     # UNSW-NB15 labels start with "unsw=" (see pipeline/adapters/unsw_nb15.py).
     if normalized.startswith("unsw="):
         return unsw_label_to_stage(label)
@@ -243,6 +270,39 @@ def unsw_label_to_stage(raw_label: str) -> str:
 
     attack_cat = label[len("unsw="):].strip()
     return UNSW_LABEL_TO_STAGE.get(attack_cat, IMPACT)
+
+
+# ---------------------------------------------------------------------------
+# NetFlow-v2 (NF-UNSW-NB15-v2, NF-CSE-CIC-IDS2018-v2, NF-ToN-IoT-v2, NF-BoT-IoT-v2) attack names.
+# Keyword rules on the lower-cased "Attack" string; the first matching rule wins. Anything no rule
+# matches is IMPACT *and* reported as an unknown fall-through by the adapter toolkit.
+# These datasets' exact label spellings were NOT available on disk when this was written, so the
+# rules are deliberately keyword-based and conservative.
+# ---------------------------------------------------------------------------
+_NF_RULES: list[tuple[tuple[str, ...], str]] = [
+    (("benign", "normal"), BENIGN),
+    (("recon", "scan"), RECONNAISSANCE),
+    (("infil", "worm"), LATERAL_MOVEMENT),
+    (("bot", "c2", "c&c"), COMMAND_AND_CONTROL),
+    (("theft", "exfil", "keylog"), EXFILTRATION),
+    (("brute", "password", "backdoor", "exploit", "shellcode", "inject", "xss", "sql", "ftp", "ssh", "web"),
+     INITIAL_ACCESS),
+    # deliberately IMPACT (outside the five-stage head), same policy as CIC DoS/DDoS and UNSW Generic/Fuzzers
+    (("ddos", "dos", "generic", "fuzz", "analysis", "ransom", "mitm"), IMPACT),
+]
+
+
+def nf_classify(raw_label: str) -> tuple[str, bool]:
+    """(stage, matched_a_rule) for an ``nf=<Attack>`` label."""
+    if raw_label is None:
+        return IMPACT, False
+    name = str(raw_label).strip().lower()
+    if name.startswith("nf="):
+        name = name[3:].strip()
+    for keys, stage in _NF_RULES:
+        if any(k in name for k in keys):
+            return stage, True
+    return IMPACT, False
 
 
 # ---------------------------------------------------------------------------

@@ -153,7 +153,7 @@ def prepare_dataset(path: str | Path, out_dir: str | Path, config_path: str | Pa
                     test_units: list[str] | None = None, max_rows_per_file: int | None = None,
                     max_files: int | None = None, only_units: list[str] | None = None, allow_experimental: bool = False,
                     allow_fallthrough: bool = False, force: bool = False,
-                    log=print) -> dict[str, Any]:
+                    sidecar: str | None = None, default_label: str | None = None, log=print) -> dict[str, Any]:
     out = check_out_dir(out_dir, force)
     path = Path(path)
     config = load_config(config_path)
@@ -163,6 +163,10 @@ def prepare_dataset(path: str | Path, out_dir: str | Path, config_path: str | Pa
     if name is None:
         raise PrepareError(f"no adapter recognised {path}: {det.evidence}")
     adapter = get_adapter(name)
+    if sidecar:
+        adapter.with_sidecar(sidecar, default_label)
+    elif default_label:
+        adapter.default_label = default_label
     if adapter.status in ("stub", "unsupported"):
         raise PrepareError(f"adapter '{name}' is {adapter.status}: {adapter.howto}")
     if adapter.status == "experimental" and not allow_experimental:
@@ -307,6 +311,7 @@ def prepare_dataset(path: str | Path, out_dir: str | Path, config_path: str | Pa
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "dataset": adapter.name, "adapter": adapter.info(),
         "source_directory": str(path), "files_used": [str(f) for f in files],
+        "labels_sidecar": (str(sidecar) if sidecar else None),
         "files_skipped": [{"file": str(f), "reason": r} for f, r in skipped],
         "max_rows_per_file": max_rows_per_file, "max_files": max_files, "only_units": only_units,
         "config": str(config_path),

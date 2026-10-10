@@ -177,19 +177,32 @@ def save_window_graphs(graphs: dict[Any, WindowGraph], path: str | Path) -> None
 
 
 class _RestrictedUnpickler(pickle.Unpickler):
-    """Audit G12: window_graphs.pkl only ever holds WindowGraph objects, numpy arrays and pandas
-    Timestamp keys, so only those may be reconstructed -- a tampered file cannot import arbitrary
-    callables (os.system etc.). Same pattern as models/baseline_lr.py."""
+    """Audit G12 / QC-2: window_graphs.pkl only ever holds WindowGraph objects, numpy arrays and
+    pandas Timestamp keys, so only an exact (module, name) allowlist may be reconstructed -- a
+    tampered file cannot import arbitrary callables (os.system etc.). Names containing '.' are
+    rejected (protocol >= 4 resolves dotted names through getattr chains). Same pattern as
+    models/baseline_lr.py."""
 
-    _ALLOWED_PREFIXES = ("numpy", "pipeline.graph_builder", "pandas._libs.tslibs.", "collections.")
-    _ALLOWED_EXACT = {("datetime", "datetime"), ("datetime", "timedelta"), ("datetime", "timezone"),
-                      ("_codecs", "encode")}
-    _ALLOWED_BUILTINS = {"set", "frozenset", "slice", "complex", "list", "dict", "tuple", "bytearray"}
+    _ALLOWED_GLOBALS = frozenset({
+        ("pipeline.graph_builder", "WindowGraph"),
+        ("numpy", "dtype"), ("numpy", "ndarray"),
+        ("numpy._core.multiarray", "_reconstruct"), ("numpy._core.multiarray", "scalar"),
+        ("numpy._core.numeric", "_frombuffer"),
+        ("numpy.core.multiarray", "_reconstruct"), ("numpy.core.multiarray", "scalar"),
+        ("numpy.core.numeric", "_frombuffer"),
+        ("pandas._libs.tslibs.timestamps", "_unpickle_timestamp"),
+        ("pandas._libs.tslibs.timestamps", "Timestamp"),
+        ("pandas._libs.tslibs.timedeltas", "_timedelta_unpickle"),
+        ("pandas._libs.tslibs.timezones", "tz_standardize"),
+        ("datetime", "datetime"), ("datetime", "timedelta"), ("datetime", "timezone"),
+        ("_codecs", "encode"),
+        ("collections", "OrderedDict"),
+    })
+    _ALLOWED_BUILTINS = frozenset({"set", "frozenset", "slice", "complex", "list", "dict", "tuple", "bytearray"})
 
     def find_class(self, module, name):
-        if (
-            module == "numpy" or module.startswith(self._ALLOWED_PREFIXES)
-            or (module, name) in self._ALLOWED_EXACT
+        if "." not in name and (
+            (module, name) in self._ALLOWED_GLOBALS
             or (module == "builtins" and name in self._ALLOWED_BUILTINS)
         ):
             return super().find_class(module, name)

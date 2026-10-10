@@ -90,15 +90,39 @@ def test_ctu_unknown_label_and_documented_zero_fill(tmp_path):
     assert "label_fallthrough" in codes(rep, "FAIL")
     assert "zero_filled_features" in codes(rep, "WARN")          # 6 flags + 3 IAT
     assert rep["flow_checks"]["iat"]["status"] == "zero_filled"  # no IAT unit check on zero-filled IAT
-    assert rep["sample"]["rows_dropped"] > 0     # ICMP rows (hex Dport) are dropped by the existing CTU adapter
+    assert rep["sample"]["rows_dropped"] == 0     # ICMP rows are kept since the 2026-10-10 fix
 
 
 def test_rows_dropped_threshold_warns_and_reports_by_label(tmp_path):
-    p = write_unsw(tmp_path / "UNSW-NB15_1.csv", n=1000, arp_rows=100, attack_cat_block=(0, 100, "Reconnaissance"))
+    p = write_unsw(tmp_path / "UNSW-NB15_1.csv", n=1000, bad_rows=100, attack_cat_block=(0, 100, "Reconnaissance"))
     rep = V.validate_dataset(p, **KW)
     assert "rows_dropped" in codes(rep, "WARN")
     assert rep["sample"]["dropped_by_label"][0]["label"] == "unsw=Reconnaissance"
     assert "attack_rows_dropped" in codes(rep, "WARN")
+    # exact full-pass accounting (default drop_scan=auto on small data) sees the same loss and lists it first
+    assert "attack_rows_dropped_full" in codes(rep, "WARN")
+    assert rep["drop_scan"]["non_benign_dropped_fraction"] == 1.0
+    assert V.render_markdown(rep).index("attack_rows_dropped_full") < V.render_markdown(rep).index("rows_dropped`: adapter")
+
+
+def test_exact_drop_scan_catches_what_the_head_sample_misses(tmp_path):
+    # attack rows with unparsable timestamps sit at the END of the file: the head sample sees no loss
+    p = write_unsw(tmp_path / "UNSW-NB15_1.csv", n=3000, attack_cat_block=(2500, 3000, "Exploits"))
+    df = pd.read_csv(p, header=None)
+    df[28] = df[28].astype(object)
+    df.loc[2500:2899, 28] = "garbage"
+    df.to_csv(p, header=False, index=False)
+    rep = V.validate_dataset(p, progress=False, embeddings=False, sample_rows=1000, min_rows_per_file=200)
+    assert rep["sample"]["rows_dropped"] == 0
+    assert "attack_rows_dropped_full" in codes(rep, "WARN") and rep["drop_scan"]["non_benign_dropped"] == 400
+
+
+def test_drop_scan_off_and_size_gate(tmp_path):
+    p = write_unsw(tmp_path / "UNSW-NB15_1.csv", n=500)
+    rep = V.validate_dataset(p, progress=False, embeddings=False, drop_scan="off", sample_rows=1000, min_rows_per_file=200)
+    assert "by_label" not in rep["drop_scan"] and "drop_scan_skipped" in codes(rep, "INFO")
+    rep = V.validate_dataset(p, progress=False, embeddings=False, drop_scan_max_bytes=10, sample_rows=1000, min_rows_per_file=200)
+    assert "skipped" in rep["drop_scan"]["mode"]
 
 
 def test_unsw_documented_approximations(tmp_path):
@@ -170,8 +194,8 @@ def test_adapter_error_and_unsupported_and_unknown_are_fail_not_crash(tmp_path):
     rep = V.validate_dataset(sets, **KW)
     assert "adapter_unsupported" in codes(rep, "FAIL") and "srcip" in rep["findings"][0]["message"].lower() + "srcip"
     nf = tmp_path / "nf.csv"
-    nf.write_text("IPV4_SRC_ADDR,L4_SRC_PORT,IPV4_DST_ADDR,L4_DST_PORT,PROTOCOL,IN_BYTES,IN_PKTS,Label,Attack\na,1,b,2,6,1,1,0,Benign\n")
-    assert "adapter_stub" in codes(V.validate_dataset(nf, **KW), "FAIL")
+    nf.write_text("flow_duration,Header_Length,Protocol Type,Rate,Srate,label\n1,2,3,4,5,x\n")
+    assert "adapter_unsupported" in codes(V.validate_dataset(nf, **KW), "FAIL")
 
 
 def test_experimental_adapter_warns(tmp_path):
@@ -181,7 +205,7 @@ def test_experimental_adapter_warns(tmp_path):
            "Flow IAT Mean, Flow IAT Std, Flow IAT Max,FIN Flag Count, SYN Flag Count, RST Flag Count, PSH Flag Count,"
            " ACK Flag Count, URG Flag Count, Label\n")
     rows = [f"{i},10.0.0.{i % 3},5,10.0.0.9,80,6,4/7/2017 8:{i % 60:02d},1000000,5,5,100,200,250000,5,300000,0,1,0,0,1,0,"
-            + ("FTP-Patator" if i % 5 == 0 else "BENIGN") for i in range(200)]
+            + ("Mystery-2017" if i % 5 == 0 else "BENIGN") for i in range(200)]
     p.write_text(hdr + "\n".join(rows) + "\n")
     rep = V.validate_dataset(p, **KW)
     assert "adapter_experimental" in codes(rep, "WARN") and "label_fallthrough" in codes(rep, "FAIL")

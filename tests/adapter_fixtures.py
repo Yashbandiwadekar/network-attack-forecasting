@@ -83,7 +83,7 @@ def write_ctu(path: Path, n: int = 200, with_unknown: int = 0, seed: int = 0) ->
 
 
 def unsw_rows(n: int = 100, attack_cat_block: tuple[int, int, str] = (40, 60, "Reconnaissance"),
-              arp_rows: int = 0, sintpkt_ms: float | None = None, seed: int = 0) -> pd.DataFrame:
+              arp_rows: int = 0, bad_rows: int = 0, sintpkt_ms: float | None = None, seed: int = 0) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     rows = []
     for i in range(n):
@@ -98,6 +98,8 @@ def unsw_rows(n: int = 100, attack_cat_block: tuple[int, int, str] = (40, 60, "R
             "dintpkt": sintpkt_ms if sintpkt_ms is not None else dur * 1000 / 5, "synack": 0.01, "ackdat": 0.02,
             "attack_cat": None, "label": 0,
         })
+        if i < bad_rows:
+            r["stime"] = "not-a-time"          # unparsable timestamp -> dropped by the adapter
         lo, hi, cat = attack_cat_block
         if lo <= i < hi:
             r["attack_cat"], r["label"] = cat, 1
