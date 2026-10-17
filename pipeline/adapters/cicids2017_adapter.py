@@ -55,10 +55,15 @@ class CICIDS2017Adapter(_CICFlowMeterBase):
         "bytes": "payload bytes (as 2018)",
     }
     caveats = [
-        "Timestamps have only minute resolution: all flows within a minute share one timestamp, so the 10 s "
-        "windows are coarse -- flows pile into the first window of each minute.",
-        "FTP-Patator / SSH-Patator / PortScan / Web Attack / Heartbleed have no entry in mitre_mapping "
-        "(silently IMPACT). Owner must decide the mapping before use.",
+        "Timestamps have only minute resolution on every day except Monday (which has seconds): all flows within a "
+        "minute share one timestamp, so 10 s windows pile into the :00 slot of each minute. Per-host windows are then "
+        ">= 60 s apart and `require_contiguous_windows` at 10 s yields ZERO sequences on Tue-Fri (docs/15); use 60 s "
+        "windows for those days. Monday works at 10 s.",
+        "Labels are mapped explicitly (mitre_mapping.CIC2017_LABEL_TO_STAGE): Patator -> initial_access, PortScan -> "
+        "reconnaissance, Web Attack -> initial_access, Heartbleed -> initial_access, Bot -> command_and_control, "
+        "Infiltration -> lateral_movement, DoS/DDoS -> impact. The AM/PM heuristic was checked against the published "
+        "attack schedule and the hours present (docs/15) but not against the PCAPs.",
+        "The Thursday-Morning WebAttacks file has ~288k empty trailing rows that are dropped (unparsable timestamp).",
         "Only the TrafficLabelling release works; the MachineLearningCVE release has no IP/Timestamp.",
     ]
 
