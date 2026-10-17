@@ -30,6 +30,16 @@ OUT_PATH = PROJECT_ROOT / "frontend" / "src" / "data" / "showcase.json"
 DEFAULT_CAPTURE = PROJECT_ROOT / "data" / "raw" / "flows_real" / "Friday-02-03-2018_TrafficForML_CICFlowMeter.csv"
 
 
+def _day_from_filename(name: str) -> str:
+    """'Friday-16-02-2018_TrafficForML_CICFlowMeter.csv' -> '16 February 2018'."""
+    import re
+
+    m = re.search(r"(\d{2})-(\d{2})-(\d{4})", name)
+    if not m:
+        return "unknown"
+    return datetime(int(m.group(3)), int(m.group(2)), int(m.group(1))).strftime("%d %B %Y").lstrip("0")
+
+
 def _slice_capture(src: Path, rows: int, tmp_dir: Path) -> tuple[Path, dict]:
     df = pd.read_csv(src, nrows=rows, low_memory=False)
     label_mix = {}
@@ -81,7 +91,7 @@ def record(api: str, capture: Path, rows: int) -> dict:
         "capture": {
             "file": capture.name,
             "dataset": "CIC-IDS-2018",
-            "day": "2 March 2018",
+            "day": _day_from_filename(capture.name),
             "rows_read": rows,
             "label_mix": label_mix,
         },
