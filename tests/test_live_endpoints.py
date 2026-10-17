@@ -71,6 +71,18 @@ def test_status_readable_from_remote_but_control_is_not(pcap_dir):
     assert forged.post("/api/v1/live/replay", json=body).status_code == 403
 
 
+def test_tunnelled_request_from_loopback_is_not_local(pcap_dir):
+    # cloudflared -> localhost:8000: the TCP peer is loopback, but the proxy adds forwarding headers.
+    body = {"path": str(pcap_dir / "dense.pcap"), "speed": 0}
+    for h in ({"Cf-Connecting-IP": "203.0.113.7"}, {"CF-Ray": "abc"}, {"X-Forwarded-For": "203.0.113.7"},
+              {"X-Real-IP": "203.0.113.7"}, {"Forwarded": "for=203.0.113.7"}):
+        c = TestClient(app, client=LOCAL, headers=h)
+        assert c.post("/api/v1/live/replay", json=body).status_code == 403
+        assert c.post("/api/v1/live/start", json={}).status_code == 403
+        assert c.post("/api/v1/live/stop").status_code == 403
+    assert not LIVE.active()
+
+
 def test_replay_path_must_be_inside_an_allowed_directory(pcap_dir, tmp_path):
     c = local()
     outside = tmp_path / "secret.pcap"

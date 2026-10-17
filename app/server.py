@@ -1034,6 +1034,7 @@ def upload_file(file: UploadFile = File(...)):
 # ---------------------------------------------------------------- live / replay (docs/11)
 
 _LOOPBACK = {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
+_PROXY_HEADERS = ("cf-connecting-ip", "cf-ray", "x-forwarded-for", "x-real-ip", "forwarded")
 
 
 def _refuse_while_live(what: str) -> None:
@@ -1051,6 +1052,10 @@ def _require_loopback(request: Request) -> None:
     host = request.client.host if request.client else None
     if host not in _LOOPBACK:
         raise HTTPException(status_code=403, detail="Live control is restricted to the local machine.")
+    # A same-host reverse proxy or tunnel (e.g. cloudflared -> localhost:8000) makes every remote request
+    # arrive from loopback. Such proxies add forwarding headers, so their presence means "not local".
+    if any(request.headers.get(h) for h in _PROXY_HEADERS):
+        raise HTTPException(status_code=403, detail="Live control is restricted to the local machine (proxied request).")
 
 
 def _require_control(request: Request, authorization: str | None = Security(_api_key_header)) -> None:
