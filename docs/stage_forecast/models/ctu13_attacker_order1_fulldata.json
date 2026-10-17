@@ -1,0 +1,43 @@
+{
+ "alpha": 1.0,
+ "beta": 2.0,
+ "counts1": {
+  "command_and_control": {
+   "<end>": 31,
+   "impact": 34
+  },
+  "impact": {
+   "<end>": 12,
+   "command_and_control": 22
+  }
+ },
+ "counts2": {},
+ "exposure": {
+  "command_and_control": 100894.49684286118,
+  "impact": 66505.97164702415
+ },
+ "fit_info": {
+  "n_censored": 3,
+  "n_chains": 46,
+  "n_end": 43,
+  "n_events": 102,
+  "n_transitions": 56
+ },
+ "max_chain_gap_s": 7200.0,
+ "min_support2": 2,
+ "order": 1,
+ "rate_prior_events": 1.0,
+ "schema": "naf.stage_forecaster/1",
+ "stages": [
+  "reconnaissance",
+  "initial_access",
+  "lateral_movement",
+  "command_and_control",
+  "exfiltration",
+  "impact"
+ ],
+ "target": {
+  "hits": 0,
+  "pairs": 0
+ }
+}

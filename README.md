@@ -228,12 +228,21 @@ and links to the report it comes from.
   attack windows go unflagged. Precision is the strong side (0.931 ± 0.024): what it flags is
   almost always real. Use it as a second signal beside existing detection, not as sole coverage.
   (`docs/04-evaluation-real-v2-seeds.md`)
-- **Early warning is not demonstrated.** The earlier lead-time figures (measured on 628
-  benign-to-attack transitions, which come from about 15 episodes on 3 pseudo-hosts) used a
-  definition of "early" that has since been tightened (audit QC-3) and were measured on a
-  different checkpoint than the one now served. Lead-time numbers are **pending re-run under the
-  QC-3 definition** on the served model and are not quoted here. (`docs/04-evaluation-real-v2.md`
-  holds the old measurement.)
+- **Early warning is not demonstrated.** Re-run under the QC-3 definition on the served seed-1
+  model, on the CIC-IDS-2018 day-disjoint test split (`python -m eval.onset_eval`,
+  `docs/13-onset-evaluation.md`). The 628 benign-to-attack sequences collapse to **12 independent
+  episodes on 3 pseudo-hosts** (181 raw onset events; 10 episodes have gap-free timelines). At the
+  served alert threshold 0.40: **0 of 12 episodes were warned early** (exact 95% CI 0-26%), 1 was
+  caught on time, 5 only after the attack had started (20 s to about 36 min later) and 6 never
+  alarmed. False-alarm rate on benign-throughout sequences is 1.5% (74 of 5,080; cluster-bootstrap
+  CI 0.1-2.9%). The old sequence-level metric (`eval/metrics.py::lead_time_metrics`) gives 6 of 628
+  sequences with an in-rollout "early" alarm (mean 16.7 s, median 15 s) and alarm precision 6.7%,
+  but those are rollout-step offsets inside one sequence, not warning time, and they come from the
+  re-onsets of a few episodes. Other seeds and the unseeded checkpoint: also 0 of 12 early. On
+  CIC-IDS-2017 (zero-shot, 60 s windows, 15 episodes on 9 hosts) the served model warned early in
+  0 of 15 (two other checkpoints: 1 of 15, the same DoS-victim episode, a flood ramp-up rather than a forecast). With these counts a true early-warning rate above about 25% (CIC-2018) or 22%
+  (CIC-2017) is excluded, but nothing finer can be said. (`docs/04-evaluation-real-v2.md` holds
+  the superseded measurement.)
 - **The headline is a t+1 number.** F1 0.481 / AUROC 0.794 measure **one step — 10 seconds —
   ahead**, not 60. The evaluation path runs a single forward pass.
   (`docs/04-evaluation-frozen-state-ablation.md`)
@@ -263,11 +272,11 @@ These are documented rather than hidden. `docs/AUDIT.md` is the full list with m
   0.917. The reported headline is now the **day-disjoint** split (no attack session appears in
   both), which is where F1 0.481 / AUROC 0.794 come from. The older split survives only in
   `docs/04-evaluation-real.md`, marked as superseded.
-- **Lead-time metric rests on narrow events.** The day-disjoint re-measure covers 628
-  benign-to-attack transitions (the earlier "32 transitions" figure predates it), but they come
-  from 3 network-wide pseudo-hosts with 96% from a single day, so the sample is wide in count and
-  narrow in origin. False alarms are counted (audit E3). The resulting lead-time and alarm-precision
-  figures are pending re-run under the QC-3 definition (see above).
+- **Lead-time metric rests on narrow events.** The 628 benign-to-attack sequences are 12
+  independent episodes (docs/13), all on 3 network-wide pseudo-hosts, so the sample is wide in
+  sequence count and tiny in independent events. False alarms are counted (audit E3) and every
+  figure above prints its episode count. The QC-3 sequence-level numbers were re-run (see above);
+  the episode-level numbers in `docs/13-onset-evaluation.md` are the ones to use.
 - **3 of 5 MITRE stages on real data.** CIC-IDS-2018 has no Reconnaissance or Exfiltration labels.
   DoS/DDoS is mapped to `impact`, which is excluded from the 5-way stage task.
 - **Flow-only in practice.** Packet-level features are implemented, but no CIC-IDS-2018 PCAP is
