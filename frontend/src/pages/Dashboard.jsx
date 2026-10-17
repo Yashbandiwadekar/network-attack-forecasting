@@ -7,6 +7,7 @@ import ThreatScoreGauge from '../components/ThreatScoreGauge/ThreatScoreGauge';
 import ForecastProbabilityCurve from '../components/ForecastProbabilityCurve/ForecastProbabilityCurve';
 import WhatIfPanel from '../components/WhatIfPanel/WhatIfPanel';
 import AuditLedger from '../components/AuditLedger/AuditLedger';
+import LiveBadge from '../components/LiveBadge/LiveBadge';
 import { systemApi, datasetApi, forecastApi, explainApi, analysisApi, reportApi, evalApi, responseApi } from '../api';
 // BUG-007: removed unused imports FileText and ShieldCheck
 import { UploadCloud, CheckCircle, AlertTriangle, Activity, Database, RefreshCw } from 'lucide-react';
@@ -243,7 +244,7 @@ const Dashboard = () => {
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-3)' }}>
               <span>
-                STATUS: <strong className="text-good">● LIVE POLLING</strong>
+                FEED: <LiveBadge />
               </span>
               <span>
                 LAST UPDATED: <strong className="text-white">{lastUpdated || 'Initialing...'}</strong>

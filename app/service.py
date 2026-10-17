@@ -32,10 +32,20 @@ from pipeline.windowing import (
 
 # Ported from streamlit_app.py. The frontend renders these as CSS classes, and treats anything
 # below the lowest threshold as "good" -- the Streamlit UI showed no alert card at all there.
+# ONE alert threshold (docs/11 "Thresholds"). A host is "at risk" / "high risk" / alerting when its peak
+# forecast probability reaches ALERT_THRESHOLD, which is exactly the "serious" tier below. It is what
+# /system/status and the upload response call high_risk, what the live engine alerts on, and the default of
+# scripts/live_forecast.py. UNCALIBRATED: it was never tuned on any live network (docs/07 T6). The other
+# numbers in the codebase are not alert thresholds: 0.15 is the "warning" display tier, 0.70 the "critical"
+# one, and windowing.alert_threshold (0.3) only gates a stage-LABELLING heuristic inside the model code
+# (models/forecast.py); it is left unchanged so batch and live outputs stay identical.
+ALERT_THRESHOLD = 0.40
+WARNING_THRESHOLD = 0.15
+CRITICAL_THRESHOLD = 0.70
 SEVERITY_LEVELS: list[tuple[float, str]] = [
-    (0.70, "critical"),
-    (0.40, "serious"),
-    (0.15, "warning"),
+    (CRITICAL_THRESHOLD, "critical"),
+    (ALERT_THRESHOLD, "serious"),
+    (WARNING_THRESHOLD, "warning"),
 ]
 
 MAX_CSV_UPLOAD_MB = 300

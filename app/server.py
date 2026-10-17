@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import json
 import tempfile
+import threading
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -23,13 +24,14 @@ from pathlib import Path
 from typing import Any, Optional
 
 import numpy as np
-from fastapi import Depends, FastAPI, File, HTTPException, Security, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, Security, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from app import live as live_mod
 from app import service
 from common.config import load_config, resolve_path
 from models.audit_ledger import AuditLedger, LedgerCorruptError
@@ -243,6 +245,8 @@ class _State:
         self.batch = None          # BatchForecastResult
         self.source_name: str | None = None
         self.ingested_flows: int = 0
+        self.host_meta: dict[str, dict[str, Any]] = {}   # live engine only: per-host provisional/contiguity
+        self._publish_lock = threading.Lock()
 
     def reset_data(self) -> None:
         self.flow_df = None
@@ -250,9 +254,23 @@ class _State:
         self.batch = None
         self.source_name = None
         self.ingested_flows = 0
+        self.host_meta = {}
+
+    def publish(self, snap: "live_mod.Snapshot") -> None:
+        """Called by the live engine thread: swap every piece of dashboard state under one lock. The
+        engine builds the new snapshot completely before this, so a poll sees the old state or the new
+        one, never a half-built one (each attribute is a single reference assignment)."""
+        with self._publish_lock:
+            self.flow_df = snap.flow_df
+            self.windows = snap.windows if len(snap.windows) else None
+            self.batch = snap.batch
+            self.source_name = snap.source_name
+            self.ingested_flows = snap.ingested_flows
+            self.host_meta = snap.host_meta
 
 
 STATE = _State()
+LIVE = live_mod.LiveController()
 
 
 def _backend():
@@ -357,7 +375,18 @@ def _host_row(idx: int) -> dict[str, Any]:
         "stage_is_heuristic": bool(heur[peak_step]),
         "stage_disclosure_note": service.stage_disclosure_note(peak_stage, bool(heur[peak_step])),
         "dataset_source": STATE.source_name or STATE.dataset_id,
+        **_live_row_fields(b.host_ids[idx], peak),
     }
+
+
+def _live_row_fields(host: str, peak: float) -> dict[str, Any]:
+    """Additive fields. `alert` uses the one shared threshold for uploads and live alike; the live-only
+    fields appear only while the live engine owns the state."""
+    out: dict[str, Any] = {"alert": bool(peak >= service.ALERT_THRESHOLD)}
+    meta = STATE.host_meta.get(host)
+    if meta is not None:
+        out.update(meta)
+    return out
 
 
 # ---------------------------------------------------------------- schemas
@@ -396,7 +425,22 @@ class SelectDatasetRequest(BaseModel):
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
     check_model_artifacts(STATE.config_path)  # refuse to start on a missing checkpoint/scaler
+    _autostart_live()
     yield
+    LIVE.stop()
+
+
+def _autostart_live() -> None:
+    """scripts/serve.py --replay / --live-dir hand over through the environment. A failure here is
+    logged, not fatal: the dashboard still comes up and shows OFF."""
+    try:
+        replay, live_dir = os.environ.get("PHOENIX_REPLAY"), os.environ.get("PHOENIX_LIVE_DIR")
+        if replay:
+            start_replay(_resolve_allowed(replay), float(os.environ.get("PHOENIX_REPLAY_SPEED") or 1.0))
+        elif live_dir and os.environ.get("PHOENIX_LIVE_AUTOSTART") == "1":
+            start_live_tail(_resolve_allowed(live_dir))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[!] live autostart failed: {exc}")
 
 
 app.router.lifespan_context = _lifespan
@@ -558,6 +602,7 @@ def get_dataset_diagnostics():
 
 @app.post("/api/v1/datasets/select", dependencies=[Depends(_require_token)])
 def select_dataset(req: SelectDatasetRequest):
+    _refuse_while_live("dataset switch")
     ds = next((d for d in _dataset_registry() if d["id"] == req.dataset_id), None)
     if not ds:
         raise HTTPException(status_code=404, detail="Dataset not found")
@@ -651,13 +696,21 @@ def get_hosts():
     """Empty until a capture is uploaded. The repo ships a checkpoint but no traffic, so a fresh
     clone legitimately has zero hosts -- the UI should show an empty state, not placeholders."""
     if STATE.batch is None:
+        if LIVE.active():
+            st = LIVE.status()
+            return {"active_dataset": STATE.dataset_id, "hosts": [], "data_source": STATE.source_name,
+                    "live_state": st.get("state"),
+                    "message": (f"{st.get('state')}: waiting for hosts to reach "
+                                f"{st.get('sequence_length')} windows ({st.get('hosts_warming_up', 0)} warming up)."),
+                    "timestamp": time.time()}
         return {"active_dataset": STATE.dataset_id, "hosts": [], "data_source": None,
                 "message": "No capture loaded. Upload a PCAP or flow CSV to populate hosts.",
                 "timestamp": time.time()}
     rows = [_host_row(i) for i in range(len(STATE.batch.host_ids))]
     rows.sort(key=lambda r: r["peak_prob"], reverse=True)
     return {"active_dataset": STATE.dataset_id, "hosts": rows,
-            "data_source": STATE.source_name, "timestamp": time.time()}
+            "data_source": STATE.source_name, "timestamp": time.time(),
+            **({"live_state": LIVE.status().get("state")} if LIVE.active() else {})}
 
 
 def _append_ledger(host: str, peak_prob: float, peak_stage: str, action: str):
@@ -898,6 +951,7 @@ def upload_file(file: UploadFile = File(...)):
     request -- including the dashboard's 5-second poll -- for the whole parse. FastAPI runs a
     sync endpoint in a threadpool instead.
     """
+    _refuse_while_live("upload")
     client_name = file.filename or "capture.pcap"
     ext = Path(client_name).suffix.lower()
     if ext not in (".pcap", ".pcapng", ".csv"):
@@ -975,6 +1029,147 @@ def upload_file(file: UploadFile = File(...)):
             f"{len(windows):,} windows, {len(rows)} hosts scored."
         ),
     }
+
+
+# ---------------------------------------------------------------- live / replay (docs/11)
+
+_LOOPBACK = {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
+
+
+def _refuse_while_live(what: str) -> None:
+    """The live engine owns STATE and the loaded model while it runs; an upload or a model switch under
+    it would be overwritten within a tick, or score windows with the wrong scaler."""
+    if LIVE.active():
+        raise HTTPException(status_code=409, detail=f"A live/replay session is active; stop it before a {what}.")
+
+
+def _require_loopback(request: Request) -> None:
+    """Control endpoints are for the machine itself. The direct TCP peer is checked; X-Forwarded-For is
+    deliberately ignored (it is client-controlled). Behind a reverse proxy on the same host every request
+    looks local, so do not put a proxy in front of this server without its own access control. When
+    PHOENIX_REQUIRE_AUTH=1 the bearer token is required as well (see _require_control)."""
+    host = request.client.host if request.client else None
+    if host not in _LOOPBACK:
+        raise HTTPException(status_code=403, detail="Live control is restricted to the local machine.")
+
+
+def _require_control(request: Request, authorization: str | None = Security(_api_key_header)) -> None:
+    _require_loopback(request)
+    _require_token(authorization)
+
+
+def _replay_roots() -> list[Path]:
+    """Directories a replay/live-tail path must live under (arbitrary-file-read guard)."""
+    roots = [PROJECT_ROOT / "data" / "raw" / "pcap", PROJECT_ROOT / "demo", PROJECT_ROOT / "lab_rec"]
+    for var in ("PHOENIX_REPLAY_DIR", "PHOENIX_LIVE_DIR"):
+        for part in (os.environ.get(var) or "").split(os.pathsep):
+            if part.strip():
+                roots.append(Path(part.strip()))
+    return [r.resolve() for r in roots]
+
+
+def _resolve_allowed(raw: str) -> Path:
+    p = Path(raw)
+    if not p.is_absolute():
+        p = PROJECT_ROOT / p
+    p = p.resolve()
+    if not any(p == r or p.is_relative_to(r) for r in _replay_roots()):
+        raise HTTPException(status_code=403, detail="Path is outside the allowed capture directories "
+                            "(data/raw/pcap, demo, lab_rec, $PHOENIX_REPLAY_DIR, $PHOENIX_LIVE_DIR).")
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="No such file or directory.")
+    return p
+
+
+def _live_settings(mode: str) -> live_mod.LiveSettings:
+    env = os.environ.get
+    cidrs = tuple(c.strip() for c in (env("PHOENIX_LAB_CIDR") or "").split(",") if c.strip())
+    ports_raw = env("PHOENIX_LIVE_IGNORE_PORTS")
+    if ports_raw is not None:
+        ports = tuple(int(x) for x in ports_raw.split(",") if x.strip())
+    else:
+        # LIVE: never score the dashboard's own traffic. REPLAY: the capture is what it is.
+        ports = (int(env("PHOENIX_PORT") or 8000),) if mode == "LIVE" else ()
+    score_log = env("PHOENIX_LIVE_SCORE_LOG")
+    return live_mod.LiveSettings(
+        flow_timeout_s=float(env("PHOENIX_LIVE_FLOW_TIMEOUT") or 30.0),
+        grace_s=float(env("PHOENIX_LIVE_GRACE") or 2.0),
+        lab_cidrs=cidrs, ignore_ports=ports,
+        score_log=Path(score_log) if score_log else None,
+    )
+
+
+def _make_live_engine(mode: str, source_name: str) -> live_mod.LiveEngine:
+    engine, config = _engine()
+    try:
+        return live_mod.LiveEngine(engine, config, _live_settings(mode), publish=STATE.publish,
+                                   source_name=source_name, mode=mode)
+    except live_mod.LiveConfigError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+def start_replay(path: Path, speed: float, max_gap_s: float | None = None) -> None:
+    """Start a replay of `path` (already validated). Also used by the PHOENIX_REPLAY autostart."""
+    paths = live_mod.list_captures(path)
+    if not paths:
+        raise HTTPException(status_code=404, detail="No .pcap/.pcapng files found there.")
+    live = _make_live_engine("REPLAY", f"REPLAY:{path.name}")
+    STATE.reset_data()
+    LIVE.start(live, lambda eng, stop: live_mod.ReplaySource(eng, paths, speed=speed, max_gap_s=max_gap_s, stop_event=stop))
+
+
+def start_live_tail(directory: Path) -> None:
+    if not directory.is_dir():
+        raise HTTPException(status_code=404, detail="The live directory does not exist.")
+    live = _make_live_engine("LIVE", f"LIVE:{directory.name}")
+    STATE.reset_data()
+    LIVE.start(live, lambda eng, stop: live_mod.LiveDirSource(eng, directory, stop_event=stop))
+
+
+class ReplayRequest(BaseModel):
+    path: str
+    speed: float = 1.0
+    max_gap_s: Optional[float] = None
+
+
+class LiveStartRequest(BaseModel):
+    directory: Optional[str] = None
+
+
+@app.get("/api/v1/live/status", dependencies=[Depends(_require_token)])
+def live_status():
+    """LIVE / REPLAY / STALE / OFF plus throughput, warm-up, lag and drop counters (docs/11)."""
+    return {**LIVE.status(), "active_dataset": STATE.dataset_id, "timestamp": time.time()}
+
+
+@app.post("/api/v1/live/replay", dependencies=[Depends(_require_control)])
+def live_replay(req: ReplayRequest):
+    if not (0.0 <= req.speed <= 1000.0):
+        raise HTTPException(status_code=422, detail="speed must be between 0 (as fast as possible) and 1000.")
+    if LIVE.active():
+        raise HTTPException(status_code=409, detail="A live/replay session is already active; stop it first.")
+    start_replay(_resolve_allowed(req.path), req.speed, req.max_gap_s)
+    return {"status": "started", **LIVE.status()}
+
+
+@app.post("/api/v1/live/start", dependencies=[Depends(_require_control)])
+def live_start(req: LiveStartRequest | None = None):
+    """Tail the directory of rotating dumpcap files. Starts no capture itself."""
+    raw = (req.directory if req and req.directory else None) or os.environ.get("PHOENIX_LIVE_DIR")
+    if not raw:
+        raise HTTPException(status_code=409, detail="No directory given and PHOENIX_LIVE_DIR is not set.")
+    if LIVE.active():
+        raise HTTPException(status_code=409, detail="A live/replay session is already active; stop it first.")
+    start_live_tail(_resolve_allowed(raw))
+    return {"status": "started", **LIVE.status()}
+
+
+@app.post("/api/v1/live/stop", dependencies=[Depends(_require_control)])
+def live_stop():
+    stopped = LIVE.stop()
+    if stopped:
+        STATE.reset_data()
+    return {"status": "stopped" if stopped else "not_running", **LIVE.status()}
 
 
 @app.post("/api/v1/reports/generate", dependencies=[Depends(_require_token)])

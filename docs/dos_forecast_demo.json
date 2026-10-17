@@ -1,0 +1,132 @@
+{
+ "_comment": "Does the model forecast DoS or only detect it? Held-out 02-16 (100% DoS among non-benign flows). Thresholds pre-registered in the script before results were seen. Lead time is MEASURED wall-clock from window_end_time, not k x 10s, because the pipeline drops empty windows.",
+ "day": "02-16",
+ "split": "test",
+ "host": "NETWORK-2018-02-16",
+ "host_note": "pseudo-host: this CIC CSV has no Src IP column, so the whole day is one network-wide series (pipeline/flow_features.py::_fill_missing_ip_columns). This is NOT per-host forecasting.",
+ "windows": 483,
+ "windows_next_is_attack": 297,
+ "windows_next_is_dos": 297,
+ "dos_visible_to_trained_stage_head": false,
+ "dos_counts_as_infiltration_positive": true,
+ "stage_named_on_dos_windows": {
+  "impact": 88,
+  "initial_access": 82,
+  "benign": 127
+ },
+ "stage_named_on_dos_windows_via_heuristic": {
+  "impact": 88
+ },
+ "stage_naming_note": "The trained 6-class head has no `impact` class, so any `impact` here came from models/forecast.py::_heuristic_stage_override -- a volume z-score rule disclosed via `stage_is_heuristic`, NOT a trained prediction. Without it the trained head calls DoS `command_and_control` (570/684 on real data, audit S7).",
+ "onsets_found": 2,
+ "thresholds_preregistered": [
+  0.4,
+  0.5
+ ],
+ "forecast_attempts": [
+  {
+   "onset_index": 26,
+   "onset_time": "2018-02-16T01:45:00.000000",
+   "steps_ahead": 1,
+   "lead_seconds_measured": 50,
+   "prob": 0.1111
+  },
+  {
+   "onset_index": 26,
+   "onset_time": "2018-02-16T01:45:00.000000",
+   "steps_ahead": 2,
+   "lead_seconds_measured": 70,
+   "prob": 0.2999
+  },
+  {
+   "onset_index": 26,
+   "onset_time": "2018-02-16T01:45:00.000000",
+   "steps_ahead": 3,
+   "lead_seconds_measured": 140,
+   "prob": 0.2062
+  },
+  {
+   "onset_index": 26,
+   "onset_time": "2018-02-16T01:45:00.000000",
+   "steps_ahead": 4,
+   "lead_seconds_measured": 210,
+   "prob": 0.2476
+  },
+  {
+   "onset_index": 26,
+   "onset_time": "2018-02-16T01:45:00.000000",
+   "steps_ahead": 5,
+   "lead_seconds_measured": 310,
+   "prob": 0.1621
+  },
+  {
+   "onset_index": 26,
+   "onset_time": "2018-02-16T01:45:00.000000",
+   "steps_ahead": 6,
+   "lead_seconds_measured": 400,
+   "prob": 0.1634
+  },
+  {
+   "onset_index": 126,
+   "onset_time": "2018-02-16T10:12:00.000000",
+   "steps_ahead": 1,
+   "lead_seconds_measured": 30,
+   "prob": 0.0247
+  },
+  {
+   "onset_index": 126,
+   "onset_time": "2018-02-16T10:12:00.000000",
+   "steps_ahead": 2,
+   "lead_seconds_measured": 160,
+   "prob": 0.0918
+  },
+  {
+   "onset_index": 126,
+   "onset_time": "2018-02-16T10:12:00.000000",
+   "steps_ahead": 3,
+   "lead_seconds_measured": 170,
+   "prob": 0.153
+  },
+  {
+   "onset_index": 126,
+   "onset_time": "2018-02-16T10:12:00.000000",
+   "steps_ahead": 4,
+   "lead_seconds_measured": 200,
+   "prob": 0.1302
+  },
+  {
+   "onset_index": 126,
+   "onset_time": "2018-02-16T10:12:00.000000",
+   "steps_ahead": 5,
+   "lead_seconds_measured": 290,
+   "prob": 0.1617
+  },
+  {
+   "onset_index": 126,
+   "onset_time": "2018-02-16T10:12:00.000000",
+   "steps_ahead": 6,
+   "lead_seconds_measured": 370,
+   "prob": 0.1461
+  }
+ ],
+ "forecast_hit_rate": {
+  "0.4": 0.0,
+  "0.5": 0.0
+ },
+ "detection_already_under_attack": {
+  "n": 297,
+  "mean_prob": 0.3861,
+  "fire_rate": {
+   "0.4": 0.5623,
+   "0.5": 0.5589
+  }
+ },
+ "benign_quiet_windows": {
+  "n": 184,
+  "mean_prob": 0.0635,
+  "false_positive_rate": {
+   "0.4": 0.0109,
+   "0.5": 0.0054
+  }
+ }
+}

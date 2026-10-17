@@ -15,8 +15,9 @@ std_payload_size, port_scan_score, retransmit_ratio) but
 It is checked against the Scapy path for parity (tests/test_fast_packet_windows.py and the real-capture
 check recorded in BUILD_REPORT.md), so a feature here means the same thing as in the demo path.
 
-Limits, stated honestly: IPv4 only (IPv6 frames are skipped, exactly as load_pcap skips non-IP); Ethernet
-and Linux-cooked (SLL, link type 113 -- what the UNSW-NB15 captures use) link layers only; the first and
+Limits, stated honestly: IPv4 only (IPv6 frames are skipped, exactly as load_pcap skips non-IP); Ethernet,
+Linux-cooked (SLL, link type 113 -- what the UNSW-NB15 captures use) and raw-IP (101, 228) link layers only
+(802.1Q VLAN-tagged frames are skipped); the first and
 last window of each file are dropped because a file boundary can cut a window in half and the
 unique-port / retransmit features are not additive across files.
 """
@@ -32,8 +33,10 @@ from scapy.utils import RawPcapReader
 
 LINKTYPE_ETHERNET = 1
 LINKTYPE_LINUX_SLL = 113
-_LINK_HEADER = {LINKTYPE_ETHERNET: 14, LINKTYPE_LINUX_SLL: 16}
-_ETHERTYPE_OFFSET = {LINKTYPE_ETHERNET: 12, LINKTYPE_LINUX_SLL: 14}
+LINKTYPE_RAW = 101      # raw IP, no link header (version nibble says IPv4 or IPv6)
+LINKTYPE_IPV4 = 228     # raw IPv4, no link header (what data/raw/pcap/synthetic_sample.pcap uses)
+_LINK_HEADER = {LINKTYPE_ETHERNET: 14, LINKTYPE_LINUX_SLL: 16, LINKTYPE_RAW: 0, LINKTYPE_IPV4: 0}
+_ETHERTYPE_OFFSET = {LINKTYPE_ETHERNET: 12, LINKTYPE_LINUX_SLL: 14, LINKTYPE_RAW: -1, LINKTYPE_IPV4: -1}  # -1: no ethertype
 
 PACKET_FEATURES = [
     "mean_ttl", "var_ttl", "mean_window_size", "frag_ratio",
@@ -49,7 +52,7 @@ def _parse_chunk(frames: list[tuple[bytes, float]], link_off: int, ethertype_off
     ts, src, dst, ttl, frag, pay, sport, dport, win, seq, is_tcp, flags, l4pay, proto_l = ([] for _ in range(14))
     u16, u32 = _U16.unpack_from, _U32.unpack_from
     for data, t in frames:
-        if len(data) < link_off + 20 or u16(data, ethertype_off)[0] != 0x0800:
+        if len(data) < link_off + 20 or (ethertype_off >= 0 and u16(data, ethertype_off)[0] != 0x0800):
             continue  # not IPv4 (load_pcap skips anything without an IP layer as well)
         ihl = (data[link_off] & 0x0F) * 4
         if data[link_off] >> 4 != 4 or ihl < 20:
@@ -69,16 +72,23 @@ def _parse_chunk(frames: list[tuple[bytes, float]], link_off: int, ethertype_off
         lp = 0
         # Ports/flags exist only in the first fragment; later fragments carry no L4 header.
         if (flags_frag & 0x1FFF) == 0:
+            # L4 payload length comes from the IPv4 TOTAL LENGTH field, not from len(data): the captured
+            # frame can be longer than the IP datagram (Ethernet pads frames to 60 bytes, so a pure ACK
+            # shows 6 phantom payload bytes) and shorter than it (snaplen truncation). Total length 0
+            # (TCP segmentation offload) or nonsense falls back to the captured length.
+            ip_total = u16(data, link_off + 2)[0]
+            if ip_total < ihl:
+                ip_total = len(data) - link_off
             if proto == 6 and len(data) >= l4 + 16:
                 sp, dp = struct.unpack_from(">HH", data, l4)
                 sq = u32(data, l4 + 4)[0]
                 w = u16(data, l4 + 14)[0]
                 tcp = 1
                 fl = data[l4 + 13]
-                lp = max(len(data) - l4 - (data[l4 + 12] >> 4) * 4, 0)
+                lp = max(ip_total - ihl - (data[l4 + 12] >> 4) * 4, 0)
             elif proto == 17 and len(data) >= l4 + 4:
                 sp, dp = struct.unpack_from(">HH", data, l4)
-                lp = max(len(data) - l4 - 8, 0)
+                lp = max(ip_total - ihl - 8, 0)
         sport.append(sp); dport.append(dp); win.append(w); seq.append(sq); is_tcp.append(tcp)
         flags.append(fl); l4pay.append(lp); proto_l.append(proto)
     return {
@@ -144,7 +154,7 @@ def process_pcap(path: str | Path, window_seconds: int = 10, chunk_packets: int 
 
         def flush(final: bool) -> None:
             nonlocal buf, carry
-            cols = _parse_chunk(buf, link_off or 14, eth_off or 12)
+            cols = _parse_chunk(buf, 14 if link_off is None else link_off, 12 if eth_off is None else eth_off)
             buf = []
             if sender_rule is not None and len(cols["ts"]):
                 # Host-based captures (CIC-IDS-2018): a packet between two captured machines shows up in BOTH
@@ -244,8 +254,28 @@ FLOW_TIMEOUT_S = 120.0  # CICFlowMeter's default flow timeout: a flow longer tha
 _FLAG_BITS = {"fin_cnt": 0x01, "syn_cnt": 0x02, "rst_cnt": 0x04, "psh_cnt": 0x08, "ack_cnt": 0x10, "urg_cnt": 0x20}
 
 
+def empty_anchors() -> pd.DataFrame:
+    """`first`/`last`: first and last packet time ever seen for the 5-tuple; `tlast`: last time of a packet that
+    has already been trimmed out of the live buffer (-inf if none)."""
+    return pd.DataFrame({"first": [], "last": [], "tlast": []},
+                        index=pd.MultiIndex.from_arrays([[], [], []], names=["lo", "hi", "proto"]))
+
+
+def flow_key_stats(cols: dict[str, np.ndarray]) -> pd.DataFrame:
+    """Per bidirectional 5-tuple (lo, hi, proto): first and last packet time in `cols`. Feeds the `anchors`
+    argument of assemble_flows (the live engine keeps these across ticks)."""
+    m = np.isin(cols["proto"], (6, 17)) & (cols["sport"] >= 0)
+    if not m.any():
+        return empty_anchors()
+    a = cols["src"][m].astype(np.int64) * 65536 + cols["sport"][m]
+    b = cols["dst"][m].astype(np.int64) * 65536 + cols["dport"][m]
+    d = pd.DataFrame({"lo": np.minimum(a, b), "hi": np.maximum(a, b), "proto": cols["proto"][m].astype(np.int64), "ts": cols["ts"][m]})
+    g = d.groupby(["lo", "hi", "proto"], sort=False)["ts"]
+    return pd.DataFrame({"first": g.min(), "last": g.max(), "tlast": -np.inf})
+
+
 def assemble_flows(cols: dict[str, np.ndarray], captured_ips: np.ndarray | None = None, host_ip: int | None = None,
-                   timeout_s: float = FLOW_TIMEOUT_S) -> pd.DataFrame:
+                   timeout_s: float = FLOW_TIMEOUT_S, anchors: pd.DataFrame | None = None) -> pd.DataFrame:
     """Packets -> flow records in the schema pipeline.windowing.build_flow_windows expects.
 
     Flow = bidirectional TCP/UDP 5-tuple, cut every `timeout_s` from the flow's first packet (CICFlowMeter's 120 s
@@ -255,7 +285,12 @@ def assemble_flows(cols: dict[str, np.ndarray], captured_ips: np.ndarray | None 
 
     Host-based captures: with `captured_ips`/`host_ip` a flow is kept only in the capture of its INITIATOR (or, if the
     initiator has no capture of its own, wherever seen), so a flow between two captured machines is not counted twice.
-    Returned src_ip/dst_ip are integers (uint32); convert with ip_to_str."""
+    Returned src_ip/dst_ip are integers (uint32); convert with ip_to_str.
+
+    `anchors` (live engine only): per-5-tuple history from packets that are no longer in `cols` (see
+    empty_anchors). It keeps the timeout grid anchored at the true first packet, and packets that merely continue
+    a flow whose current timeout bucket began before `cols` are dropped (that flow belongs to the earlier window it
+    started in, which has already been emitted). With anchors=None this is the batch behaviour."""
     m = np.isin(cols["proto"], (6, 17)) & (cols["sport"] >= 0)
     if not m.any():
         return pd.DataFrame()
@@ -265,7 +300,21 @@ def assemble_flows(cols: dict[str, np.ndarray], captured_ips: np.ndarray | None 
     df["lo"], df["hi"] = np.minimum(a, b), np.maximum(a, b)
     key = ["lo", "hi", "proto"]
     first_ts = df.groupby(key, sort=False)["ts"].transform("min")
-    df["bucket"] = np.floor((df["ts"] - first_ts) / timeout_s).astype(np.int64)
+    if anchors is not None and len(anchors):
+        pos = anchors.index.get_indexer(pd.MultiIndex.from_arrays([df["lo"], df["hi"], df["proto"]]))
+        prior = np.where(pos >= 0, anchors["first"].to_numpy()[np.maximum(pos, 0)], np.inf)
+        buffer_first = first_ts.to_numpy()
+        first_ts = pd.Series(np.minimum(buffer_first, prior), index=df.index)
+        df["bucket"] = np.floor((df["ts"] - first_ts) / timeout_s).astype(np.int64)
+        # A packet whose timeout bucket already held a packet that has since been trimmed away belongs to a
+        # flow that started in an earlier (already emitted) window: it is a continuation, not a new flow.
+        tlast = np.where(pos >= 0, anchors["tlast"].to_numpy()[np.maximum(pos, 0)], -np.inf)
+        bucket_start = first_ts.to_numpy() + df["bucket"].to_numpy() * timeout_s
+        df = df[~(tlast >= bucket_start - 1e-9)].reset_index(drop=True)
+        if df.empty:
+            return pd.DataFrame()
+    else:
+        df["bucket"] = np.floor((df["ts"] - first_ts) / timeout_s).astype(np.int64)
     fk = key + ["bucket"]
     g = df.groupby(fk, sort=False)
     first = g[["src", "dst", "sport", "dport", "ts"]].first()
@@ -301,21 +350,28 @@ def assemble_flows(cols: dict[str, np.ndarray], captured_ips: np.ndarray | None 
 
 def read_all_frames(path: str | Path, max_frames: int | None = None) -> dict[str, np.ndarray]:
     """Whole capture -> parsed packet arrays (one host capture is < 1 GB, so this fits in memory)."""
+    return read_all_frames_counted(path, max_frames)[0]
+
+
+def read_all_frames_counted(path: str | Path, max_frames: int | None = None) -> tuple[dict[str, np.ndarray], int]:
+    """read_all_frames plus the number of frames read, so callers can report how many were not parsed
+    (non-IPv4, VLAN-tagged, short): len(cols["ts"]) is the parsed count."""
     buf: list[tuple[bytes, float]] = []
     with RawPcapReader(str(path)) as reader:
         is_ng = type(reader).__name__ == "RawPcapNgReader"
+        usec_scale = 1e9 if getattr(reader, "nano", False) else 1e6  # nanosecond-magic classic pcap
         linktype = None
         for data, meta in reader:
             if linktype is None:
                 linktype = meta.linktype if is_ng else reader.linktype
                 if linktype not in _LINK_HEADER:
                     raise ValueError(f"{Path(path).name}: unsupported link type {linktype}")
-            buf.append((data, ((meta.tshigh << 32) | meta.tslow) / meta.tsresol if is_ng else meta.sec + meta.usec / 1e6))
+            buf.append((data, ((meta.tshigh << 32) | meta.tslow) / meta.tsresol if is_ng else meta.sec + meta.usec / usec_scale))
             if max_frames is not None and len(buf) >= max_frames:
                 break
     if not buf:
-        return _parse_chunk([], 14, 12)
-    return _parse_chunk(buf, _LINK_HEADER[linktype], _ETHERTYPE_OFFSET[linktype])
+        return _parse_chunk([], 14, 12), 0
+    return _parse_chunk(buf, _LINK_HEADER[linktype], _ETHERTYPE_OFFSET[linktype]), len(buf)
 
 
 def ip_to_str(values: pd.Series) -> pd.Series:

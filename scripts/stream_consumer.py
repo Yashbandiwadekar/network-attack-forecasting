@@ -1,4 +1,10 @@
 """
+DEPRECATED for anything live (docs/11, docs/07 D2/D3, T16). Kept only as an offline row-batch example.
+It windows each 100-ROW batch on its own, so a 10 s window that straddles two batches is emitted twice with
+understated counts, its pacing ignores flow timestamps, its default config is the synthetic pipeline, and
+it POSTs alerts to an endpoint that exists only on the disabled app/api.py. Use app/live.py (replay or
+dumpcap tail, inside the server) instead. Not modified otherwise: tests/test_stream_consumer.py pins it.
+
 Simulated Kafka consumer for real-time streaming ingestion.
 In a real deployment, this script would connect to a Kafka broker or socket,
 maintain a rolling window of flows, and push predictions to the SIEM/SOAR API.
