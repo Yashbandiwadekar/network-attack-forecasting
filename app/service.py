@@ -68,7 +68,12 @@ def stage_disclosure_note(stage: str, is_heuristic: bool) -> str:
 def load_backend(config_path: str):
     """(config, model, scaler, shap_background). model/scaler are None when no checkpoint is
     present -- callers must handle that rather than substituting invented output."""
+    from common.bundle import bundle_dir_of, verify_bundle
+    if bundle_dir_of(config_path):
+        verify_bundle(bundle_dir_of(config_path))  # before parsing config.yaml: a tampered file must say so
     config = load_config(config_path)
+    if config.get("_bundle_dir"):
+        return _load_bundle_backend(config)
     checkpoint_dir = resolve_path(config, "checkpoint_dir")
     checkpoint_path = checkpoint_dir / "world_model_best.pt"
     scaler_path = resolve_path(config, "processed_dir") / "scaler.npz"
@@ -96,9 +101,35 @@ def load_backend(config_path: str):
     return config, model, scaler, background
 
 
+# bundle dir -> verify_bundle() summary, filled by _load_bundle_backend (read by /api/v1/health).
+BUNDLE_STATUS: dict[str, dict] = {}
+
+
+def _load_bundle_backend(config: dict):
+    """Bundle path of load_backend. Unlike the config path it NEVER returns (config, None, ...):
+    a bundle that fails verification raises BundleError, because serving a model whose checksum or
+    feature schema does not match its manifest is worse than not serving. Nothing here reads data/,
+    writes into the bundle, or regenerates shap_background.npy (the API never uses it, QC-20)."""
+    from common.bundle import verify_bundle
+
+    bundle_dir = config["_bundle_dir"]
+    status = verify_bundle(bundle_dir)  # raises BundleError on checksum / schema / encoder mismatch
+    model, _ = load_world_model(resolve_path(config, "checkpoint_dir") / "world_model_best.pt")
+    scaler = FeatureScaler.load(resolve_path(config, "processed_dir") / "scaler.npz")
+    BUNDLE_STATUS[bundle_dir] = status
+    return config, model, scaler, None
+
+
+def bundle_status(config: dict) -> dict | None:
+    """Verification summary for a bundle-backed config, else None."""
+    bundle_dir = config.get("_bundle_dir")
+    return BUNDLE_STATUS.get(bundle_dir) if bundle_dir else None
+
+
 def clear_backend_cache() -> None:
     """Clear cached model and scaler instances."""
     load_backend.cache_clear()
+    BUNDLE_STATUS.clear()
 
 
 def is_flow_only_model(config: dict) -> bool:

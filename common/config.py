@@ -14,13 +14,31 @@ def load_config(config_path: str | Path = "configs/default.yaml") -> dict[str, A
     if not path.is_absolute():
         path = PROJECT_ROOT / path
     with open(path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        config = yaml.safe_load(f)
+    # A model bundle (scripts/make_model_bundle.py) is a self-contained folder: its config.yaml sits
+    # next to a MANIFEST.json. Such a config is pinned to ITS OWN directory (never PROJECT_ROOT, never
+    # the global PHOENIX_*_DIR overrides -- QC-11), so serving a bundle cannot touch data/ or V:.
+    if path.name == "config.yaml" and (path.parent / "MANIFEST.json").is_file():
+        bundle_dir = path.parent.resolve()
+        config["_bundle_dir"] = str(bundle_dir)
+        config["paths"] = {
+            "checkpoint_dir": str(bundle_dir / "checkpoint"),
+            "processed_dir": str(bundle_dir / "processed"),
+            # Training-time inputs; deliberately absent from a bundle.
+            "raw_flow_dir": str(bundle_dir / "_not_in_bundle" / "raw_flow"),
+            "raw_pcap_dir": str(bundle_dir / "_not_in_bundle" / "raw_pcap"),
+        }
+    return config
 
 
 def resolve_path(config: dict[str, Any], key: str) -> Path:
     """Resolve a paths.<key> entry from config relative to the project root,
     with support for environment variable overrides and machine-independent paths."""
     import os
+
+    # Bundle configs are pinned to their own folder: ignore every env override and every fallback.
+    if config.get("_bundle_dir"):
+        return Path(config["paths"][key])
 
     # Check environment variable overrides first
     env_var_map = {

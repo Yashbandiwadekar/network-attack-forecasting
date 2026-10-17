@@ -8,6 +8,8 @@ frontend needs no build-time knowledge of the host's address.
     python -m scripts.serve --lan           # bind 0.0.0.0 and print the LAN URL to open
     python -m scripts.serve --lan --port 80 # a port a phone will reach without a suffix
     python -m scripts.serve --config v1     # serve the v1 (leaky-split) model; default is v2
+    python -m scripts.serve --bundle dist/models/seed1 --host 0.0.0.0   # self-contained model bundle
+                                            # (docs/10); needs no data/ folder, V: drive or GPU
 
 The model defaults to configs/real_data_v2_converged_seed1.yaml (day-disjoint, lowest-val-loss seed;
 see docs/04-evaluation-real-v2-seeds.md). `--config v2-unseeded` selects the older unseeded run.
@@ -74,11 +76,18 @@ def main() -> None:
     parser.add_argument("--config", default=None,
                         help="model to serve: v1, v2 (default) or a configs/*.yaml path; "
                              "also settable via $PHOENIX_CONFIG")
+    parser.add_argument("--bundle", default=None,
+                        help="serve a model bundle directory (scripts/make_model_bundle.py); "
+                             "also settable via $PHOENIX_BUNDLE. Verified against MANIFEST.json at startup.")
     parser.add_argument("--rebuild", action="store_true", help="rebuild the dashboard even if a build exists")
     args = parser.parse_args()
 
+    if args.bundle and args.config:
+        parser.error("--bundle and --config are mutually exclusive")
     if args.config:
         os.environ["PHOENIX_CONFIG"] = args.config
+    if args.bundle:
+        os.environ["PHOENIX_BUNDLE"] = str(Path(args.bundle).resolve())
 
     have_frontend = build_frontend(args.rebuild)
     host = args.host or ("0.0.0.0" if args.lan else "127.0.0.1")
@@ -93,10 +102,15 @@ def main() -> None:
         from app.server import STATE, check_model_artifacts
         config_path = STATE.config_path  # resolved (and validated to exist) when app.server is imported
         check_model_artifacts(config_path)
-    except RuntimeError as exc:  # ModelUnavailableError
+    except RuntimeError as exc:  # ModelUnavailableError / BundleError
         print(f"[!] {exc}", file=sys.stderr)
         sys.exit(2)
     print(f"    model   {config_path}")
+    if os.environ.get("PHOENIX_BUNDLE"):
+        from common.bundle import verify_bundle
+        v = verify_bundle(os.environ["PHOENIX_BUNDLE"])
+        print(f"    bundle  {v['name']}  checksums OK ({v['n_files']} files)  "
+              f"manifest sha256 {v['manifest_sha256'][:16]}...")
     if host == "0.0.0.0":
         ip = lan_ip()
         if ip:

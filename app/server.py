@@ -154,8 +154,20 @@ class ModelUnavailableError(RuntimeError):
 def resolve_config_choice(choice: str | None = None) -> str:
     """The config path the server should serve: explicit choice, else $PHOENIX_CONFIG, else the v2
     default. Accepts the aliases v1/v2 or a path (relative to the project root, or absolute)."""
+    bundle_env = (os.environ.get("PHOENIX_BUNDLE") or "").strip()
+    if bundle_env and not choice:
+        if os.environ.get("PHOENIX_CONFIG"):
+            raise ModelUnavailableError(
+                "Both PHOENIX_BUNDLE and PHOENIX_CONFIG are set; pick one (a bundle is self-contained).")
+        choice = bundle_env
     raw = (choice or os.environ.get("PHOENIX_CONFIG") or DEFAULT_CONFIG).strip()
     raw = CONFIG_ALIASES.get(raw.lower(), raw)
+    # A model bundle directory (scripts/make_model_bundle.py): serve its config.yaml. The path is
+    # resolved against the current directory, not PROJECT_ROOT, so it can live anywhere.
+    if (Path(raw) / "MANIFEST.json").is_file():
+        return str((Path(raw) / "config.yaml").resolve())
+    if bundle_env and raw == bundle_env:
+        raise ModelUnavailableError(f"PHOENIX_BUNDLE={bundle_env!r} is not a model bundle (no MANIFEST.json).")
     path = Path(raw)
     if not path.is_absolute():
         path = PROJECT_ROOT / path
@@ -173,6 +185,12 @@ def resolve_config_choice(choice: str | None = None) -> str:
 def check_model_artifacts(config_path: str) -> None:
     """Fail loudly, naming the missing file, rather than serving 503s later. Existence check only;
     the full load happens on first use."""
+    from common.bundle import bundle_dir_of, verify_bundle
+    if bundle_dir_of(config_path):
+        # Full SHA256 + feature-schema + encoder verification, not just existence. BundleError is a
+        # RuntimeError, so scripts/serve.py aborts startup and the lifespan hook refuses to start.
+        verify_bundle(bundle_dir_of(config_path))
+        return
     config = load_config(config_path)
     ckpt = resolve_path(config, "checkpoint_dir") / "world_model_best.pt"
     scaler = resolve_path(config, "processed_dir") / "scaler.npz"
@@ -194,6 +212,14 @@ def _display_path(path: Path) -> str:
 
 def model_info(config_path: str) -> dict[str, Any]:
     config = load_config(config_path)
+    if config.get("_bundle_dir"):
+        from common.bundle import read_manifest
+        return {
+            "model_name": read_manifest(config["_bundle_dir"])["model_name"],
+            "config_path": "<bundle>/config.yaml",
+            "checkpoint_dir": "<bundle>/checkpoint",
+            "checkpoint_path": "<bundle>/" + "checkpoint/world_model_best.pt",
+        }
     return {
         "model_name": Path(config_path).stem,
         "config_path": config_path,
@@ -210,6 +236,8 @@ class _State:
         self.config_path: str = resolve_config_choice()
         self.dataset_id: str = next(
             (i for i, c, _ in MODEL_REGISTRY if c == self.config_path), Path(self.config_path).stem)
+        if Path(self.config_path).name == "config.yaml" and (Path(self.config_path).parent / "MANIFEST.json").is_file():
+            self.dataset_id = Path(self.config_path).parent.name  # bundle
         self.flow_df = None
         self.windows = None
         self.batch = None          # BatchForecastResult
@@ -245,6 +273,13 @@ def _engine() -> tuple[ForecastEngine, dict[str, Any]]:
 
 def _ledger_path() -> Path:
     config, _, _, _ = service.load_backend(STATE.config_path)
+    if config.get("_bundle_dir"):
+        # Bundles are read-only inputs; the ledger lives in a separate writable state dir
+        # ($PHOENIX_STATE_DIR, default <bundle>/state), outside the manifest.
+        from common.bundle import bundle_state_dir
+        state = bundle_state_dir(config["_bundle_dir"])
+        state.mkdir(parents=True, exist_ok=True)
+        return state / "audit_ledger.jsonl"
     return resolve_path(config, "checkpoint_dir") / "audit_ledger.jsonl"
 
 
@@ -377,6 +412,9 @@ def read_root():
         "checkpoint_loaded": model is not None,
         **model_info(STATE.config_path),
         **service.horizon_info(config),
+        # Present only when serving a bundle: proof the files matched MANIFEST.json at load.
+        **({"bundle": service.bundle_status(config)} if config.get("_bundle_dir") else {}),
+        "device": str(next(model.parameters()).device) if model is not None else None,
     }
 
 
@@ -385,6 +423,21 @@ def _dataset_registry() -> list[dict[str, Any]]:
     Separates dataset availability (processed data / metadata) from model checkpoint availability,
     and returns machine-independent path and capability data."""
     out: list[dict[str, Any]] = []
+    if Path(STATE.config_path).name == "config.yaml" and (Path(STATE.config_path).parent / "MANIFEST.json").is_file():
+        # Bundle mode: the only model on this machine is the bundle. The repo's other configs would
+        # all report "unavailable" (no checkpoints / data here), which is noise.
+        cfg = load_config(STATE.config_path)
+        _, model, scaler, _ = service.load_backend(STATE.config_path)
+        meta = json.loads((resolve_path(cfg, "processed_dir") / "metadata.json").read_text(encoding="utf-8"))
+        info = model_info(STATE.config_path)
+        return [{
+            "id": STATE.dataset_id, "name": f"{info['model_name']} (bundle)", "config": STATE.config_path,
+            "status": "Available", "total_sequences": meta.get("num_sequences"),
+            "features": len(meta.get("feature_columns", [])) or None,
+            "checkpoint_loaded": True, "dataset_available": False, "checkpoint_available": True,
+            "can_select": True, "can_forecast": model is not None and scaler is not None, "reason": None,
+            "checkpoint_path": info["checkpoint_path"], "processed_dir": "<bundle>/processed",
+        }]
     for ds_id, cfg_rel, display_name in MODEL_REGISTRY:
         cfg_name = Path(cfg_rel).name
         cfg_path = PROJECT_ROOT / "configs" / cfg_name
