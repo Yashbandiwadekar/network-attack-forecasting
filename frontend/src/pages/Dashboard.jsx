@@ -303,12 +303,37 @@ const Dashboard = () => {
                     <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--text-3)', marginTop: '0.9rem', lineHeight: 1.6 }}>
                       {evalMetrics.n_test_sequences?.toLocaleString()} test sequences
                       ({evalMetrics.n_test_positive?.toLocaleString()} positive),
-                      mean ± SD over {evalMetrics.n_seeds} independent training runs.
+                      The cards above: mean ± SD over {evalMetrics.n_seeds} independent training runs.
                       Source: {evalMetrics.source}
                       {evalMetrics.note && (
                         <div style={{ marginTop: '0.4rem', color: 'var(--text-2)' }}>{evalMetrics.note}</div>
                       )}
                     </div>
+                    {evalMetrics.served_model && (
+                      <div data-testid="served-model-metrics" style={{ marginTop: '0.9rem', padding: '0.8rem 1rem', background: 'var(--bg-panel-2)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-mono)', fontSize: '0.72rem', lineHeight: 1.6 }}>
+                        <div style={{ color: 'var(--text-3)' }}>
+                          SERVED MODEL (this checkpoint only, single run — not the mean above): {evalMetrics.served_model.model_name}
+                          {' · '}{evalMetrics.served_model.checkpoint_path}
+                        </div>
+                        {evalMetrics.served_model.available ? (
+                          <div style={{ marginTop: '0.3rem' }}>
+                            {[
+                              ['AUROC', 'auroc'], ['AUPRC', 'auprc'], ['PRECISION @ 0.5', 'precision_at_0.5'],
+                              ['RECALL @ 0.5', 'recall_at_0.5'], ['F1 @ 0.5', 'f1_at_0.5'],
+                            ].map(([label, key]) => (
+                              <span key={key} style={{ marginRight: '1.2rem' }}>
+                                {label} <strong>{evalMetrics.served_model.metrics[key]?.toFixed(3)}</strong>
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                        <div style={{ color: 'var(--text-2)', marginTop: '0.3rem' }}>
+                          {evalMetrics.served_model.note}
+                          {evalMetrics.served_model.selection_rule && ` Selection rule: ${evalMetrics.served_model.selection_rule}`}
+                          {evalMetrics.served_model.val_loss != null && ` (val loss ${evalMetrics.served_model.val_loss}).`}
+                        </div>
+                      </div>
+                    )}
                     {evalMetrics.generalisation_lofo && (
                       <div style={{ marginTop: '1.2rem' }}>
                         <div className="panel-header-mono" style={{ marginBottom: '0.8rem', fontSize: '0.92rem', color: 'var(--text-1-dim)' }}>

@@ -9,7 +9,8 @@ frontend needs no build-time knowledge of the host's address.
     python -m scripts.serve --lan --port 80 # a port a phone will reach without a suffix
     python -m scripts.serve --config v1     # serve the v1 (leaky-split) model; default is v2
 
-The model defaults to configs/real_data_v2_converged.yaml (day-disjoint, the README headline).
+The model defaults to configs/real_data_v2_converged_seed1.yaml (day-disjoint, lowest-val-loss seed;
+see docs/04-evaluation-real-v2-seeds.md). `--config v2-unseeded` selects the older unseeded run.
 --config (or $PHOENIX_CONFIG) takes v1, v2, or a path to a configs/*.yaml file. Startup aborts with
 a clear message if that model's checkpoint or scaler is missing.
 

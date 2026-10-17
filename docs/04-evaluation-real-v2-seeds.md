@@ -63,3 +63,27 @@ document supersedes it as the number to quote.
   which days land in test (see E7, and the concentration noted in G2).
 - E10 remains open for everything else: the LOFO folds, the cross-dataset evaluations and the
   packet-aware pilots are all still single runs or have their own separate seed sets.
+
+## Which checkpoint is served (A1 truth pass, 2026-10-17)
+
+The server used to load the unseeded run (F1 0.370 / AUROC 0.706, below all three seeds) while the
+dashboard displayed the 3-seed mean. It now serves one of the seeds, picked by a rule stated before
+looking at any test metric: **the seed with the lowest validation loss.** Best val loss per run,
+from `logs/seeds_v2_converged.log` (the checkpoints do not store it):
+
+| Seed | Best val loss | Served? |
+|---|---|---|
+| **seed 1** | **0.7579** | **yes** |
+| seed 2 | 0.8327 | no |
+| seed 3 | 0.8555 | no |
+
+Seed 1 is not the best seed on test F1 (seed 2) or AUROC (seed 3); it was not selected on test. Its
+own test row: F1 0.466, precision 0.903, recall 0.314, AUROC 0.800, AUPRC 0.651. Served via
+`configs/real_data_v2_converged_seed1.yaml` (checkpoint `checkpoints_real_v2_converged/seed1/world_model_best.pt`,
+same `data/processed_real_v2_converged` dataset and 41-wide scaler all three seeds trained on). The
+seed-1 file already carries `feature_names`, so the W19 schema guard runs on load
+(`tests/test_feature_schema_guard.py`); `scripts/backfill_feature_names.py` had nothing to write for
+it. The unseeded checkpoint has no `feature_names` and the backfill script cannot derive them (no
+embedded config key it reads), so it remains unguarded; it is selectable as `--config v2-unseeded`.
+`/api/v1/eval/metrics` returns the served model's row under `served_model`, separate from the
+across-seed mean.

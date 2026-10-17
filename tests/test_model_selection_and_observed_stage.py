@@ -28,7 +28,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SAMPLE_CSV = PROJECT_ROOT / "data" / "raw" / "flows" / "synthetic_sample.csv"
 SAMPLE_PCAP = PROJECT_ROOT / "data" / "raw" / "pcap" / "synthetic_sample.pcap"
 V1 = "configs/real_data.yaml"
-V2 = "configs/real_data_v2_converged.yaml"
+V2 = "configs/real_data_v2_converged_seed1.yaml"  # served default (A1: lowest val loss of seeds 1-3)
+V2_UNSEEDED = "configs/real_data_v2_converged.yaml"
 
 needs_sample = pytest.mark.skipif(not SAMPLE_CSV.exists(), reason="synthetic sample not present")
 
@@ -59,7 +60,8 @@ def test_default_model_is_the_v2_day_disjoint_checkpoint(monkeypatch):
 
 
 @pytest.mark.parametrize("choice, expected", [
-    ("v1", V1), ("V2", V2), (V1, V1), ("configs/real_data_v2_converged.yaml", V2),
+    ("v1", V1), ("V2", V2), (V1, V1), ("configs/real_data_v2_converged.yaml", V2_UNSEEDED),
+    ("v2-unseeded", V2_UNSEEDED), (V2, V2),
 ])
 def test_env_var_selects_model(monkeypatch, choice, expected):
     monkeypatch.setenv("PHOENIX_CONFIG", choice)
@@ -122,10 +124,11 @@ def test_health_and_status_report_the_active_model(client, restore_state):
     STATE.config_path = V2
     health = client.get("/api/v1/health").json()
     assert health["config_path"] == V2
-    assert health["model_name"] == "real_data_v2_converged"
-    assert health["checkpoint_dir"] == "checkpoints_real_v2_converged"
+    assert health["model_name"] == "real_data_v2_converged_seed1"
+    assert health["checkpoint_dir"] == "checkpoints_real_v2_converged/seed1"
+    assert health["checkpoint_path"] == "checkpoints_real_v2_converged/seed1/world_model_best.pt"
     status = client.get("/api/v1/system/status").json()
-    assert status["model_name"] == "real_data_v2_converged"
+    assert status["model_name"] == "real_data_v2_converged_seed1"
 
     STATE.config_path = V1
     assert client.get("/api/v1/health").json()["model_name"] == "real_data"

@@ -381,3 +381,47 @@ def test_spa_fallback_cannot_escape_the_build_directory(client: TestClient):
     resp = client.get("/../../app/server.py")
     assert resp.status_code in (200, 404)
     assert "uvicorn.run" not in resp.text
+
+
+# ----------------------------------------------------------------- A1: served model's own metrics
+
+def _results():
+    return json.loads((PROJECT_ROOT / "docs" / "v2_converged_seed_results.json").read_text())
+
+
+def test_eval_metrics_report_served_model_separately_from_the_mean(client: TestClient):
+    from app.server import DEFAULT_CONFIG, STATE
+    saved = STATE.config_path  # other test modules leave STATE on a different model
+    STATE.config_path = DEFAULT_CONFIG
+    try:
+        body = client.get("/api/v1/eval/metrics").json()
+    finally:
+        STATE.config_path = saved
+    served = body["served_model"]
+    assert served["available"] is True
+    assert served["model_name"] == "real_data_v2_converged_seed1"
+    assert served["results_key"] == "seed1"
+    row = _results()["per_run"]["seed1"]
+    assert served["metrics"]["auroc"] == round(row["auroc"], 4)
+    assert served["metrics"]["f1_at_0.5"] == round(row["f1@0.5"], 4)
+    # separate from, and not equal to, the 3-seed mean
+    assert served["metrics"]["auroc"] != body["auroc"]["mean"]
+    assert body["auroc"]["mean"] == round(_results()["across_seeds"]["auroc"]["mean"], 4)
+    # selection was by validation loss: the served seed has the lowest recorded val loss
+    losses = served["seed_val_losses"]
+    assert served["results_key"] == min(losses, key=losses.get)
+
+
+def test_eval_metrics_follow_the_active_model(client: TestClient):
+    from app.server import STATE
+    saved = STATE.config_path
+    try:
+        STATE.config_path = "configs/real_data_v2_converged.yaml"
+        served = client.get("/api/v1/eval/metrics").json()["served_model"]
+        assert served["results_key"] == "unseeded (shipped)"
+        assert served["metrics"]["auroc"] == round(_results()["per_run"]["unseeded (shipped)"]["auroc"], 4)
+        STATE.config_path = "configs/real_data.yaml"
+        served = client.get("/api/v1/eval/metrics").json()["served_model"]
+        assert served["available"] is False and served["metrics"] is None
+    finally:
+        STATE.config_path = saved

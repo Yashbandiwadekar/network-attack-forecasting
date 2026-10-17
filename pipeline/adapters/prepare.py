@@ -48,15 +48,21 @@ def protected_paths() -> list[Path]:
     prot = [p for p in data.glob("processed*") if p.name != "processed_adapter"]
     prot += list(root.glob("checkpoints*")) + [root / "configs", data / "raw", data / "threat_intel",
                                                 root / "pipeline", root / "models", root / "docs"]
+    # data/raw/* entries may be junctions/symlinks to another drive; protect their targets too.
+    if (data / "raw").is_dir():
+        prot += list((data / "raw").iterdir())
     return [p.resolve() for p in prot]
 
 
 def check_out_dir(out: str | Path, force: bool = False) -> Path:
     """Refuse an --out that equals / sits inside / contains a protected path (path COMPONENTS, not
     string prefixes: data/processed_adapter/x is fine, data/processed/x and data/processed_real_v2 are not)."""
+    unresolved = Path(os.path.abspath(out))
     out = Path(out).resolve()
     for p in protected_paths():
-        if out == p or p in out.parents or out in p.parents:
+        # Check the resolved path and the as-typed path: a junction (e.g. data/raw/flows_real -> V:)
+        # would otherwise move the resolved path outside the protected tree.
+        if any(c == p or p in c.parents or c in p.parents for c in (out, unresolved)):
             raise PrepareError(f"refusing --out {out}: it overlaps protected path {p}. "
                                "Use a NEW directory, e.g. data/processed_adapter/<name>/")
     if out.exists():

@@ -133,13 +133,14 @@ python -m eval.benchmark --train-config configs/real_data.yaml \
 | `app/server.py`, `app/service.py` | REST API for the React dashboard (forecast, explainability, narrative, CERT-In report, audit ledger) and the headless pipeline behind it |
 | `frontend/` | React + Vite dashboard: alert table, 60-second forecast timeline, explainability, 3D network field |
 | `scripts/` | Synthetic sample generation, benign-traffic augmentation, robustness and adversarial checks, one-off data-inspection scripts |
-| `configs/` | `default.yaml` (synthetic), `real_data.yaml` (CIC-IDS-2018), `ctu13*.yaml` — windowing, features and hyperparameters |
+| `configs/` | `default.yaml` (synthetic), `real_data.yaml` (CIC-IDS-2018, v1), `real_data_v2_converged_seed1.yaml` (served model), `ctu13*.yaml` — windowing, features and hyperparameters |
 | `docs/` | Problem statement, architecture, dataset notes, MITRE mapping, evaluation reports, related work, audit |
 
 ## Tests
 
 ```bash
-pytest tests/       # 157 tests
+pytest tests/       # 542 tests (541 pass; one, test_adapter_prepare's flows_real guard case, fails when
+                    # data/raw/flows_real is a symlink to another drive, as on the dev machine)
 ```
 
 ## Results (real CIC-IDS-2018)
@@ -159,6 +160,17 @@ Day-disjoint split (no attack session appears in both train and test), 7,191 tes
 three independent training runs. The model is consistently *conservative*: precision holds at 0.93
 across seeds while recall sits at 0.33 — what it flags is almost always right, but it misses most
 attack windows on an honest split.
+
+**The model the server loads by default is one of those three runs, not the mean.** It is the
+seed-1 checkpoint (`configs/real_data_v2_converged_seed1.yaml` ->
+`checkpoints_real_v2_converged/seed1/world_model_best.pt`), chosen because it has the lowest
+validation loss of the three seeds (0.7579 vs 0.8327 and 0.8555), a rule fixed before looking at
+test results. Its own test metrics, on the same 7,191 sequences, are F1 0.466, precision 0.903,
+recall 0.314, AUROC 0.800, AUPRC 0.651 (`docs/v2_converged_seed_results.json`, row `seed1`); the
+numbers in the table above are the 3-seed mean. `/api/v1/health` names the served model, and
+`/api/v1/eval/metrics` and the dashboard show its own row separately from the mean. The earlier
+unseeded checkpoint (F1 0.370 / AUROC 0.706) is still on disk and selectable with
+`--config v2-unseeded`.
 
 ### Why an earlier, higher number is not quoted
 
@@ -194,12 +206,18 @@ per-host data in CIC-IDS-2018 (see E7) — the limitation is the dataset's struc
 model.
 
 Zero-shot on CTU-13 (trained on CIC-IDS-2018, never fine-tuned): **the model does not transfer.**
-Recomputed against the shipped checkpoint and the current CTU-13 build: F1 0.009 at the 5% FPR
-budget, AUROC 0.517 (chance level), stage macro-F1 0.328 (attack-class F1 0.000). An earlier
-version of this README quoted F1 0.534; that number came from a 33-feature checkpoint and dataset
-build that no longer exist and is withdrawn (see `docs/AUDIT.md` G1). The model struggles with the
-domain shift between the datasets' fundamental feature scales -- generalising across different
-network topologies and packet-capture tools remains a significant challenge.
+After the CTU-13 label fix (D-1), the day-disjoint v2 checkpoint `checkpoints_real_v2/` (not the
+served seed-1 model) scores AUROC 0.7804 on CTU-13, but this is **detection of ongoing botnet C2
+traffic, not forecasting**: AUPRC is only 0.070, F1 at the 0.5 threshold is about 0, the corrected
+test set contains no benign-to-attack onsets, and a stacked logistic regression trained natively
+on CTU-13 gets 0.7811, so it does not beat a shallow in-domain baseline
+(`docs/04-evaluation-ctu13_cross_from_real_data_v2_postD1.md`). The v1 checkpoint is at chance (AUROC about 0.52) on both the old and the corrected labels; the
+earlier headline CTU-13 AUROC in this README came from that v1 checkpoint on pre-fix labels and is
+superseded. An even earlier version of this README
+quoted F1 0.534; that number came from a 33-feature checkpoint and dataset build that no longer
+exist and is withdrawn (see `docs/AUDIT.md` G1). Generalising across different network topologies
+and packet-capture tools remains a significant challenge. The served seed-1 model has not been
+scored on CTU-13.
 
 ## What this system does not do
 
@@ -210,10 +228,12 @@ and links to the report it comes from.
   attack windows go unflagged. Precision is the strong side (0.931 ± 0.024): what it flags is
   almost always real. Use it as a second signal beside existing detection, not as sole coverage.
   (`docs/04-evaluation-real-v2-seeds.md`)
-- **It does not warn early.** Measured lead time over 628 benign-to-attack transitions is
-  **−0.5 s mean, +0.0 s median** — it alarms *at* onset, fractionally late, not before. 93.5% of
-  transitions are missed entirely and alarm precision at that operating point is 1.5%.
-  (`docs/04-evaluation-real-v2.md`)
+- **Early warning is not demonstrated.** The earlier lead-time figures (measured on 628
+  benign-to-attack transitions, which come from about 15 episodes on 3 pseudo-hosts) used a
+  definition of "early" that has since been tightened (audit QC-3) and were measured on a
+  different checkpoint than the one now served. Lead-time numbers are **pending re-run under the
+  QC-3 definition** on the served model and are not quoted here. (`docs/04-evaluation-real-v2.md`
+  holds the old measurement.)
 - **The headline is a t+1 number.** F1 0.481 / AUROC 0.794 measure **one step — 10 seconds —
   ahead**, not 60. The evaluation path runs a single forward pass.
   (`docs/04-evaluation-frozen-state-ablation.md`)
@@ -223,7 +243,7 @@ and links to the report it comes from.
   produces the trajectory, stages and what-if path; it does not improve infiltration ranking.
   (`docs/04-evaluation-frozen-state-ablation.md`)
 - **No demonstrated generalisation to unseen attack families or datasets.** Leave-one-family-out
-  is chance-level on three of four families; zero-shot CTU-13 is AUROC 0.517.
+  is chance-level on three of four families; zero-shot CTU-13 is detection only (AUROC 0.7804, AUPRC 0.070, no better than a native LR at 0.7811).
   (`docs/04-evaluation-lofo-seeds.md`, `docs/AUDIT.md` G1)
 - **Single dataset, single network.** Trained on CIC-IDS-2018 only. Cross-network transfer is a
   known-hard problem in this literature and this project is a textbook instance of the collapse,
@@ -246,18 +266,21 @@ These are documented rather than hidden. `docs/AUDIT.md` is the full list with m
 - **Lead-time metric rests on narrow events.** The day-disjoint re-measure covers 628
   benign-to-attack transitions (the earlier "32 transitions" figure predates it), but they come
   from 3 network-wide pseudo-hosts with 96% from a single day, so the sample is wide in count and
-  narrow in origin. False alarms are now counted (audit E3): 93.5% of transitions missed, 1.5%
-  alarm precision.
+  narrow in origin. False alarms are counted (audit E3). The resulting lead-time and alarm-precision
+  figures are pending re-run under the QC-3 definition (see above).
 - **3 of 5 MITRE stages on real data.** CIC-IDS-2018 has no Reconnaissance or Exfiltration labels.
   DoS/DDoS is mapped to `impact`, which is excluded from the 5-way stage task.
 - **Flow-only in practice.** Packet-level features are implemented, but no CIC-IDS-2018 PCAP is
   downloaded (37 GB/day), so the real-data model is trained with them zero-filled.
-- **Demo input.** The upload path accepts a flow CSV (labelled or unlabelled); a PCAP can supplement
-  it but cannot yet be used on its own.
-- **Fabricated benign traffic in v2.** The v2 (day-disjoint) validation and test sets contain
-  17-27% fabricated benign traffic generated by an augment script.
-- **Adversarial evasion works, but only under a specific threat model (audit W11, re-measured
-  2026-09-23 on the current 41-feature checkpoint).** A white-box PGD attack that perturbs only
+- **Demo input.** The upload path accepts a flow CSV (labelled or unlabelled), a PCAP/PCAPNG on its
+  own (flow records are derived from the packets; fixed in audit S4), or both. A PCAP-only upload
+  has no ground-truth labels, so the observed stage is reported as unknown.
+- **Fabricated benign traffic.** The earlier v2 runs (`docs/04-evaluation-real-v2.md`'s first
+  version) had val/test sets with 17-27% fabricated benign traffic from an augment script. The
+  converged config behind the headline above drops those fabricated days (04-01, 04-02) from val
+  and test entirely.
+- **Adversarial evasion works, but only under a specific threat model (audit W11, measured
+  2026-09-23 on a 41-feature checkpoint other than the one now served).** A white-box PGD attack that perturbs only
   the most recent window's raw features drives the t+1 infiltration probability from 0.9975 to
   0.0000 within an epsilon=1.5-std budget (`scripts/check_adversarial_robustness.py`). **What this
   attack actually requires, stated precisely rather than left implicit:** the top perturbed
@@ -285,10 +308,11 @@ These are documented rather than hidden. `docs/AUDIT.md` is the full list with m
     logic (that would need its own tuning and a wider evaluation than one synthetic attack
     capture); it is reported here as evidence for the threat model above, not as a claim the
     vulnerability is closed.
-- **Both robustness scripts are broken.** `scripts/check_robustness.py` and
-  `scripts/check_adversarial_robustness.py` build their windows without the 8 `graph_embed_*`
-  columns added in the GNN work, so they raise `KeyError` against the current 41-feature
-  checkpoints. Neither check has run since that schema change.
+- **Robustness scripts: code fixed, not re-run on the served model.** `scripts/check_robustness.py`
+  and `scripts/check_adversarial_robustness.py` used to build their windows without the 8
+  `graph_embed_*` columns and raised `KeyError` against the 41-feature checkpoints; both now call
+  `merge_graph_embedding_features`. The adversarial numbers quoted above were measured on
+  2026-09-23 on a checkpoint that is not the served seed-1 model, and have not been re-run on it.
 
 ## Deliverables checklist (per problem statement)
 

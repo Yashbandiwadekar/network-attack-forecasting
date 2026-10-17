@@ -126,19 +126,22 @@ def _require_token(authorization: str | None = Security(_api_key_header)) -> Non
 
 # ---------------------------------------------------------------- server state
 
-# Model selection. The day-disjoint v2 checkpoint is the one every README number comes from;
-# v1 (configs/real_data.yaml) was trained on the leaky per-host split whose 0.917 F1 was withdrawn,
-# so it stays selectable but is never the default. Override with PHOENIX_CONFIG (an alias below or
+# Model selection. The default is the seed-1 run of the day-disjoint v2 model (A1 truth pass: lowest
+# validation loss of seeds 1-3, rule fixed before looking at test; see the header of
+# configs/real_data_v2_converged_seed1.yaml). The earlier unseeded v2 checkpoint (F1 0.370, below
+# every seed) stays selectable as "v2-unseeded". v1 (configs/real_data.yaml) was trained on the
+# leaky per-host split whose 0.917 F1 was withdrawn, so it stays selectable but is never the default. Override with PHOENIX_CONFIG (an alias below or
 # a config path) or `python -m scripts.serve --config ...`.
-DEFAULT_CONFIG = "configs/real_data_v2_converged.yaml"
+DEFAULT_CONFIG = "configs/real_data_v2_converged_seed1.yaml"
 CONFIG_ALIASES = {
-    "v2": "configs/real_data_v2_converged.yaml",
+    "v2": "configs/real_data_v2_converged_seed1.yaml",
+    "v2-unseeded": "configs/real_data_v2_converged.yaml",
     "v1": "configs/real_data.yaml",
 }
 # (dataset id, config, display name) for the dataset registry / dashboard dropdown.
 MODEL_REGISTRY = (
     ("CIC-IDS-2018", "configs/real_data.yaml", "CIC-IDS-2018 (v1, leaky split)"),
-    ("CIC-IDS-2018-v2", "configs/real_data_v2_converged.yaml", "CIC-IDS-2018 (v2, day-disjoint)"),
+    ("CIC-IDS-2018-v2", "configs/real_data_v2_converged_seed1.yaml", "CIC-IDS-2018 (v2, day-disjoint, seed 1)"),
     ("UNSW-NB15", "configs/unsw_nb15.yaml", "UNSW-NB15"),
     ("CTU-13", "configs/ctu13.yaml", "CTU-13"),
 )
@@ -182,12 +185,20 @@ def check_model_artifacts(config_path: str) -> None:
         )
 
 
+def _display_path(path: Path) -> str:
+    try:
+        return path.relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return str(path)
+
+
 def model_info(config_path: str) -> dict[str, Any]:
     config = load_config(config_path)
     return {
         "model_name": Path(config_path).stem,
         "config_path": config_path,
-        "checkpoint_dir": resolve_path(config, "checkpoint_dir").name,
+        "checkpoint_dir": _display_path(resolve_path(config, "checkpoint_dir")),
+        "checkpoint_path": _display_path(resolve_path(config, "checkpoint_dir") / "world_model_best.pt"),
     }
 
 
@@ -1107,6 +1118,39 @@ def download_report(filename: str):
     )
 
 
+_SERVED_METRIC_KEYS = (
+    ("auroc", "auroc"), ("auprc", "auprc"), ("f1_at_0.5", "f1@0.5"),
+    ("precision_at_0.5", "precision@0.5"), ("recall_at_0.5", "recall@0.5"),
+)
+
+
+def _served_model_metrics(data: dict[str, Any]) -> dict[str, Any]:
+    """The test metrics of the checkpoint this server is actually scoring with, read from the same
+    results file (one row of `per_run`), kept apart from the 3-seed mean. Returns an explicit
+    "no matching row" record rather than borrowing the mean when the active model has none."""
+    config = load_config(STATE.config_path)
+    serving = config.get("serving") or {}
+    info = model_info(STATE.config_path)
+    out: dict[str, Any] = {
+        "model_name": info["model_name"], "checkpoint_path": info["checkpoint_path"],
+        "selection_rule": serving.get("selection_rule"),
+        "val_loss": serving.get("val_loss"), "seed_val_losses": serving.get("seed_val_losses"),
+    }
+    row = (data.get("per_run") or {}).get(serving.get("results_key", ""))
+    if row is None:
+        out.update(available=False, metrics=None,
+                   note="No test metrics on file for the active model; the figures above are the "
+                        "3-seed mean of the v2 day-disjoint runs, not this model's own.")
+        return out
+    out.update(
+        available=True, results_key=serving["results_key"],
+        metrics={k: round(row[src], 4) for k, src in _SERVED_METRIC_KEYS if src in row},
+        note="This single checkpoint's own test metrics (one training run), shown separately from "
+             "the 3-seed mean +/- SD. It was chosen by lowest validation loss, not by test score.",
+    )
+    return out
+
+
 @app.get("/api/v1/eval/metrics")
 def get_eval_metrics():
     """The project's measured results, read from the seed-summary files -- never literals.
@@ -1143,6 +1187,7 @@ def get_eval_metrics():
             "split that shared attack sessions between train and test and was withdrawn (audit E1)."
         ),
     }
+    payload["served_model"] = _served_model_metrics(data)
     if LOFO_PATH.exists():
         lofo = json.loads(LOFO_PATH.read_text(encoding="utf-8"))
         payload["generalisation_lofo"] = {
