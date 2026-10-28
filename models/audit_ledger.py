@@ -16,16 +16,31 @@ Usage:
                   recommended_action="Isolate the host from internal network segments...")
     ledger.save(path)
     ok, first_bad_index = ledger.verify_integrity()
+
+Concurrent writers (e.g. API request threads) MUST use ``AuditLedger.append_and_save(path, ...)``,
+which holds a process-wide lock across load -> append -> atomic save; the bare
+load_or_create/append/save sequence is not safe under concurrency (lost updates).
 """
 from __future__ import annotations
 
 import hashlib
 import json
+import os
+import threading
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 GENESIS_HASH = "0" * 64
+
+# Process-wide (re-entrant) lock guarding every ledger read-modify-write. It does NOT protect
+# against several processes writing the same file; the API runs as one process.
+LEDGER_LOCK = threading.RLock()
+
+
+class LedgerCorruptError(RuntimeError):
+    """Raised when appending to a ledger file that failed to parse -- saving would silently
+    overwrite (destroy) the evidence of the corruption."""
 
 
 @dataclass(frozen=True)
@@ -54,6 +69,9 @@ def _content_hash(
 class AuditLedger:
     def __init__(self, entries: list[LedgerEntry] | None = None):
         self.entries: list[LedgerEntry] = entries or []
+        # Set by load_or_create when a line could not be parsed: (1-based line number, reason).
+        # `entries` then holds only the valid entries BEFORE that line.
+        self.load_error: tuple[int, str] | None = None
 
     def append(
         self, host: str, peak_infiltration_prob: float, peak_stage: str, recommended_action: str,
@@ -73,40 +91,97 @@ class AuditLedger:
         return entry
 
     def verify_integrity(self) -> tuple[bool, int | None]:
-        """Walks the whole chain recomputing every hash from its own recorded content — returns
+        """Walks the whole chain recomputing every hash from its own recorded content - returns
         (True, None) if every link matches, or (False, index) at the first entry whose recorded
         hash no longer matches what its content actually hashes to (or whose prev_hash no longer
         matches the previous entry's actual hash), i.e. the first point where the chain was
-        broken by tampering, truncation, or reordering."""
+        broken by editing or reordering. A file line that could not be parsed at load time
+        (garbage, extra/missing keys) is reported as (False, <index that entry would have had>)
+        instead of raising; ``load_error`` holds the file line number and reason.
+
+        LIMITATION (QC-7): TAIL TRUNCATION IS NOT DETECTED. Deleting the last N lines leaves a
+        shorter chain that still verifies, because nothing outside the file records the expected
+        head hash or entry count. Detecting that would need an external anchor (e.g. the head hash
+        stored elsewhere); this ledger does not provide one.
+        """
+        if self.load_error is not None:
+            return False, len(self.entries)
         expected_prev = GENESIS_HASH
         for entry in self.entries:
             if entry.prev_hash != expected_prev:
                 return False, entry.index
-            recomputed = _content_hash(
-                entry.index, entry.timestamp, entry.host, entry.peak_infiltration_prob,
-                entry.peak_stage, entry.recommended_action, entry.prev_hash,
-            )
+            try:
+                recomputed = _content_hash(
+                    entry.index, entry.timestamp, entry.host, entry.peak_infiltration_prob,
+                    entry.peak_stage, entry.recommended_action, entry.prev_hash,
+                )
+            except (TypeError, ValueError):
+                return False, entry.index
             if recomputed != entry.record_hash:
                 return False, entry.index
             expected_prev = entry.record_hash
         return True, None
 
     def save(self, path: str | Path) -> None:
+        """Atomic: writes a temp file in the same directory, fsyncs, then os.replace()s it over
+        `path`, so a crash or concurrent reader never sees a half-written ledger."""
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w", encoding="utf-8") as f:
-            for entry in self.entries:
-                f.write(json.dumps(asdict(entry)) + "\n")
+        tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+        try:
+            with open(tmp, "w", encoding="utf-8") as f:
+                for entry in self.entries:
+                    f.write(json.dumps(asdict(entry)) + "\n")
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, path)
+        finally:
+            if tmp.exists():
+                tmp.unlink()
+
+    @classmethod
+    def append_and_save(
+        cls, path: str | Path, host: str, peak_infiltration_prob: float, peak_stage: str,
+        recommended_action: str,
+    ) -> LedgerEntry:
+        """Thread-safe load -> append -> atomic save under LEDGER_LOCK. Refuses (LedgerCorruptError)
+        to extend a ledger whose file did not parse, so evidence is never overwritten."""
+        with LEDGER_LOCK:
+            ledger = cls.load_or_create(path)
+            if ledger.load_error is not None:
+                line, reason = ledger.load_error
+                raise LedgerCorruptError(f"Ledger {path} is corrupt at line {line}: {reason}")
+            entry = ledger.append(host, peak_infiltration_prob, peak_stage, recommended_action)
+            ledger.save(path)
+            return entry
 
     @classmethod
     def load_or_create(cls, path: str | Path) -> "AuditLedger":
+        """Never raises on malformed content: parsing stops at the first bad line (not JSON, not an
+        object, missing/extra keys) and records it in ``load_error``, so verify_integrity()
+        reports not-intact instead of the caller crashing."""
         path = Path(path)
-        if not path.exists():
-            return cls()
-        entries = []
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if line:
-                    entries.append(LedgerEntry(**json.loads(line)))
-        return cls(entries)
+        with LEDGER_LOCK:
+            ledger = cls()
+            if not path.exists():
+                return ledger
+            expected_keys = set(LedgerEntry.__dataclass_fields__)
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                for line_no, line in enumerate(f, start=1):
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                        if not isinstance(obj, dict):
+                            raise ValueError("line is not a JSON object")
+                        if set(obj) != expected_keys:
+                            raise ValueError(
+                                f"unexpected keys: extra={sorted(set(obj) - expected_keys)} "
+                                f"missing={sorted(expected_keys - set(obj))}"
+                            )
+                        ledger.entries.append(LedgerEntry(**obj))
+                    except (ValueError, TypeError) as exc:  # JSONDecodeError is a ValueError
+                        ledger.load_error = (line_no, str(exc))
+                        break
+            return ledger

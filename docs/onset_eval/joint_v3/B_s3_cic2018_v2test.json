@@ -1,0 +1,1908 @@
+{
+ "window_seconds": 10,
+ "L": 12,
+ "K": 6,
+ "n_sequences": 7191,
+ "timeline_label_mismatches": 0,
+ "merge_gap_windows": 6,
+ "sequences": {
+  "benign_throughout": 5080,
+  "onset": 628,
+  "already_attacking": 1483
+ },
+ "hosts": {
+  "n_hosts": 3,
+  "n_hosts_with_onset_episode": 3,
+  "n_hosts_benign_throughout_only": 0,
+  "n_hosts_whose_first_observed_window_is_already_attacking": 1
+ },
+ "episodes": {
+  "n_episodes_merged": 12,
+  "n_raw_onset_events": 181,
+  "n_unresolved_time": 0,
+  "n_clean_history": 9,
+  "n_contiguous": 10,
+  "n_gapped_or_unverifiable": 2,
+  "n_hosts": 3,
+  "by_stage": {
+   "impact": 2,
+   "initial_access": 8,
+   "lateral_movement": 2
+  }
+ },
+ "thresholds": {
+  "served_0.40": {
+   "threshold": 0.4,
+   "episodes_all": {
+    "n_episodes": 12,
+    "n_unresolved_time": 0,
+    "n_scored": 12,
+    "n_hosts": 3,
+    "early": {
+     "k": 0,
+     "n": 12,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.2646484693970512
+     ]
+    },
+    "on_time": {
+     "k": 1,
+     "n": 12,
+     "rate": 0.08333333333333333,
+     "ci95_exact": [
+      0.002107593231860227,
+      0.38479616515094406
+     ]
+    },
+    "late": {
+     "k": 4,
+     "n": 12,
+     "rate": 0.3333333333333333,
+     "ci95_exact": [
+      0.09924609114958328,
+      0.6511244935811844
+     ]
+    },
+    "missed": {
+     "k": 7,
+     "n": 12,
+     "rate": 0.5833333333333334,
+     "ci95_exact": [
+      0.2766696856821058,
+      0.8483477701915698
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 1,
+     "n": 12,
+     "rate": 0.08333333333333333,
+     "ci95_exact": [
+      0.002107593231860227,
+      0.38479616515094406
+     ]
+    },
+    "detected_at_all": {
+     "k": 5,
+     "n": 12,
+     "rate": 0.4166666666666667,
+     "ci95_exact": [
+      0.15165222980843016,
+      0.7233303143178942
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 5,
+     "median": 970.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 71,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.050629407954403696
+     ]
+    }
+   },
+   "episodes_contiguous": {
+    "n_episodes": 10,
+    "n_unresolved_time": 0,
+    "n_scored": 10,
+    "n_hosts": 2,
+    "early": {
+     "k": 0,
+     "n": 10,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.3084971078187608
+     ]
+    },
+    "on_time": {
+     "k": 0,
+     "n": 10,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.3084971078187608
+     ]
+    },
+    "late": {
+     "k": 3,
+     "n": 10,
+     "rate": 0.3,
+     "ci95_exact": [
+      0.06673951117773445,
+      0.6524528500599973
+     ]
+    },
+    "missed": {
+     "k": 7,
+     "n": 10,
+     "rate": 0.7,
+     "ci95_exact": [
+      0.3475471499400027,
+      0.9332604888222655
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 0,
+     "n": 10,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.3084971078187608
+     ]
+    },
+    "detected_at_all": {
+     "k": 3,
+     "n": 10,
+     "rate": 0.3,
+     "ci95_exact": [
+      0.06673951117773445,
+      0.6524528500599973
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 3,
+     "median": 1040.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 59,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.060608900950339835
+     ]
+    }
+   },
+   "episodes_clean_history": {
+    "n_episodes": 9,
+    "n_unresolved_time": 0,
+    "n_scored": 9,
+    "n_hosts": 3,
+    "early": {
+     "k": 0,
+     "n": 9,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.3362671168799428
+     ]
+    },
+    "on_time": {
+     "k": 1,
+     "n": 9,
+     "rate": 0.1111111111111111,
+     "ci95_exact": [
+      0.0028091367465992146,
+      0.48249651491733697
+     ]
+    },
+    "late": {
+     "k": 4,
+     "n": 9,
+     "rate": 0.4444444444444444,
+     "ci95_exact": [
+      0.13699566226516646,
+      0.7879914932211319
+     ]
+    },
+    "missed": {
+     "k": 4,
+     "n": 9,
+     "rate": 0.4444444444444444,
+     "ci95_exact": [
+      0.13699566226516646,
+      0.7879914932211319
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 1,
+     "n": 9,
+     "rate": 0.1111111111111111,
+     "ci95_exact": [
+      0.0028091367465992146,
+      0.48249651491733697
+     ]
+    },
+    "detected_at_all": {
+     "k": 5,
+     "n": 9,
+     "rate": 0.5555555555555556,
+     "ci95_exact": [
+      0.212008506778868,
+      0.8630043377348335
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 5,
+     "median": 970.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 54,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.06603151424442182
+     ]
+    }
+   },
+   "episodes_gapped_or_unverifiable": {
+    "n_episodes": 2,
+    "n_unresolved_time": 0,
+    "n_scored": 2,
+    "n_hosts": 1,
+    "early": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.841886116991581
+     ]
+    },
+    "on_time": {
+     "k": 1,
+     "n": 2,
+     "rate": 0.5,
+     "ci95_exact": [
+      0.01257911709342505,
+      0.9874208829065749
+     ]
+    },
+    "late": {
+     "k": 1,
+     "n": 2,
+     "rate": 0.5,
+     "ci95_exact": [
+      0.01257911709342505,
+      0.9874208829065749
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.841886116991581
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 1,
+     "n": 2,
+     "rate": 0.5,
+     "ci95_exact": [
+      0.01257911709342505,
+      0.9874208829065749
+     ]
+    },
+    "detected_at_all": {
+     "k": 2,
+     "n": 2,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.15811388300841897,
+      1.0
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 2,
+     "median": 15.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 12,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.2646484693970512
+     ]
+    }
+   },
+   "false_alarm_benign_throughout_sequences": {
+    "all": {
+     "k": 22,
+     "n": 5080,
+     "n_clusters": 13,
+     "rate": 0.004330708661417323,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.011612983894894258
+     ]
+    },
+    "contiguous": {
+     "k": 12,
+     "n": 4801,
+     "n_clusters": 10,
+     "rate": 0.0024994792751510102,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.006399338959824043
+     ]
+    },
+    "gapped_or_unverifiable": {
+     "k": 10,
+     "n": 279,
+     "n_clusters": 7,
+     "rate": 0.035842293906810034,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.09569377990430622
+     ]
+    },
+    "clean_history": {
+     "k": 2,
+     "n": 4947,
+     "n_clusters": 11,
+     "rate": 0.0004042854255104103,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.0010173718520979094
+     ]
+    },
+    "same_hosts_as_episodes": {
+     "k": 22,
+     "n": 5080,
+     "n_clusters": 13,
+     "rate": 0.004330708661417323,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.011612983894894258
+     ]
+    },
+    "n_alarm_bursts": 2,
+    "n_sequences": 5080
+   },
+   "alarm_rate_on_onset_sequences": {
+    "k": 3,
+    "n": 628,
+    "n_clusters": 12,
+    "rate": 0.004777070063694267,
+    "ci95_cluster_bootstrap": [
+     0.0,
+     0.012179032311297402
+    ]
+   },
+   "alarm_rate_on_already_attacking_sequences": {
+    "k": 461,
+    "n": 1483,
+    "rate": 0.31085637221847606
+   },
+   "already_attacking_runs_with_any_alarm": {
+    "k": 5,
+    "n": 182
+   },
+   "alarm_rate_by_steps_to_onset": {
+    "1": {
+     "n_sequences": 181,
+     "n_episodes": 12,
+     "alarm_rate": 0.0055248618784530384
+    },
+    "2": {
+     "n_sequences": 150,
+     "n_episodes": 12,
+     "alarm_rate": 0.006666666666666667
+    },
+    "3": {
+     "n_sequences": 122,
+     "n_episodes": 12,
+     "alarm_rate": 0.00819672131147541
+    },
+    "4": {
+     "n_sequences": 102,
+     "n_episodes": 12,
+     "alarm_rate": 0.0
+    },
+    "5": {
+     "n_sequences": 62,
+     "n_episodes": 12,
+     "alarm_rate": 0.0
+    },
+    "6": {
+     "n_sequences": 11,
+     "n_episodes": 11,
+     "alarm_rate": 0.0
+    }
+   },
+   "per_episode": [
+    {
+     "key": "NETWORK-2018-02-16",
+     "stage": "impact",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "on_time",
+     "lead_s": null,
+     "delay_s": 10.0,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-16",
+     "stage": "impact",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "late",
+     "lead_s": null,
+     "delay_s": 20.0,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 73,
+     "n_early_origins": 5,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": false
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 3,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 2,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": false
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 3,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 4,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": false
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 90,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "late",
+     "lead_s": null,
+     "delay_s": 970.0,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-03-01",
+     "stage": "lateral_movement",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "late",
+     "lead_s": null,
+     "delay_s": 1830.0,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-03-01",
+     "stage": "lateral_movement",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "late",
+     "lead_s": null,
+     "delay_s": 1040.0,
+     "clean_history": true
+    }
+   ]
+  },
+  "val_fixed_fa0.05": {
+   "threshold": 0.0941046327352524,
+   "episodes_all": {
+    "n_episodes": 12,
+    "n_unresolved_time": 0,
+    "n_scored": 12,
+    "n_hosts": 3,
+    "early": {
+     "k": 0,
+     "n": 12,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.2646484693970512
+     ]
+    },
+    "on_time": {
+     "k": 2,
+     "n": 12,
+     "rate": 0.16666666666666666,
+     "ci95_exact": [
+      0.020862525460092374,
+      0.48413774868596715
+     ]
+    },
+    "late": {
+     "k": 4,
+     "n": 12,
+     "rate": 0.3333333333333333,
+     "ci95_exact": [
+      0.09924609114958328,
+      0.6511244935811844
+     ]
+    },
+    "missed": {
+     "k": 6,
+     "n": 12,
+     "rate": 0.5,
+     "ci95_exact": [
+      0.21094463823929668,
+      0.7890553617607033
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 2,
+     "n": 12,
+     "rate": 0.16666666666666666,
+     "ci95_exact": [
+      0.020862525460092374,
+      0.48413774868596715
+     ]
+    },
+    "detected_at_all": {
+     "k": 6,
+     "n": 12,
+     "rate": 0.5,
+     "ci95_exact": [
+      0.21094463823929668,
+      0.7890553617607033
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 6,
+     "median": 525.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 71,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.050629407954403696
+     ]
+    }
+   },
+   "episodes_contiguous": {
+    "n_episodes": 10,
+    "n_unresolved_time": 0,
+    "n_scored": 10,
+    "n_hosts": 2,
+    "early": {
+     "k": 0,
+     "n": 10,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.3084971078187608
+     ]
+    },
+    "on_time": {
+     "k": 0,
+     "n": 10,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.3084971078187608
+     ]
+    },
+    "late": {
+     "k": 4,
+     "n": 10,
+     "rate": 0.4,
+     "ci95_exact": [
+      0.12155225811982717,
+      0.7376219233930549
+     ]
+    },
+    "missed": {
+     "k": 6,
+     "n": 10,
+     "rate": 0.6,
+     "ci95_exact": [
+      0.26237807660694507,
+      0.8784477418801728
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 0,
+     "n": 10,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.3084971078187608
+     ]
+    },
+    "detected_at_all": {
+     "k": 4,
+     "n": 10,
+     "rate": 0.4,
+     "ci95_exact": [
+      0.12155225811982717,
+      0.7376219233930549
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 4,
+     "median": 1385.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 59,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.060608900950339835
+     ]
+    }
+   },
+   "episodes_clean_history": {
+    "n_episodes": 9,
+    "n_unresolved_time": 0,
+    "n_scored": 9,
+    "n_hosts": 3,
+    "early": {
+     "k": 0,
+     "n": 9,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.3362671168799428
+     ]
+    },
+    "on_time": {
+     "k": 2,
+     "n": 9,
+     "rate": 0.2222222222222222,
+     "ci95_exact": [
+      0.0281449734778982,
+      0.600093573716312
+     ]
+    },
+    "late": {
+     "k": 3,
+     "n": 9,
+     "rate": 0.3333333333333333,
+     "ci95_exact": [
+      0.0748546314196918,
+      0.7007049437914596
+     ]
+    },
+    "missed": {
+     "k": 4,
+     "n": 9,
+     "rate": 0.4444444444444444,
+     "ci95_exact": [
+      0.13699566226516646,
+      0.7879914932211319
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 2,
+     "n": 9,
+     "rate": 0.2222222222222222,
+     "ci95_exact": [
+      0.0281449734778982,
+      0.600093573716312
+     ]
+    },
+    "detected_at_all": {
+     "k": 5,
+     "n": 9,
+     "rate": 0.5555555555555556,
+     "ci95_exact": [
+      0.212008506778868,
+      0.8630043377348335
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 5,
+     "median": 110.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 54,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.06603151424442182
+     ]
+    }
+   },
+   "episodes_gapped_or_unverifiable": {
+    "n_episodes": 2,
+    "n_unresolved_time": 0,
+    "n_scored": 2,
+    "n_hosts": 1,
+    "early": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.841886116991581
+     ]
+    },
+    "on_time": {
+     "k": 2,
+     "n": 2,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.15811388300841897,
+      1.0
+     ]
+    },
+    "late": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.841886116991581
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.841886116991581
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 2,
+     "n": 2,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.15811388300841897,
+      1.0
+     ]
+    },
+    "detected_at_all": {
+     "k": 2,
+     "n": 2,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.15811388300841897,
+      1.0
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 2,
+     "median": 10.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 12,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.2646484693970512
+     ]
+    }
+   },
+   "false_alarm_benign_throughout_sequences": {
+    "all": {
+     "k": 54,
+     "n": 5080,
+     "n_clusters": 13,
+     "rate": 0.01062992125984252,
+     "ci95_cluster_bootstrap": [
+      0.00474852563304952,
+      0.018789607672131763
+     ]
+    },
+    "contiguous": {
+     "k": 34,
+     "n": 4801,
+     "n_clusters": 10,
+     "rate": 0.007081857946261196,
+     "ci95_cluster_bootstrap": [
+      0.0009243934162417044,
+      0.012586524979306889
+     ]
+    },
+    "gapped_or_unverifiable": {
+     "k": 20,
+     "n": 279,
+     "n_clusters": 7,
+     "rate": 0.07168458781362007,
+     "ci95_cluster_bootstrap": [
+      0.006993006993006993,
+      0.17494607481409996
+     ]
+    },
+    "clean_history": {
+     "k": 21,
+     "n": 4947,
+     "n_clusters": 11,
+     "rate": 0.004244996967859308,
+     "ci95_cluster_bootstrap": [
+      0.0007148596747652755,
+      0.00637401176267149
+     ]
+    },
+    "same_hosts_as_episodes": {
+     "k": 54,
+     "n": 5080,
+     "n_clusters": 13,
+     "rate": 0.01062992125984252,
+     "ci95_cluster_bootstrap": [
+      0.00474852563304952,
+      0.018789607672131763
+     ]
+    },
+    "n_alarm_bursts": 11,
+    "n_sequences": 5080
+   },
+   "alarm_rate_on_onset_sequences": {
+    "k": 7,
+    "n": 628,
+    "n_clusters": 12,
+    "rate": 0.011146496815286623,
+    "ci95_cluster_bootstrap": [
+     0.0,
+     0.02841774205969394
+    ]
+   },
+   "alarm_rate_on_already_attacking_sequences": {
+    "k": 605,
+    "n": 1483,
+    "rate": 0.4079568442346595
+   },
+   "already_attacking_runs_with_any_alarm": {
+    "k": 9,
+    "n": 182
+   },
+   "alarm_rate_by_steps_to_onset": {
+    "1": {
+     "n_sequences": 181,
+     "n_episodes": 12,
+     "alarm_rate": 0.016574585635359115
+    },
+    "2": {
+     "n_sequences": 150,
+     "n_episodes": 12,
+     "alarm_rate": 0.013333333333333334
+    },
+    "3": {
+     "n_sequences": 122,
+     "n_episodes": 12,
+     "alarm_rate": 0.00819672131147541
+    },
+    "4": {
+     "n_sequences": 102,
+     "n_episodes": 12,
+     "alarm_rate": 0.00980392156862745
+    },
+    "5": {
+     "n_sequences": 62,
+     "n_episodes": 12,
+     "alarm_rate": 0.0
+    },
+    "6": {
+     "n_sequences": 11,
+     "n_episodes": 11,
+     "alarm_rate": 0.0
+    }
+   },
+   "per_episode": [
+    {
+     "key": "NETWORK-2018-02-16",
+     "stage": "impact",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "on_time",
+     "lead_s": null,
+     "delay_s": 10.0,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-16",
+     "stage": "impact",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "on_time",
+     "lead_s": null,
+     "delay_s": 10.0,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 73,
+     "n_early_origins": 5,
+     "n_early_origins_alarmed": 0,
+     "outcome": "late",
+     "lead_s": null,
+     "delay_s": 2200.0,
+     "clean_history": false
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 3,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 2,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": false
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 3,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 4,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": false
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 90,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "late",
+     "lead_s": null,
+     "delay_s": 110.0,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-03-01",
+     "stage": "lateral_movement",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "late",
+     "lead_s": null,
+     "delay_s": 1830.0,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-03-01",
+     "stage": "lateral_movement",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "late",
+     "lead_s": null,
+     "delay_s": 940.0,
+     "clean_history": true
+    }
+   ]
+  },
+  "val_fixed_fa0.01": {
+   "threshold": 0.2170161157846451,
+   "episodes_all": {
+    "n_episodes": 12,
+    "n_unresolved_time": 0,
+    "n_scored": 12,
+    "n_hosts": 3,
+    "early": {
+     "k": 0,
+     "n": 12,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.2646484693970512
+     ]
+    },
+    "on_time": {
+     "k": 2,
+     "n": 12,
+     "rate": 0.16666666666666666,
+     "ci95_exact": [
+      0.020862525460092374,
+      0.48413774868596715
+     ]
+    },
+    "late": {
+     "k": 3,
+     "n": 12,
+     "rate": 0.25,
+     "ci95_exact": [
+      0.054860644527992726,
+      0.5718584618781891
+     ]
+    },
+    "missed": {
+     "k": 7,
+     "n": 12,
+     "rate": 0.5833333333333334,
+     "ci95_exact": [
+      0.2766696856821058,
+      0.8483477701915698
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 2,
+     "n": 12,
+     "rate": 0.16666666666666666,
+     "ci95_exact": [
+      0.020862525460092374,
+      0.48413774868596715
+     ]
+    },
+    "detected_at_all": {
+     "k": 5,
+     "n": 12,
+     "rate": 0.4166666666666667,
+     "ci95_exact": [
+      0.15165222980843016,
+      0.7233303143178942
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 5,
+     "median": 110.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 71,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.050629407954403696
+     ]
+    }
+   },
+   "episodes_contiguous": {
+    "n_episodes": 10,
+    "n_unresolved_time": 0,
+    "n_scored": 10,
+    "n_hosts": 2,
+    "early": {
+     "k": 0,
+     "n": 10,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.3084971078187608
+     ]
+    },
+    "on_time": {
+     "k": 0,
+     "n": 10,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.3084971078187608
+     ]
+    },
+    "late": {
+     "k": 3,
+     "n": 10,
+     "rate": 0.3,
+     "ci95_exact": [
+      0.06673951117773445,
+      0.6524528500599973
+     ]
+    },
+    "missed": {
+     "k": 7,
+     "n": 10,
+     "rate": 0.7,
+     "ci95_exact": [
+      0.3475471499400027,
+      0.9332604888222655
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 0,
+     "n": 10,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.3084971078187608
+     ]
+    },
+    "detected_at_all": {
+     "k": 3,
+     "n": 10,
+     "rate": 0.3,
+     "ci95_exact": [
+      0.06673951117773445,
+      0.6524528500599973
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 3,
+     "median": 1040.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 59,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.060608900950339835
+     ]
+    }
+   },
+   "episodes_clean_history": {
+    "n_episodes": 9,
+    "n_unresolved_time": 0,
+    "n_scored": 9,
+    "n_hosts": 3,
+    "early": {
+     "k": 0,
+     "n": 9,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.3362671168799428
+     ]
+    },
+    "on_time": {
+     "k": 2,
+     "n": 9,
+     "rate": 0.2222222222222222,
+     "ci95_exact": [
+      0.0281449734778982,
+      0.600093573716312
+     ]
+    },
+    "late": {
+     "k": 3,
+     "n": 9,
+     "rate": 0.3333333333333333,
+     "ci95_exact": [
+      0.0748546314196918,
+      0.7007049437914596
+     ]
+    },
+    "missed": {
+     "k": 4,
+     "n": 9,
+     "rate": 0.4444444444444444,
+     "ci95_exact": [
+      0.13699566226516646,
+      0.7879914932211319
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 2,
+     "n": 9,
+     "rate": 0.2222222222222222,
+     "ci95_exact": [
+      0.0281449734778982,
+      0.600093573716312
+     ]
+    },
+    "detected_at_all": {
+     "k": 5,
+     "n": 9,
+     "rate": 0.5555555555555556,
+     "ci95_exact": [
+      0.212008506778868,
+      0.8630043377348335
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 5,
+     "median": 110.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 54,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.06603151424442182
+     ]
+    }
+   },
+   "episodes_gapped_or_unverifiable": {
+    "n_episodes": 2,
+    "n_unresolved_time": 0,
+    "n_scored": 2,
+    "n_hosts": 1,
+    "early": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.841886116991581
+     ]
+    },
+    "on_time": {
+     "k": 2,
+     "n": 2,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.15811388300841897,
+      1.0
+     ]
+    },
+    "late": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.841886116991581
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 2,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.841886116991581
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 2,
+     "n": 2,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.15811388300841897,
+      1.0
+     ]
+    },
+    "detected_at_all": {
+     "k": 2,
+     "n": 2,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.15811388300841897,
+      1.0
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 2,
+     "median": 10.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 12,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.2646484693970512
+     ]
+    }
+   },
+   "false_alarm_benign_throughout_sequences": {
+    "all": {
+     "k": 33,
+     "n": 5080,
+     "n_clusters": 13,
+     "rate": 0.006496062992125984,
+     "ci95_cluster_bootstrap": [
+      0.0017746572381422926,
+      0.014350174567295954
+     ]
+    },
+    "contiguous": {
+     "k": 20,
+     "n": 4801,
+     "n_clusters": 10,
+     "rate": 0.00416579879191835,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.008032431384663842
+     ]
+    },
+    "gapped_or_unverifiable": {
+     "k": 13,
+     "n": 279,
+     "n_clusters": 7,
+     "rate": 0.04659498207885305,
+     "ci95_cluster_bootstrap": [
+      0.0034965034965034965,
+      0.10471204188481675
+     ]
+    },
+    "clean_history": {
+     "k": 4,
+     "n": 4947,
+     "n_clusters": 11,
+     "rate": 0.0008085708510208206,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.001340112246929746
+     ]
+    },
+    "same_hosts_as_episodes": {
+     "k": 33,
+     "n": 5080,
+     "n_clusters": 13,
+     "rate": 0.006496062992125984,
+     "ci95_cluster_bootstrap": [
+      0.0017746572381422926,
+      0.014350174567295954
+     ]
+    },
+    "n_alarm_bursts": 6,
+    "n_sequences": 5080
+   },
+   "alarm_rate_on_onset_sequences": {
+    "k": 3,
+    "n": 628,
+    "n_clusters": 12,
+    "rate": 0.004777070063694267,
+    "ci95_cluster_bootstrap": [
+     0.0,
+     0.012179032311297402
+    ]
+   },
+   "alarm_rate_on_already_attacking_sequences": {
+    "k": 495,
+    "n": 1483,
+    "rate": 0.3337828725556305
+   },
+   "already_attacking_runs_with_any_alarm": {
+    "k": 6,
+    "n": 182
+   },
+   "alarm_rate_by_steps_to_onset": {
+    "1": {
+     "n_sequences": 181,
+     "n_episodes": 12,
+     "alarm_rate": 0.0055248618784530384
+    },
+    "2": {
+     "n_sequences": 150,
+     "n_episodes": 12,
+     "alarm_rate": 0.006666666666666667
+    },
+    "3": {
+     "n_sequences": 122,
+     "n_episodes": 12,
+     "alarm_rate": 0.00819672131147541
+    },
+    "4": {
+     "n_sequences": 102,
+     "n_episodes": 12,
+     "alarm_rate": 0.0
+    },
+    "5": {
+     "n_sequences": 62,
+     "n_episodes": 12,
+     "alarm_rate": 0.0
+    },
+    "6": {
+     "n_sequences": 11,
+     "n_episodes": 11,
+     "alarm_rate": 0.0
+    }
+   },
+   "per_episode": [
+    {
+     "key": "NETWORK-2018-02-16",
+     "stage": "impact",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "on_time",
+     "lead_s": null,
+     "delay_s": 10.0,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-16",
+     "stage": "impact",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "on_time",
+     "lead_s": null,
+     "delay_s": 10.0,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 73,
+     "n_early_origins": 5,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": false
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 3,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 2,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": false
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 3,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 4,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": false
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-02-23",
+     "stage": "initial_access",
+     "contiguous": true,
+     "n_raw_onsets": 90,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "late",
+     "lead_s": null,
+     "delay_s": 110.0,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-03-01",
+     "stage": "lateral_movement",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "late",
+     "lead_s": null,
+     "delay_s": 1830.0,
+     "clean_history": true
+    },
+    {
+     "key": "NETWORK-2018-03-01",
+     "stage": "lateral_movement",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "late",
+     "lead_s": null,
+     "delay_s": 1040.0,
+     "clean_history": true
+    }
+   ]
+  }
+ },
+ "already_attacking_runs": {
+  "n_runs": 182,
+  "n_left_censored_runs(first observed window already attacking)": 1
+ },
+ "auroc_onset_vs_benign_throughout_same_hosts_only": {
+  "n_pos": 628,
+  "n_pos_episodes": 12,
+  "n_neg": 5080,
+  "n_neg_stretches": 13,
+  "auroc": 0.49264444054365814,
+  "ci95_cluster_bootstrap": [
+   0.3777776459989819,
+   0.6225791413813213
+  ]
+ },
+ "auroc_onset_vs_benign_throughout_clean_history": {
+  "n_pos": 54,
+  "n_pos_episodes": 9,
+  "n_neg": 4947,
+  "n_neg_stretches": 11,
+  "auroc": 0.5029947068556326,
+  "ci95_cluster_bootstrap": [
+   0.3088243275631757,
+   0.6791675432306965
+  ]
+ },
+ "auroc_onset_vs_benign_throughout": {
+  "n_pos": 628,
+  "n_pos_episodes": 12,
+  "n_neg": 5080,
+  "n_neg_stretches": 13,
+  "auroc": 0.49264444054365814,
+  "ci95_cluster_bootstrap": [
+   0.3777776459989819,
+   0.6225791413813213
+  ]
+ },
+ "meta": {
+  "label": "B_s3_cic2018_v2test",
+  "config": "configs/joint_v3_B.yaml",
+  "checkpoint": "checkpoints_joint_v3\\B\\seed3\\world_model_best.pt",
+  "data_dir": "data\\processed_real_v2_converged",
+  "splits": "test",
+  "window_seconds_eval": 10,
+  "window_seconds_training": 10,
+  "score": "max over K rollout infiltration probabilities",
+  "threshold_source": "served = app.service.ALERT_THRESHOLD; val_fixed = fit on C:\\Users\\Yash\\Documents\\Claude\\Projects\\Network Attack Forecasting\\data\\processed_adapter\\cic18c_v3 val split (benign-throughout sequences), never on the evaluated data",
+  "device": "cuda:0"
+ },
+ "validation_reference": {
+  "n_val_sequences": 6651,
+  "val_sequences_by_category": {
+   "benign_throughout": 5571,
+   "onset": 575,
+   "already_attacking": 505
+  }
+ },
+ "legacy_qc3_lead_time_sequence_level": {
+  "benchmark_val_5pct_fpr_t1": {
+   "threshold": 0.08579535037279129,
+   "n_transitions": 628,
+   "n_missed": 623,
+   "miss_rate": 0.9920382165605095,
+   "n_no_alarm": 619,
+   "n_alarm_on_time": 4,
+   "n_alarm_late": 0,
+   "pct_detected_early": 0.007961783439490446,
+   "mean_lead_time_s": 18.0,
+   "median_lead_time_s": 20.0,
+   "n_false_alarm_eligible": 5080,
+   "n_false_alarms": 66,
+   "false_alarm_rate": 0.012992125984251968,
+   "alarm_precision": 0.06666666666666667
+  },
+  "served_0.40": {
+   "threshold": 0.4,
+   "n_transitions": 628,
+   "n_missed": 626,
+   "miss_rate": 0.9968152866242038,
+   "n_no_alarm": 625,
+   "n_alarm_on_time": 1,
+   "n_alarm_late": 0,
+   "pct_detected_early": 0.0031847133757961785,
+   "mean_lead_time_s": 15.0,
+   "median_lead_time_s": 15.0,
+   "n_false_alarm_eligible": 5080,
+   "n_false_alarms": 22,
+   "false_alarm_rate": 0.004330708661417323,
+   "alarm_precision": 0.08
+  }
+ }
+}

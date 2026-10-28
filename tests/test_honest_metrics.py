@@ -79,7 +79,7 @@ def test_lead_time_metrics_counts_false_alarms_on_non_transitioning_sequences():
     # doesn't. One sequence genuinely transitions and is detected correctly.
     infiltration = np.array([[0, 0, 0], [0, 0, 0], [0, 0, 1]])
     current = np.array([0.0, 0.0, 0.0])
-    probs = np.array([[0.9, 0.9, 0.9], [0.1, 0.1, 0.1], [0.1, 0.1, 0.9]])
+    probs = np.array([[0.9, 0.9, 0.9], [0.1, 0.1, 0.1], [0.1, 0.9, 0.9]])
 
     result = lead_time_metrics(infiltration, current, probs, threshold=0.5, window_seconds=10)
 
@@ -87,14 +87,14 @@ def test_lead_time_metrics_counts_false_alarms_on_non_transitioning_sequences():
     assert result["n_false_alarm_eligible"] == 2
     assert result["n_false_alarms"] == 1
     assert result["false_alarm_rate"] == 0.5
-    # 1 true alarm (the transition, detected at onset) + 1 false alarm = 2 alarms raised.
+    # 1 true early alarm (the transition, alarmed one step before onset) + 1 false alarm = 2 alarms raised.
     assert result["alarm_precision"] == 0.5
 
 
 def test_lead_time_metrics_alarm_precision_is_one_when_no_false_alarms():
     infiltration = np.array([[0, 0, 1], [0, 0, 0]])
     current = np.array([0.0, 0.0])
-    probs = np.array([[0.1, 0.1, 0.9], [0.1, 0.1, 0.1]])
+    probs = np.array([[0.1, 0.9, 0.9], [0.1, 0.1, 0.1]])
 
     result = lead_time_metrics(infiltration, current, probs, threshold=0.5, window_seconds=10)
 

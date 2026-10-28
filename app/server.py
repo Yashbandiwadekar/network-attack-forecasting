@@ -16,22 +16,25 @@ from __future__ import annotations
 import os
 import json
 import tempfile
+import threading
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
 import numpy as np
-from fastapi import Depends, FastAPI, File, HTTPException, Security, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Request, Security, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from app import live as live_mod
 from app import service
 from common.config import load_config, resolve_path
-from models.audit_ledger import AuditLedger
+from models.audit_ledger import AuditLedger, LedgerCorruptError
 from models.compliance import generate_cert_in_report
 from models.cve_lookup import related_capec, related_cves, snapshot_metadata
 from models.explain import (
@@ -46,6 +49,7 @@ from pipeline.mitre_mapping import CIC_LABEL_TO_STAGE, STAGE_CLASSIFICATION_LABE
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_PATH = PROJECT_ROOT / "docs" / "v2_converged_seed_results.json"
 LOFO_PATH = PROJECT_ROOT / "docs" / "lofo_seed_summary.json"
+PER_DAY_PATH = PROJECT_ROOT / "docs" / "results_per_day_v4.json"      # written by `python -m eval.report_v4` (docs/17)
 
 MAX_UPLOAD_MB = service.MAX_PCAP_UPLOAD_MB
 
@@ -125,18 +129,125 @@ def _require_token(authorization: str | None = Security(_api_key_header)) -> Non
 
 # ---------------------------------------------------------------- server state
 
+# Model selection. The default is the seed-1 run of the day-disjoint v2 model (A1 truth pass: lowest
+# validation loss of seeds 1-3, rule fixed before looking at test; see the header of
+# configs/real_data_v2_converged_seed1.yaml). The earlier unseeded v2 checkpoint (F1 0.370, below
+# every seed) stays selectable as "v2-unseeded". v1 (configs/real_data.yaml) was trained on the
+# leaky per-host split whose 0.917 F1 was withdrawn, so it stays selectable but is never the default. Override with PHOENIX_CONFIG (an alias below or
+# a config path) or `python -m scripts.serve --config ...`.
+DEFAULT_CONFIG = "configs/real_data_v2_converged_seed1.yaml"
+CONFIG_ALIASES = {
+    "v2": "configs/real_data_v2_converged_seed1.yaml",
+    "v2-unseeded": "configs/real_data_v2_converged.yaml",
+    "v1": "configs/real_data.yaml",
+}
+# (dataset id, config, display name) for the dataset registry / dashboard dropdown.
+MODEL_REGISTRY = (
+    ("CIC-IDS-2018", "configs/real_data.yaml", "CIC-IDS-2018 (v1, leaky split)"),
+    ("CIC-IDS-2018-v2", "configs/real_data_v2_converged_seed1.yaml", "CIC-IDS-2018 (v2, day-disjoint, seed 1)"),
+    ("UNSW-NB15", "configs/unsw_nb15.yaml", "UNSW-NB15"),
+    ("CTU-13", "configs/ctu13.yaml", "CTU-13"),
+)
+
+
+class ModelUnavailableError(RuntimeError):
+    """The selected config's checkpoint or scaler is missing."""
+
+
+def resolve_config_choice(choice: str | None = None) -> str:
+    """The config path the server should serve: explicit choice, else $PHOENIX_CONFIG, else the v2
+    default. Accepts the aliases v1/v2 or a path (relative to the project root, or absolute)."""
+    bundle_env = (os.environ.get("PHOENIX_BUNDLE") or "").strip()
+    if bundle_env and not choice:
+        if os.environ.get("PHOENIX_CONFIG"):
+            raise ModelUnavailableError(
+                "Both PHOENIX_BUNDLE and PHOENIX_CONFIG are set; pick one (a bundle is self-contained).")
+        choice = bundle_env
+    raw = (choice or os.environ.get("PHOENIX_CONFIG") or DEFAULT_CONFIG).strip()
+    raw = CONFIG_ALIASES.get(raw.lower(), raw)
+    # A model bundle directory (scripts/make_model_bundle.py): serve its config.yaml. The path is
+    # resolved against the current directory, not PROJECT_ROOT, so it can live anywhere.
+    if (Path(raw) / "MANIFEST.json").is_file():
+        return str((Path(raw) / "config.yaml").resolve())
+    if bundle_env and raw == bundle_env:
+        raise ModelUnavailableError(f"PHOENIX_BUNDLE={bundle_env!r} is not a model bundle (no MANIFEST.json).")
+    path = Path(raw)
+    if not path.is_absolute():
+        path = PROJECT_ROOT / path
+    if not path.is_file():
+        raise ModelUnavailableError(
+            f"Model config not found: {raw!r} (looked for {path}). Use v1, v2, or a path to a "
+            f"configs/*.yaml file."
+        )
+    try:
+        return path.relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def check_model_artifacts(config_path: str) -> None:
+    """Fail loudly, naming the missing file, rather than serving 503s later. Existence check only;
+    the full load happens on first use."""
+    from common.bundle import bundle_dir_of, verify_bundle
+    if bundle_dir_of(config_path):
+        # Full SHA256 + feature-schema + encoder verification, not just existence. BundleError is a
+        # RuntimeError, so scripts/serve.py aborts startup and the lifespan hook refuses to start.
+        verify_bundle(bundle_dir_of(config_path))
+        return
+    config = load_config(config_path)
+    ckpt = resolve_path(config, "checkpoint_dir") / "world_model_best.pt"
+    scaler = resolve_path(config, "processed_dir") / "scaler.npz"
+    missing = [f"{what} {p}" for what, p in (("checkpoint", ckpt), ("feature scaler", scaler))
+               if not p.exists()]
+    if missing:
+        raise ModelUnavailableError(
+            f"Cannot serve model {config_path}: missing " + " and ".join(missing)
+            + ". Train it, restore the files, or choose another model (PHOENIX_CONFIG / --config)."
+        )
+
+
+def _display_path(path: Path) -> str:
+    try:
+        return path.relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def model_info(config_path: str) -> dict[str, Any]:
+    config = load_config(config_path)
+    if config.get("_bundle_dir"):
+        from common.bundle import read_manifest
+        return {
+            "model_name": read_manifest(config["_bundle_dir"])["model_name"],
+            "config_path": "<bundle>/config.yaml",
+            "checkpoint_dir": "<bundle>/checkpoint",
+            "checkpoint_path": "<bundle>/" + "checkpoint/world_model_best.pt",
+        }
+    return {
+        "model_name": Path(config_path).stem,
+        "config_path": config_path,
+        "checkpoint_dir": _display_path(resolve_path(config, "checkpoint_dir")),
+        "checkpoint_path": _display_path(resolve_path(config, "checkpoint_dir") / "world_model_best.pt"),
+    }
+
+
 class _State:
     """What the server currently knows. Populated by /analysis/upload -- nothing is preloaded,
     because the repo ships a checkpoint but no traffic. Empty here means empty in the UI."""
 
     def __init__(self) -> None:
-        self.config_path: str = "configs/real_data.yaml"
-        self.dataset_id: str = "CIC-IDS-2018"
+        self.config_path: str = resolve_config_choice()
+        self.dataset_id: str = next(
+            (i for i, c, _ in MODEL_REGISTRY if c == self.config_path), Path(self.config_path).stem)
+        if Path(self.config_path).name == "config.yaml" and (Path(self.config_path).parent / "MANIFEST.json").is_file():
+            self.dataset_id = Path(self.config_path).parent.name  # bundle
         self.flow_df = None
         self.windows = None
         self.batch = None          # BatchForecastResult
         self.source_name: str | None = None
         self.ingested_flows: int = 0
+        self.host_meta: dict[str, dict[str, Any]] = {}   # live engine only: per-host provisional/contiguity
+        self._publish_lock = threading.Lock()
 
     def reset_data(self) -> None:
         self.flow_df = None
@@ -144,9 +255,23 @@ class _State:
         self.batch = None
         self.source_name = None
         self.ingested_flows = 0
+        self.host_meta = {}
+
+    def publish(self, snap: "live_mod.Snapshot") -> None:
+        """Called by the live engine thread: swap every piece of dashboard state under one lock. The
+        engine builds the new snapshot completely before this, so a poll sees the old state or the new
+        one, never a half-built one (each attribute is a single reference assignment)."""
+        with self._publish_lock:
+            self.flow_df = snap.flow_df
+            self.windows = snap.windows if len(snap.windows) else None
+            self.batch = snap.batch
+            self.source_name = snap.source_name
+            self.ingested_flows = snap.ingested_flows
+            self.host_meta = snap.host_meta
 
 
 STATE = _State()
+LIVE = live_mod.LiveController()
 
 
 def _backend():
@@ -167,6 +292,13 @@ def _engine() -> tuple[ForecastEngine, dict[str, Any]]:
 
 def _ledger_path() -> Path:
     config, _, _, _ = service.load_backend(STATE.config_path)
+    if config.get("_bundle_dir"):
+        # Bundles are read-only inputs; the ledger lives in a separate writable state dir
+        # ($PHOENIX_STATE_DIR, default <bundle>/state), outside the manifest.
+        from common.bundle import bundle_state_dir
+        state = bundle_state_dir(config["_bundle_dir"])
+        state.mkdir(parents=True, exist_ok=True)
+        return state / "audit_ledger.jsonl"
     return resolve_path(config, "checkpoint_dir") / "audit_ledger.jsonl"
 
 
@@ -188,6 +320,11 @@ def _observed_stage(host_ip: str) -> str | None:
     rows = STATE.windows[STATE.windows["src_ip"] == host_ip]
     if rows.empty:
         return None
+    # Unlabelled input (no Label column, PCAP, live) has its windowing label defaulted to BENIGN so
+    # the pipeline can run; that default is not an observation. service.process_uploads records
+    # which windows carry real ground truth in `stage_observed`.
+    if "stage_observed" in rows.columns and not bool(rows.iloc[-1]["stage_observed"]):
+        return None
     return str(rows.iloc[-1]["stage"])
 
 
@@ -198,6 +335,15 @@ def _strip_markup(text: str) -> str:
     day someone reaches for dangerouslySetInnerHTML."""
     import re
     return re.sub(r"<[^>]+>", "", text)
+
+
+UNLABELLED = "Unlabelled"
+
+
+def _display_observed(observed: str | None) -> str:
+    """Observed stage for display. With no ground truth we say so; we never substitute the
+    forecast's first step (that is t+1, a prediction, not an observation)."""
+    return _display(observed) if observed is not None else UNLABELLED
 
 
 def _host_row(idx: int) -> dict[str, Any]:
@@ -220,17 +366,28 @@ def _host_row(idx: int) -> dict[str, Any]:
         "peak_prob": round(peak, 4),
         "risk_score": round(peak, 4),
         "severity": service.severity_for(peak),
-        # Observed, not forecast: stages[0] is already t+1. Falls back to the first forecast step
-        # only when the capture carries no labels, and says so via current_stage_observed.
-        "current_stage": _display(observed or stages[0]),
-        "current_stage_id": observed or stages[0],
+        # Observed, not forecast: stages[0] is already t+1. A capture with no labels has no
+        # observed stage: current_stage is "Unlabelled", current_stage_id null, observed false.
+        "current_stage": _display_observed(observed),
+        "current_stage_id": observed,
         "current_stage_observed": observed is not None,
         "predicted_stage": _display(peak_stage),
         "predicted_stage_id": peak_stage,
         "stage_is_heuristic": bool(heur[peak_step]),
         "stage_disclosure_note": service.stage_disclosure_note(peak_stage, bool(heur[peak_step])),
         "dataset_source": STATE.source_name or STATE.dataset_id,
+        **_live_row_fields(b.host_ids[idx], peak),
     }
+
+
+def _live_row_fields(host: str, peak: float) -> dict[str, Any]:
+    """Additive fields. `alert` uses the one shared threshold for uploads and live alike; the live-only
+    fields appear only while the live engine owns the state."""
+    out: dict[str, Any] = {"alert": bool(peak >= service.ALERT_THRESHOLD)}
+    meta = STATE.host_meta.get(host)
+    if meta is not None:
+        out.update(meta)
+    return out
 
 
 # ---------------------------------------------------------------- schemas
@@ -266,6 +423,30 @@ class SelectDatasetRequest(BaseModel):
 
 # ---------------------------------------------------------------- endpoints
 
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    check_model_artifacts(STATE.config_path)  # refuse to start on a missing checkpoint/scaler
+    _autostart_live()
+    yield
+    LIVE.stop()
+
+
+def _autostart_live() -> None:
+    """scripts/serve.py --replay / --live-dir hand over through the environment. A failure here is
+    logged, not fatal: the dashboard still comes up and shows OFF."""
+    try:
+        replay, live_dir = os.environ.get("PHOENIX_REPLAY"), os.environ.get("PHOENIX_LIVE_DIR")
+        if replay:
+            start_replay(_resolve_allowed(replay), float(os.environ.get("PHOENIX_REPLAY_SPEED") or 1.0))
+        elif live_dir and os.environ.get("PHOENIX_LIVE_AUTOSTART") == "1":
+            start_live_tail(_resolve_allowed(live_dir))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[!] live autostart failed: {exc}")
+
+
+app.router.lifespan_context = _lifespan
+
+
 @app.get("/api/v1/health")
 def read_root():
     config, model, _, _ = service.load_backend(STATE.config_path)
@@ -274,8 +455,11 @@ def read_root():
         "status": "online",
         "active_dataset": STATE.dataset_id,
         "checkpoint_loaded": model is not None,
-        "config_path": STATE.config_path,
+        **model_info(STATE.config_path),
         **service.horizon_info(config),
+        # Present only when serving a bundle: proof the files matched MANIFEST.json at load.
+        **({"bundle": service.bundle_status(config)} if config.get("_bundle_dir") else {}),
+        "device": str(next(model.parameters()).device) if model is not None else None,
     }
 
 
@@ -284,9 +468,23 @@ def _dataset_registry() -> list[dict[str, Any]]:
     Separates dataset availability (processed data / metadata) from model checkpoint availability,
     and returns machine-independent path and capability data."""
     out: list[dict[str, Any]] = []
-    for ds_id, cfg_name in (("CIC-IDS-2018", "real_data.yaml"),
-                            ("UNSW-NB15", "unsw_nb15.yaml"),
-                            ("CTU-13", "ctu13.yaml")):
+    if Path(STATE.config_path).name == "config.yaml" and (Path(STATE.config_path).parent / "MANIFEST.json").is_file():
+        # Bundle mode: the only model on this machine is the bundle. The repo's other configs would
+        # all report "unavailable" (no checkpoints / data here), which is noise.
+        cfg = load_config(STATE.config_path)
+        _, model, scaler, _ = service.load_backend(STATE.config_path)
+        meta = json.loads((resolve_path(cfg, "processed_dir") / "metadata.json").read_text(encoding="utf-8"))
+        info = model_info(STATE.config_path)
+        return [{
+            "id": STATE.dataset_id, "name": f"{info['model_name']} (bundle)", "config": STATE.config_path,
+            "status": "Available", "total_sequences": meta.get("num_sequences"),
+            "features": len(meta.get("feature_columns", [])) or None,
+            "checkpoint_loaded": True, "dataset_available": False, "checkpoint_available": True,
+            "can_select": True, "can_forecast": model is not None and scaler is not None, "reason": None,
+            "checkpoint_path": info["checkpoint_path"], "processed_dir": "<bundle>/processed",
+        }]
+    for ds_id, cfg_rel, display_name in MODEL_REGISTRY:
+        cfg_name = Path(cfg_rel).name
         cfg_path = PROJECT_ROOT / "configs" / cfg_name
         if not cfg_path.exists():
             continue
@@ -334,7 +532,7 @@ def _dataset_registry() -> list[dict[str, Any]]:
 
             entry: dict[str, Any] = {
                 "id": ds_id,
-                "name": ds_id,
+                "name": display_name,
                 "config": f"configs/{cfg_name}",
                 "status": status,
                 "total_sequences": total_sequences,
@@ -351,7 +549,7 @@ def _dataset_registry() -> list[dict[str, Any]]:
         except Exception as exc:
             entry = {
                 "id": ds_id,
-                "name": ds_id,
+                "name": display_name,
                 "config": f"configs/{cfg_name}",
                 "status": f"Unreadable: {type(exc).__name__}",
                 "total_sequences": None,
@@ -405,6 +603,7 @@ def get_dataset_diagnostics():
 
 @app.post("/api/v1/datasets/select", dependencies=[Depends(_require_token)])
 def select_dataset(req: SelectDatasetRequest):
+    _refuse_while_live("dataset switch")
     ds = next((d for d in _dataset_registry() if d["id"] == req.dataset_id), None)
     if not ds:
         raise HTTPException(status_code=404, detail="Dataset not found")
@@ -462,8 +661,12 @@ def login(credentials: LoginRequest):
 @app.get("/api/v1/system/status", dependencies=[Depends(_require_token)])
 def get_system_status():
     config, model, _, _ = service.load_backend(STATE.config_path)
-    ledger = AuditLedger.load_or_create(_ledger_path())
-    intact, first_bad = ledger.verify_integrity()
+    try:
+        ledger = AuditLedger.load_or_create(_ledger_path())
+        intact, first_bad = ledger.verify_integrity()
+        ledger_entries = len(ledger.entries)
+    except Exception:  # an unreadable ledger must degrade the flag, never 500 the status page
+        intact, first_bad, ledger_entries = False, None, 0
     hosts_n = len(STATE.batch.host_ids) if STATE.batch else 0
     high_risk = 0
     if STATE.batch:
@@ -475,12 +678,13 @@ def get_system_status():
         "status": "online",
         "api_connected": True,
         "active_dataset": STATE.dataset_id,
+        **model_info(STATE.config_path),
         "model_loaded": model is not None,
         "data_source": STATE.source_name,
         "active_monitored_hosts": hosts_n,
         "total_active_flows": STATE.ingested_flows,
         "high_risk_hosts": high_risk,
-        "ledger_entries": len(ledger.entries),
+        "ledger_entries": ledger_entries,
         "ledger_intact": intact,
         "ledger_first_bad_index": first_bad,
         **service.horizon_info(config),
@@ -493,13 +697,29 @@ def get_hosts():
     """Empty until a capture is uploaded. The repo ships a checkpoint but no traffic, so a fresh
     clone legitimately has zero hosts -- the UI should show an empty state, not placeholders."""
     if STATE.batch is None:
+        if LIVE.active():
+            st = LIVE.status()
+            return {"active_dataset": STATE.dataset_id, "hosts": [], "data_source": STATE.source_name,
+                    "live_state": st.get("state"),
+                    "message": (f"{st.get('state')}: waiting for hosts to reach "
+                                f"{st.get('sequence_length')} windows ({st.get('hosts_warming_up', 0)} warming up)."),
+                    "timestamp": time.time()}
         return {"active_dataset": STATE.dataset_id, "hosts": [], "data_source": None,
                 "message": "No capture loaded. Upload a PCAP or flow CSV to populate hosts.",
                 "timestamp": time.time()}
     rows = [_host_row(i) for i in range(len(STATE.batch.host_ids))]
     rows.sort(key=lambda r: r["peak_prob"], reverse=True)
     return {"active_dataset": STATE.dataset_id, "hosts": rows,
-            "data_source": STATE.source_name, "timestamp": time.time()}
+            "data_source": STATE.source_name, "timestamp": time.time(),
+            **({"live_state": LIVE.status().get("state")} if LIVE.active() else {})}
+
+
+def _append_ledger(host: str, peak_prob: float, peak_stage: str, action: str):
+    """Thread-safe ledger append (QC-5); a corrupt ledger file is a 503, never silently overwritten."""
+    try:
+        return AuditLedger.append_and_save(_ledger_path(), host, peak_prob, peak_stage, action)
+    except LedgerCorruptError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 def _sequence_for(host_ip: str, config: dict[str, Any]) -> np.ndarray:
@@ -521,6 +741,7 @@ def predict_forecast(req: PredictRequest):
     60 seconds); a caller-supplied `horizon` is accepted for compatibility but ignored, because
     the model cannot roll out to an arbitrary depth it was not trained for."""
     _require_data()
+    from models.forecast import latest_sequence_is_contiguous
     engine, config = _engine()
     seq = _sequence_for(req.host_ip, config)
     result = engine.rollout(seq)
@@ -542,8 +763,14 @@ def predict_forecast(req: PredictRequest):
         # Observed, like _host_row -- stages[0] is already t+1, so using it here made the
         # forecast panel report "Benign" for a host the table and narrative both showed as
         # Command & Control.
-        "current_stage": _display(_observed_stage(req.host_ip) or stages[0]),
+        "current_stage": _display_observed(_observed_stage(req.host_ip)),
         "current_stage_observed": _observed_stage(req.host_ip) is not None,
+        # QC-1: False means the host's latest L windows span wall-clock gaps (windows exist only
+        # for slots with flows), so lead-time claims for this host should be qualified.
+        "input_contiguous": latest_sequence_is_contiguous(
+            STATE.windows, req.host_ip, int(config["windowing"]["sequence_length"]),
+            horizon["window_seconds"],
+        ),
         "horizon_note": (
             f"Forecast covers {horizon['horizon_seconds']} seconds "
             f"({horizon['horizon_k']} steps x {horizon['window_seconds']}s)."
@@ -725,6 +952,7 @@ def upload_file(file: UploadFile = File(...)):
     request -- including the dashboard's 5-second poll -- for the whole parse. FastAPI runs a
     sync endpoint in a threadpool instead.
     """
+    _refuse_while_live("upload")
     client_name = file.filename or "capture.pcap"
     ext = Path(client_name).suffix.lower()
     if ext not in (".pcap", ".pcapng", ".csv"):
@@ -804,6 +1032,152 @@ def upload_file(file: UploadFile = File(...)):
     }
 
 
+# ---------------------------------------------------------------- live / replay (docs/11)
+
+_LOOPBACK = {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
+_PROXY_HEADERS = ("cf-connecting-ip", "cf-ray", "x-forwarded-for", "x-real-ip", "forwarded")
+
+
+def _refuse_while_live(what: str) -> None:
+    """The live engine owns STATE and the loaded model while it runs; an upload or a model switch under
+    it would be overwritten within a tick, or score windows with the wrong scaler."""
+    if LIVE.active():
+        raise HTTPException(status_code=409, detail=f"A live/replay session is active; stop it before a {what}.")
+
+
+def _require_loopback(request: Request) -> None:
+    """Control endpoints are for the machine itself. The direct TCP peer is checked; X-Forwarded-For is
+    deliberately ignored (it is client-controlled). Behind a reverse proxy on the same host every request
+    looks local, so do not put a proxy in front of this server without its own access control. When
+    PHOENIX_REQUIRE_AUTH=1 the bearer token is required as well (see _require_control)."""
+    host = request.client.host if request.client else None
+    if host not in _LOOPBACK:
+        raise HTTPException(status_code=403, detail="Live control is restricted to the local machine.")
+    # A same-host reverse proxy or tunnel (e.g. cloudflared -> localhost:8000) makes every remote request
+    # arrive from loopback. Such proxies add forwarding headers, so their presence means "not local".
+    if any(request.headers.get(h) for h in _PROXY_HEADERS):
+        raise HTTPException(status_code=403, detail="Live control is restricted to the local machine (proxied request).")
+
+
+def _require_control(request: Request, authorization: str | None = Security(_api_key_header)) -> None:
+    _require_loopback(request)
+    _require_token(authorization)
+
+
+def _replay_roots() -> list[Path]:
+    """Directories a replay/live-tail path must live under (arbitrary-file-read guard)."""
+    roots = [PROJECT_ROOT / "data" / "raw" / "pcap", PROJECT_ROOT / "demo", PROJECT_ROOT / "lab_rec"]
+    for var in ("PHOENIX_REPLAY_DIR", "PHOENIX_LIVE_DIR"):
+        for part in (os.environ.get(var) or "").split(os.pathsep):
+            if part.strip():
+                roots.append(Path(part.strip()))
+    return [r.resolve() for r in roots]
+
+
+def _resolve_allowed(raw: str) -> Path:
+    p = Path(raw)
+    if not p.is_absolute():
+        p = PROJECT_ROOT / p
+    p = p.resolve()
+    if not any(p == r or p.is_relative_to(r) for r in _replay_roots()):
+        raise HTTPException(status_code=403, detail="Path is outside the allowed capture directories "
+                            "(data/raw/pcap, demo, lab_rec, $PHOENIX_REPLAY_DIR, $PHOENIX_LIVE_DIR).")
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="No such file or directory.")
+    return p
+
+
+def _live_settings(mode: str) -> live_mod.LiveSettings:
+    env = os.environ.get
+    cidrs = tuple(c.strip() for c in (env("PHOENIX_LAB_CIDR") or "").split(",") if c.strip())
+    ports_raw = env("PHOENIX_LIVE_IGNORE_PORTS")
+    if ports_raw is not None:
+        ports = tuple(int(x) for x in ports_raw.split(",") if x.strip())
+    else:
+        # LIVE: never score the dashboard's own traffic. REPLAY: the capture is what it is.
+        ports = (int(env("PHOENIX_PORT") or 8000),) if mode == "LIVE" else ()
+    score_log = env("PHOENIX_LIVE_SCORE_LOG")
+    return live_mod.LiveSettings(
+        flow_timeout_s=float(env("PHOENIX_LIVE_FLOW_TIMEOUT") or 30.0),
+        grace_s=float(env("PHOENIX_LIVE_GRACE") or 2.0),
+        lab_cidrs=cidrs, ignore_ports=ports,
+        score_log=Path(score_log) if score_log else None,
+    )
+
+
+def _make_live_engine(mode: str, source_name: str) -> live_mod.LiveEngine:
+    engine, config = _engine()
+    try:
+        return live_mod.LiveEngine(engine, config, _live_settings(mode), publish=STATE.publish,
+                                   source_name=source_name, mode=mode)
+    except live_mod.LiveConfigError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+def start_replay(path: Path, speed: float, max_gap_s: float | None = None) -> None:
+    """Start a replay of `path` (already validated). Also used by the PHOENIX_REPLAY autostart."""
+    paths = live_mod.list_captures(path)
+    if not paths:
+        raise HTTPException(status_code=404, detail="No .pcap/.pcapng files found there.")
+    live = _make_live_engine("REPLAY", f"REPLAY:{path.name}")
+    STATE.reset_data()
+    LIVE.start(live, lambda eng, stop: live_mod.ReplaySource(eng, paths, speed=speed, max_gap_s=max_gap_s, stop_event=stop))
+
+
+def start_live_tail(directory: Path) -> None:
+    if not directory.is_dir():
+        raise HTTPException(status_code=404, detail="The live directory does not exist.")
+    live = _make_live_engine("LIVE", f"LIVE:{directory.name}")
+    STATE.reset_data()
+    LIVE.start(live, lambda eng, stop: live_mod.LiveDirSource(eng, directory, stop_event=stop))
+
+
+class ReplayRequest(BaseModel):
+    path: str
+    speed: float = 1.0
+    max_gap_s: Optional[float] = None
+
+
+class LiveStartRequest(BaseModel):
+    directory: Optional[str] = None
+
+
+@app.get("/api/v1/live/status", dependencies=[Depends(_require_token)])
+def live_status():
+    """LIVE / REPLAY / STALE / OFF plus throughput, warm-up, lag and drop counters (docs/11)."""
+    return {**LIVE.status(), "active_dataset": STATE.dataset_id, "timestamp": time.time()}
+
+
+@app.post("/api/v1/live/replay", dependencies=[Depends(_require_control)])
+def live_replay(req: ReplayRequest):
+    if not (0.0 <= req.speed <= 1000.0):
+        raise HTTPException(status_code=422, detail="speed must be between 0 (as fast as possible) and 1000.")
+    if LIVE.active():
+        raise HTTPException(status_code=409, detail="A live/replay session is already active; stop it first.")
+    start_replay(_resolve_allowed(req.path), req.speed, req.max_gap_s)
+    return {"status": "started", **LIVE.status()}
+
+
+@app.post("/api/v1/live/start", dependencies=[Depends(_require_control)])
+def live_start(req: LiveStartRequest | None = None):
+    """Tail the directory of rotating dumpcap files. Starts no capture itself."""
+    raw = (req.directory if req and req.directory else None) or os.environ.get("PHOENIX_LIVE_DIR")
+    if not raw:
+        raise HTTPException(status_code=409, detail="No directory given and PHOENIX_LIVE_DIR is not set.")
+    if LIVE.active():
+        raise HTTPException(status_code=409, detail="A live/replay session is already active; stop it first.")
+    start_live_tail(_resolve_allowed(raw))
+    return {"status": "started", **LIVE.status()}
+
+
+@app.post("/api/v1/live/stop", dependencies=[Depends(_require_control)])
+def live_stop():
+    stopped = LIVE.stop()
+    if stopped:
+        STATE.reset_data()
+    return {"status": "stopped" if stopped else "not_running", **LIVE.status()}
+
+
 @app.post("/api/v1/reports/generate", dependencies=[Depends(_require_token)])
 def generate_report(req: ReportRequest):
     """A real CERT-In-aligned incident report, appended to the hash-chained audit ledger.
@@ -826,10 +1200,7 @@ def generate_report(req: ReportRequest):
         int(config["windowing"]["window_seconds"]), current_stage=_observed_stage(req.host_ip),
     ))
 
-    ledger_path = _ledger_path()
-    ledger = AuditLedger.load_or_create(ledger_path)
-    entry = ledger.append(req.host_ip, peak_prob, peak_stage, action["action"])
-    ledger.save(ledger_path)
+    entry = _append_ledger(req.host_ip, peak_prob, peak_stage, action["action"])
 
     report = generate_cert_in_report(
         host=req.host_ip,
@@ -885,13 +1256,10 @@ def simulate_isolation(req: SimulateIsolationRequest):
     peak_prob = float(result.infiltration_probs[peak_step])
     peak_stage = result.stage_predictions[peak_step]
 
-    ledger_path = _ledger_path()
-    ledger = AuditLedger.load_or_create(ledger_path)
-    entry = ledger.append(
+    entry = _append_ledger(
         req.host_ip, peak_prob, peak_stage,
         "SIMULATED: host isolated (demo action, no real network change)",
     )
-    ledger.save(ledger_path)
 
     return {
         "status": "simulated",
@@ -1004,6 +1372,74 @@ def download_report(filename: str):
     )
 
 
+_SERVED_METRIC_KEYS = (
+    ("auroc", "auroc"), ("auprc", "auprc"), ("f1_at_0.5", "f1@0.5"),
+    ("precision_at_0.5", "precision@0.5"), ("recall_at_0.5", "recall@0.5"),
+)
+
+
+def _served_model_metrics(data: dict[str, Any]) -> dict[str, Any]:
+    """The test metrics of the checkpoint this server is actually scoring with, read from the same
+    results file (one row of `per_run`), kept apart from the 3-seed mean. Returns an explicit
+    "no matching row" record rather than borrowing the mean when the active model has none."""
+    config = load_config(STATE.config_path)
+    serving = config.get("serving") or {}
+    info = model_info(STATE.config_path)
+    out: dict[str, Any] = {
+        "model_name": info["model_name"], "checkpoint_path": info["checkpoint_path"],
+        "selection_rule": serving.get("selection_rule"),
+        "val_loss": serving.get("val_loss"), "seed_val_losses": serving.get("seed_val_losses"),
+    }
+    row = (data.get("per_run") or {}).get(serving.get("results_key", ""))
+    if row is None:
+        out.update(available=False, metrics=None,
+                   note="No test metrics on file for the active model; the figures above are the "
+                        "3-seed mean of the v2 day-disjoint runs, not this model's own.")
+        return out
+    out.update(
+        available=True, results_key=serving["results_key"],
+        metrics={k: round(row[src], 4) for k, src in _SERVED_METRIC_KEYS if src in row},
+        note="This single checkpoint's own test metrics (one training run), shown separately from "
+             "the 3-seed mean +/- SD. It was chosen by lowest validation loss, not by test score.",
+    )
+    return out
+
+
+def _per_day_payload() -> dict[str, Any] | None:
+    """The per-day headline table of docs/17 (read from docs/results_per_day_v4.json, never literals). Additive: the pooled
+    fields of get_eval_metrics are unchanged. Returns None when the file has not been generated."""
+    if not PER_DAY_PATH.exists():
+        return None
+    r = json.loads(PER_DAY_PATH.read_text(encoding="utf-8"))
+
+    def split(sp: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "n_sequences": sp["n_sequences"], "n_positive": sp["n_pos"], "n_episodes": sp["n_episodes"],
+            "days": [{"day": d, "n_sequences": v["n"], "n_positive": v["pos"], "episodes": v["episodes"],
+                      "truncated_source": v["truncated"], "scores": v["scores"]} for d, v in sorted(sp["days"].items())],
+            "mean_of_days": sp["mean_within"],
+            "pooled_secondary": sp["pooled"],
+        }
+
+    return {
+        "source": "docs/results_per_day_v4.json (docs/17-results-per-day.md)",
+        "headline_rule": "within-day AUROC per day, with episodes beside it; pooled AUROC is a secondary row",
+        "truncation_note": r["truncation_note"], "truncated_days": r["truncated_days"],
+        "models": r["models"], "baselines": r["baselines"], "served_column": "seed1",
+        "baseline_notes": {"persistence_oracle": "reads the true current label - not deployable, upper reference only",
+                           "flow_count": "last-window flow_count, no training",
+                           "HGB_last": "HistGradientBoosting, last window", "HGB_stacked": "HistGradientBoosting, 12-window stack",
+                           "LR_last": "logistic regression, last window"},
+        "test": split(r["cic2018"]["test"]), "val": split(r["cic2018"]["val"]),
+        "cross_dataset_unit_balanced": {
+            k: {"unit_definition": v["unit_definition"], **v["counts"], "onset_episodes": v["episodes"],
+                "scores": {n: {"unit_balanced": s["unit_balanced"], "host_mean": s["host_mean"],
+                               "host_mean_ci95": s["host_mean_ci95"], "sequence_weighted_secondary": s["seq_weighted"]}
+                           for n, s in v["scores"].items()}}
+            for k, v in r["cross_dataset"].items()},
+    }
+
+
 @app.get("/api/v1/eval/metrics")
 def get_eval_metrics():
     """The project's measured results, read from the seed-summary files -- never literals.
@@ -1040,6 +1476,8 @@ def get_eval_metrics():
             "split that shared attack sessions between train and test and was withdrawn (audit E1)."
         ),
     }
+    payload["served_model"] = _served_model_metrics(data)
+    payload["per_day_v4"] = _per_day_payload()
     if LOFO_PATH.exists():
         lofo = json.loads(LOFO_PATH.read_text(encoding="utf-8"))
         payload["generalisation_lofo"] = {

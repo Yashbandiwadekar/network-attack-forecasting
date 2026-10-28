@@ -83,9 +83,9 @@ def test_chunking_does_not_change_the_result(tmp_path):
 def test_unsupported_link_type_is_rejected(tmp_path):
     from scapy.all import RawPcapWriter
     path = tmp_path / "raw.pcap"
-    w = RawPcapWriter(str(path), linktype=101, sync=True)  # raw IP, not handled
+    w = RawPcapWriter(str(path), linktype=147, sync=True)  # user-defined DLT, not handled (raw IP 101/228 is handled since docs/11)
     w._write_header(None)
-    w._write_packet(bytes(IP()), linktype=101, sec=BASE, usec=0, caplen=20, wirelen=20)
+    w._write_packet(bytes(IP()), linktype=147, sec=BASE, usec=0, caplen=20, wirelen=20)
     w.close()
     with pytest.raises(ValueError, match="unsupported link type"):
         process_pcap(path, 10)

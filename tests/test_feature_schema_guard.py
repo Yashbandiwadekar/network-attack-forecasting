@@ -56,3 +56,30 @@ def test_no_module_hand_picks_flow_level_only_as_a_model_input():
         if line and not line.startswith("common/config.py:")
     ]
     assert code_hits == [], f"found a hand-picked flow_level-only feature matrix outside common/config.py: {code_hits}"
+
+
+def test_served_checkpoint_carries_feature_names_and_the_guard_runs_on_load(monkeypatch):
+    """A1: the served model (configs/real_data_v2_converged_seed1.yaml) must exercise the W19 guard,
+    not skip it. Checks the file has feature_names matching its processed dataset's column list,
+    and that load_world_model actually calls validate_feature_names for it."""
+    import json
+
+    from common.config import load_config, resolve_path
+    from models import checkpoint_io, forecast
+
+    config = load_config("configs/real_data_v2_converged_seed1.yaml")
+    ckpt_path = resolve_path(config, "checkpoint_dir") / "world_model_best.pt"
+    meta_path = resolve_path(config, "processed_dir") / "metadata.json"
+    if not ckpt_path.exists() or not meta_path.exists():
+        pytest.skip("served checkpoint / processed metadata not present")
+
+    ckpt = checkpoint_io.load_checkpoint(ckpt_path, "cpu")
+    assert ckpt.get("feature_names"), "served checkpoint has no feature_names; guard would be skipped"
+    assert list(ckpt["feature_names"]) == json.loads(meta_path.read_text())["feature_columns"]
+
+    calls = []
+    real = checkpoint_io.validate_feature_names
+    monkeypatch.setattr(checkpoint_io, "validate_feature_names",
+                        lambda c, names: (calls.append(len(names)), real(c, names))[1])
+    forecast.load_world_model(ckpt_path)
+    assert calls == [41]

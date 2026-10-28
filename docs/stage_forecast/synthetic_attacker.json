@@ -1,0 +1,3291 @@
+{
+ "SYNTHETIC": true,
+ "recovery": {
+  "SYNTHETIC": true,
+  "view": "attacker",
+  "n_decoys": 3,
+  "n_campaigns": 1500,
+  "seed": 0,
+  "events": 3498,
+  "chains": 2127,
+  "rows": [
+   {
+    "transition": "reconnaissance->initial_access",
+    "n_from_state": 1500,
+    "k": 1056,
+    "p_true": 0.7,
+    "p_mle": 0.704,
+    "p_smoothed": 0.701859229747676,
+    "ci95_exact": [
+     0.6801820244895063,
+     0.7270165413013572
+    ],
+    "truth_inside_ci": true,
+    "mean_gap_true_s": 420.0,
+    "mean_gap_est_s": 421.2458187674657
+   },
+   {
+    "transition": "initial_access->command_and_control",
+    "n_from_state": 1055,
+    "k": 0,
+    "p_true": 0.6,
+    "p_mle": 0.0,
+    "p_smoothed": 0.000942507068803016,
+    "ci95_exact": [
+     0.0,
+     0.003490462326963067
+    ],
+    "truth_inside_ci": false,
+    "mean_gap_true_s": 600.0,
+    "mean_gap_est_s": 601.1847663203962
+   },
+   {
+    "transition": "command_and_control->exfiltration",
+    "n_from_state": 627,
+    "k": 315,
+    "p_true": 0.5,
+    "p_mle": 0.5023923444976076,
+    "p_smoothed": 0.49921011058451814,
+    "ci95_exact": [
+     0.46252644698334167,
+     0.5422356172262062
+    ],
+    "truth_inside_ci": true,
+    "mean_gap_true_s": 480.0,
+    "mean_gap_est_s": 517.8193599937209
+   }
+  ],
+  "all_truth_inside_ci": false
+ },
+ "setup": {
+  "fold_by": "chain",
+  "horizon_s": 3600.0,
+  "thresholds": [
+   0.25,
+   0.5
+  ],
+  "confirm_s": 0.0,
+  "model_kw": {
+   "max_chain_gap_s": 7200.0
+  },
+  "n_chains": 2127,
+  "n_events": 3498,
+  "n_entities": 2127,
+  "focus_stage": "reconnaissance",
+  "n_chains_terminated": 2127,
+  "chain_length_histogram": {
+   "1": 756,
+   "2": 1371
+  }
+ },
+ "focus_events": {
+  "order1": {
+   "n_items": 1500,
+   "resolution": {
+    "followed": 1056,
+    "terminated": 444,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "no_followup": 444,
+     "early": 1056,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1056,
+    "early": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1056,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.003487162734792625
+     ]
+    },
+    "lead_s": {
+     "n": 1056,
+     "median": 299.6388306617737,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "negatives": 444,
+    "false_alarm": {
+     "k": 444,
+     "n": 444,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.991726131372749,
+      1.0
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1056,
+      "n": 1056,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9965128372652073,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 444,
+      "n": 444,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.991726131372749,
+       1.0
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "no_followup": 444,
+     "early": 1056,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1056,
+    "early": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1056,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.003487162734792625
+     ]
+    },
+    "lead_s": {
+     "n": 1056,
+     "median": 299.6388306617737,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "negatives": 444,
+    "false_alarm": {
+     "k": 444,
+     "n": 444,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.991726131372749,
+      1.0
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1056,
+      "n": 1056,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9965128372652073,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 444,
+      "n": 444,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.991726131372749,
+       1.0
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 1500,
+    "mean_nats": 0.6107647078596279
+   },
+   "brier_p_any_within_H": {
+    "n": 1500,
+    "mean": 0.20866110532620247
+   },
+   "next_stage_top1": {
+    "k": 1056,
+    "n": 1056,
+    "rate": 1.0,
+    "ci95_exact": [
+     0.9965128372652073,
+     1.0
+    ]
+   }
+  },
+  "order0": {
+   "n_items": 1500,
+   "resolution": {
+    "followed": 1056,
+    "terminated": 444,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "no_followup": 444,
+     "early": 1056,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1056,
+    "early": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1056,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.003487162734792625
+     ]
+    },
+    "lead_s": {
+     "n": 1056,
+     "median": 299.6388306617737,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "negatives": 444,
+    "false_alarm": {
+     "k": 444,
+     "n": 444,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.991726131372749,
+      1.0
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1056,
+      "n": 1056,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9965128372652073,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 444,
+      "n": 444,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.991726131372749,
+       1.0
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "no_followup": 444,
+     "missed": 1056,
+     "early": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1056,
+    "early": {
+     "k": 0,
+     "n": 1056,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.003487162734792625
+     ]
+    },
+    "missed": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "min": null,
+     "max": null
+    },
+    "early_and_top_stage_correct": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "negatives": 444,
+    "false_alarm": {
+     "k": 0,
+     "n": 444,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.008273868627251015
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1056,
+      "n": 1056,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9965128372652073,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 444,
+      "n": 444,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.991726131372749,
+       1.0
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 1500,
+    "mean_nats": 0.9919496379970102
+   },
+   "brier_p_any_within_H": {
+    "n": 1500,
+    "mean": 0.3053388304780397
+   },
+   "next_stage_top1": {
+    "k": 1056,
+    "n": 1056,
+    "rate": 1.0,
+    "ci95_exact": [
+     0.9965128372652073,
+     1.0
+    ]
+   }
+  },
+  "order2": {
+   "n_items": 1500,
+   "resolution": {
+    "followed": 1056,
+    "terminated": 444,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "no_followup": 444,
+     "early": 1056,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1056,
+    "early": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1056,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.003487162734792625
+     ]
+    },
+    "lead_s": {
+     "n": 1056,
+     "median": 299.6388306617737,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "negatives": 444,
+    "false_alarm": {
+     "k": 444,
+     "n": 444,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.991726131372749,
+      1.0
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1056,
+      "n": 1056,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9965128372652073,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 444,
+      "n": 444,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.991726131372749,
+       1.0
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "no_followup": 444,
+     "early": 1056,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1056,
+    "early": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1056,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.003487162734792625
+     ]
+    },
+    "lead_s": {
+     "n": 1056,
+     "median": 299.6388306617737,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "negatives": 444,
+    "false_alarm": {
+     "k": 444,
+     "n": 444,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.991726131372749,
+      1.0
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1056,
+      "n": 1056,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9965128372652073,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 444,
+      "n": 444,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.991726131372749,
+       1.0
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 1500,
+    "mean_nats": 0.6107647078596279
+   },
+   "brier_p_any_within_H": {
+    "n": 1500,
+    "mean": 0.20866110532620247
+   },
+   "next_stage_top1": {
+    "k": 1056,
+    "n": 1056,
+    "rate": 1.0,
+    "ci95_exact": [
+     0.9965128372652073,
+     1.0
+    ]
+   }
+  },
+  "paired_logloss_order1_minus_order0": {
+   "n": 1500,
+   "mean": -0.38118493013738247,
+   "n_entities_or_chains_independent": 1500
+  }
+ },
+ "focus_events_first_onset": {
+  "order1": {
+   "n_items": 1500,
+   "resolution": {
+    "followed": 1056,
+    "terminated": 444,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "no_followup": 444,
+     "early": 1056,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1056,
+    "early": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1056,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.003487162734792625
+     ]
+    },
+    "lead_s": {
+     "n": 1056,
+     "median": 299.6388306617737,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "negatives": 444,
+    "false_alarm": {
+     "k": 444,
+     "n": 444,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.991726131372749,
+      1.0
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1056,
+      "n": 1056,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9965128372652073,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 444,
+      "n": 444,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.991726131372749,
+       1.0
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "no_followup": 444,
+     "early": 1056,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1056,
+    "early": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1056,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.003487162734792625
+     ]
+    },
+    "lead_s": {
+     "n": 1056,
+     "median": 299.6388306617737,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "negatives": 444,
+    "false_alarm": {
+     "k": 444,
+     "n": 444,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.991726131372749,
+      1.0
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1056,
+      "n": 1056,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9965128372652073,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 444,
+      "n": 444,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.991726131372749,
+       1.0
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 1500,
+    "mean_nats": 0.6107647078596279
+   },
+   "brier_p_any_within_H": {
+    "n": 1500,
+    "mean": 0.20866110532620247
+   },
+   "next_stage_top1": {
+    "k": 1056,
+    "n": 1056,
+    "rate": 1.0,
+    "ci95_exact": [
+     0.9965128372652073,
+     1.0
+    ]
+   }
+  },
+  "order0": {
+   "n_items": 1500,
+   "resolution": {
+    "followed": 1056,
+    "terminated": 444,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "no_followup": 444,
+     "early": 1056,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1056,
+    "early": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1056,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.003487162734792625
+     ]
+    },
+    "lead_s": {
+     "n": 1056,
+     "median": 299.6388306617737,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "negatives": 444,
+    "false_alarm": {
+     "k": 444,
+     "n": 444,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.991726131372749,
+      1.0
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1056,
+      "n": 1056,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9965128372652073,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 444,
+      "n": 444,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.991726131372749,
+       1.0
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "no_followup": 444,
+     "missed": 1056,
+     "early": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1056,
+    "early": {
+     "k": 0,
+     "n": 1056,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.003487162734792625
+     ]
+    },
+    "missed": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "min": null,
+     "max": null
+    },
+    "early_and_top_stage_correct": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "negatives": 444,
+    "false_alarm": {
+     "k": 0,
+     "n": 444,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.008273868627251015
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1056,
+      "n": 1056,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9965128372652073,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 444,
+      "n": 444,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.991726131372749,
+       1.0
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 1500,
+    "mean_nats": 0.9919496379970102
+   },
+   "brier_p_any_within_H": {
+    "n": 1500,
+    "mean": 0.3053388304780397
+   },
+   "next_stage_top1": {
+    "k": 1056,
+    "n": 1056,
+    "rate": 1.0,
+    "ci95_exact": [
+     0.9965128372652073,
+     1.0
+    ]
+   }
+  },
+  "order2": {
+   "n_items": 1500,
+   "resolution": {
+    "followed": 1056,
+    "terminated": 444,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "no_followup": 444,
+     "early": 1056,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1056,
+    "early": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1056,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.003487162734792625
+     ]
+    },
+    "lead_s": {
+     "n": 1056,
+     "median": 299.6388306617737,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "negatives": 444,
+    "false_alarm": {
+     "k": 444,
+     "n": 444,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.991726131372749,
+      1.0
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1056,
+      "n": 1056,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9965128372652073,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 444,
+      "n": 444,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.991726131372749,
+       1.0
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "no_followup": 444,
+     "early": 1056,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1056,
+    "early": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1056,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.003487162734792625
+     ]
+    },
+    "lead_s": {
+     "n": 1056,
+     "median": 299.6388306617737,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1056,
+     "n": 1056,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9965128372652073,
+      1.0
+     ]
+    },
+    "negatives": 444,
+    "false_alarm": {
+     "k": 444,
+     "n": 444,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.991726131372749,
+      1.0
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1056,
+      "n": 1056,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9965128372652073,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 444,
+      "n": 444,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.991726131372749,
+       1.0
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 1500,
+    "mean_nats": 0.6107647078596279
+   },
+   "brier_p_any_within_H": {
+    "n": 1500,
+    "mean": 0.20866110532620247
+   },
+   "next_stage_top1": {
+    "k": 1056,
+    "n": 1056,
+    "rate": 1.0,
+    "ci95_exact": [
+     0.9965128372652073,
+     1.0
+    ]
+   }
+  },
+  "paired_logloss_order1_minus_order0": {
+   "n": 1500,
+   "mean": -0.38118493013738247,
+   "n_entities_or_chains_independent": 1500
+  }
+ },
+ "focus_events_reonset": {
+  "order1": {
+   "n_items": 0,
+   "resolution": {
+    "followed": 0,
+    "terminated": 0,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "early": 0,
+     "missed": 0,
+     "beyond_horizon": 0,
+     "no_followup": 0
+    },
+    "positives_next_stage_within_H": 0,
+    "early": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "min": null,
+     "max": null
+    },
+    "early_and_top_stage_correct": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "negatives": 0,
+    "false_alarm": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     },
+     "false_alarm": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "early": 0,
+     "missed": 0,
+     "beyond_horizon": 0,
+     "no_followup": 0
+    },
+    "positives_next_stage_within_H": 0,
+    "early": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "min": null,
+     "max": null
+    },
+    "early_and_top_stage_correct": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "negatives": 0,
+    "false_alarm": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     },
+     "false_alarm": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 0,
+    "mean_nats": null
+   },
+   "brier_p_any_within_H": {
+    "n": 0,
+    "mean": null
+   },
+   "next_stage_top1": {
+    "k": 0,
+    "n": 0,
+    "rate": null,
+    "ci95_exact": [
+     null,
+     null
+    ]
+   }
+  },
+  "order0": {
+   "n_items": 0,
+   "resolution": {
+    "followed": 0,
+    "terminated": 0,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "early": 0,
+     "missed": 0,
+     "beyond_horizon": 0,
+     "no_followup": 0
+    },
+    "positives_next_stage_within_H": 0,
+    "early": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "min": null,
+     "max": null
+    },
+    "early_and_top_stage_correct": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "negatives": 0,
+    "false_alarm": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     },
+     "false_alarm": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "early": 0,
+     "missed": 0,
+     "beyond_horizon": 0,
+     "no_followup": 0
+    },
+    "positives_next_stage_within_H": 0,
+    "early": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "min": null,
+     "max": null
+    },
+    "early_and_top_stage_correct": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "negatives": 0,
+    "false_alarm": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     },
+     "false_alarm": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 0,
+    "mean_nats": null
+   },
+   "brier_p_any_within_H": {
+    "n": 0,
+    "mean": null
+   },
+   "next_stage_top1": {
+    "k": 0,
+    "n": 0,
+    "rate": null,
+    "ci95_exact": [
+     null,
+     null
+    ]
+   }
+  },
+  "order2": {
+   "n_items": 0,
+   "resolution": {
+    "followed": 0,
+    "terminated": 0,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "early": 0,
+     "missed": 0,
+     "beyond_horizon": 0,
+     "no_followup": 0
+    },
+    "positives_next_stage_within_H": 0,
+    "early": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "min": null,
+     "max": null
+    },
+    "early_and_top_stage_correct": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "negatives": 0,
+    "false_alarm": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     },
+     "false_alarm": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "early": 0,
+     "missed": 0,
+     "beyond_horizon": 0,
+     "no_followup": 0
+    },
+    "positives_next_stage_within_H": 0,
+    "early": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "min": null,
+     "max": null
+    },
+    "early_and_top_stage_correct": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "negatives": 0,
+    "false_alarm": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     },
+     "false_alarm": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 0,
+    "mean_nats": null
+   },
+   "brier_p_any_within_H": {
+    "n": 0,
+    "mean": null
+   },
+   "next_stage_top1": {
+    "k": 0,
+    "n": 0,
+    "rate": null,
+    "ci95_exact": [
+     null,
+     null
+    ]
+   }
+  },
+  "paired_logloss_order1_minus_order0": {
+   "n": 0,
+   "mean": null,
+   "n_entities_or_chains_independent": 0
+  }
+ },
+ "all_events": {
+  "order1": {
+   "n_items": 3498,
+   "resolution": {
+    "followed": 1371,
+    "terminated": 2127,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "no_followup": 2127,
+     "early": 1371,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1371,
+    "early": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1371,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.002687032211996872
+     ]
+    },
+    "lead_s": {
+     "n": 1371,
+     "median": 319.84893560409546,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "negatives": 2127,
+    "false_alarm": {
+     "k": 756,
+     "n": 2127,
+     "rate": 0.3554301833568406,
+     "ci95_exact": [
+      0.3350648250771619,
+      0.376194712665655
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1371,
+      "n": 1371,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9973129677880032,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 2127,
+      "n": 2127,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9982671920684069,
+       1.0
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "no_followup": 2127,
+     "early": 1371,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1371,
+    "early": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1371,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.002687032211996872
+     ]
+    },
+    "lead_s": {
+     "n": 1371,
+     "median": 319.84893560409546,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "negatives": 2127,
+    "false_alarm": {
+     "k": 756,
+     "n": 2127,
+     "rate": 0.3554301833568406,
+     "ci95_exact": [
+      0.3350648250771619,
+      0.376194712665655
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1371,
+      "n": 1371,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9973129677880032,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 2127,
+      "n": 2127,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9982671920684069,
+       1.0
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 3498,
+    "mean_nats": 0.39041517114039576
+   },
+   "brier_p_any_within_H": {
+    "n": 3498,
+    "mean": 0.13445933932787524
+   },
+   "next_stage_top1": {
+    "k": 1371,
+    "n": 1371,
+    "rate": 1.0,
+    "ci95_exact": [
+     0.9973129677880032,
+     1.0
+    ]
+   }
+  },
+  "order0": {
+   "n_items": 3498,
+   "resolution": {
+    "followed": 1371,
+    "terminated": 2127,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "no_followup": 2127,
+     "early": 1371,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1371,
+    "early": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1371,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.002687032211996872
+     ]
+    },
+    "lead_s": {
+     "n": 1371,
+     "median": 319.84893560409546,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1056,
+     "n": 1371,
+     "rate": 0.7702407002188184,
+     "ci95_exact": [
+      0.747042009290732,
+      0.7922750420266127
+     ]
+    },
+    "negatives": 2127,
+    "false_alarm": {
+     "k": 2127,
+     "n": 2127,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9982671920684069,
+      1.0
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1371,
+      "n": 1371,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9973129677880032,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 2127,
+      "n": 2127,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9982671920684069,
+       1.0
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "no_followup": 2127,
+     "missed": 1371,
+     "early": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1371,
+    "early": {
+     "k": 0,
+     "n": 1371,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.002687032211996872
+     ]
+    },
+    "missed": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "min": null,
+     "max": null
+    },
+    "early_and_top_stage_correct": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "negatives": 2127,
+    "false_alarm": {
+     "k": 0,
+     "n": 2127,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.0017328079315931649
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1371,
+      "n": 1371,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9973129677880032,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 2127,
+      "n": 2127,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9982671920684069,
+       1.0
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 3498,
+    "mean_nats": 0.8823462243956447
+   },
+   "brier_p_any_within_H": {
+    "n": 3498,
+    "mean": 0.23835263324615688
+   },
+   "next_stage_top1": {
+    "k": 1056,
+    "n": 1371,
+    "rate": 0.7702407002188184,
+    "ci95_exact": [
+     0.747042009290732,
+     0.7922750420266127
+    ]
+   }
+  },
+  "order2": {
+   "n_items": 3498,
+   "resolution": {
+    "followed": 1371,
+    "terminated": 2127,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "no_followup": 2127,
+     "early": 1371,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1371,
+    "early": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1371,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.002687032211996872
+     ]
+    },
+    "lead_s": {
+     "n": 1371,
+     "median": 319.84893560409546,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "negatives": 2127,
+    "false_alarm": {
+     "k": 756,
+     "n": 2127,
+     "rate": 0.3554301833568406,
+     "ci95_exact": [
+      0.3350648250771619,
+      0.376194712665655
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1371,
+      "n": 1371,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9973129677880032,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 2127,
+      "n": 2127,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9982671920684069,
+       1.0
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "no_followup": 2127,
+     "early": 1371,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1371,
+    "early": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1371,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.002687032211996872
+     ]
+    },
+    "lead_s": {
+     "n": 1371,
+     "median": 319.84893560409546,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "negatives": 2127,
+    "false_alarm": {
+     "k": 756,
+     "n": 2127,
+     "rate": 0.3554301833568406,
+     "ci95_exact": [
+      0.3350648250771619,
+      0.376194712665655
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1371,
+      "n": 1371,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9973129677880032,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 2127,
+      "n": 2127,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9982671920684069,
+       1.0
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 3498,
+    "mean_nats": 0.38758259146276325
+   },
+   "brier_p_any_within_H": {
+    "n": 3498,
+    "mean": 0.1344306678102222
+   },
+   "next_stage_top1": {
+    "k": 1371,
+    "n": 1371,
+    "rate": 1.0,
+    "ci95_exact": [
+     0.9973129677880032,
+     1.0
+    ]
+   }
+  },
+  "paired_logloss_order1_minus_order0": {
+   "n": 3498,
+   "mean": -0.4919310532552489,
+   "n_entities_or_chains_independent": 2127
+  }
+ },
+ "all_events_first_onset": {
+  "order1": {
+   "n_items": 3498,
+   "resolution": {
+    "followed": 1371,
+    "terminated": 2127,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "no_followup": 2127,
+     "early": 1371,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1371,
+    "early": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1371,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.002687032211996872
+     ]
+    },
+    "lead_s": {
+     "n": 1371,
+     "median": 319.84893560409546,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "negatives": 2127,
+    "false_alarm": {
+     "k": 756,
+     "n": 2127,
+     "rate": 0.3554301833568406,
+     "ci95_exact": [
+      0.3350648250771619,
+      0.376194712665655
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1371,
+      "n": 1371,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9973129677880032,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 2127,
+      "n": 2127,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9982671920684069,
+       1.0
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "no_followup": 2127,
+     "early": 1371,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1371,
+    "early": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1371,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.002687032211996872
+     ]
+    },
+    "lead_s": {
+     "n": 1371,
+     "median": 319.84893560409546,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "negatives": 2127,
+    "false_alarm": {
+     "k": 756,
+     "n": 2127,
+     "rate": 0.3554301833568406,
+     "ci95_exact": [
+      0.3350648250771619,
+      0.376194712665655
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1371,
+      "n": 1371,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9973129677880032,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 2127,
+      "n": 2127,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9982671920684069,
+       1.0
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 3498,
+    "mean_nats": 0.39041517114039576
+   },
+   "brier_p_any_within_H": {
+    "n": 3498,
+    "mean": 0.13445933932787524
+   },
+   "next_stage_top1": {
+    "k": 1371,
+    "n": 1371,
+    "rate": 1.0,
+    "ci95_exact": [
+     0.9973129677880032,
+     1.0
+    ]
+   }
+  },
+  "order0": {
+   "n_items": 3498,
+   "resolution": {
+    "followed": 1371,
+    "terminated": 2127,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "no_followup": 2127,
+     "early": 1371,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1371,
+    "early": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1371,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.002687032211996872
+     ]
+    },
+    "lead_s": {
+     "n": 1371,
+     "median": 319.84893560409546,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1056,
+     "n": 1371,
+     "rate": 0.7702407002188184,
+     "ci95_exact": [
+      0.747042009290732,
+      0.7922750420266127
+     ]
+    },
+    "negatives": 2127,
+    "false_alarm": {
+     "k": 2127,
+     "n": 2127,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9982671920684069,
+      1.0
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1371,
+      "n": 1371,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9973129677880032,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 2127,
+      "n": 2127,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9982671920684069,
+       1.0
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "no_followup": 2127,
+     "missed": 1371,
+     "early": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1371,
+    "early": {
+     "k": 0,
+     "n": 1371,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.002687032211996872
+     ]
+    },
+    "missed": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "min": null,
+     "max": null
+    },
+    "early_and_top_stage_correct": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "negatives": 2127,
+    "false_alarm": {
+     "k": 0,
+     "n": 2127,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.0017328079315931649
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1371,
+      "n": 1371,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9973129677880032,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 2127,
+      "n": 2127,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9982671920684069,
+       1.0
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 3498,
+    "mean_nats": 0.8823462243956447
+   },
+   "brier_p_any_within_H": {
+    "n": 3498,
+    "mean": 0.23835263324615688
+   },
+   "next_stage_top1": {
+    "k": 1056,
+    "n": 1371,
+    "rate": 0.7702407002188184,
+    "ci95_exact": [
+     0.747042009290732,
+     0.7922750420266127
+    ]
+   }
+  },
+  "order2": {
+   "n_items": 3498,
+   "resolution": {
+    "followed": 1371,
+    "terminated": 2127,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "no_followup": 2127,
+     "early": 1371,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1371,
+    "early": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1371,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.002687032211996872
+     ]
+    },
+    "lead_s": {
+     "n": 1371,
+     "median": 319.84893560409546,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "negatives": 2127,
+    "false_alarm": {
+     "k": 756,
+     "n": 2127,
+     "rate": 0.3554301833568406,
+     "ci95_exact": [
+      0.3350648250771619,
+      0.376194712665655
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1371,
+      "n": 1371,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9973129677880032,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 2127,
+      "n": 2127,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9982671920684069,
+       1.0
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "no_followup": 2127,
+     "early": 1371,
+     "missed": 0,
+     "beyond_horizon": 0
+    },
+    "positives_next_stage_within_H": 1371,
+    "early": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 1371,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.002687032211996872
+     ]
+    },
+    "lead_s": {
+     "n": 1371,
+     "median": 319.84893560409546,
+     "min": 4.484463453292847,
+     "max": 3120.1909108161926
+    },
+    "early_and_top_stage_correct": {
+     "k": 1371,
+     "n": 1371,
+     "rate": 1.0,
+     "ci95_exact": [
+      0.9973129677880032,
+      1.0
+     ]
+    },
+    "negatives": 2127,
+    "false_alarm": {
+     "k": 756,
+     "n": 2127,
+     "rate": 0.3554301833568406,
+     "ci95_exact": [
+      0.3350648250771619,
+      0.376194712665655
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 1371,
+      "n": 1371,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9973129677880032,
+       1.0
+      ]
+     },
+     "false_alarm": {
+      "k": 2127,
+      "n": 2127,
+      "rate": 1.0,
+      "ci95_exact": [
+       0.9982671920684069,
+       1.0
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 3498,
+    "mean_nats": 0.38758259146276325
+   },
+   "brier_p_any_within_H": {
+    "n": 3498,
+    "mean": 0.1344306678102222
+   },
+   "next_stage_top1": {
+    "k": 1371,
+    "n": 1371,
+    "rate": 1.0,
+    "ci95_exact": [
+     0.9973129677880032,
+     1.0
+    ]
+   }
+  },
+  "paired_logloss_order1_minus_order0": {
+   "n": 3498,
+   "mean": -0.4919310532552489,
+   "n_entities_or_chains_independent": 2127
+  }
+ },
+ "all_events_reonset": {
+  "order1": {
+   "n_items": 0,
+   "resolution": {
+    "followed": 0,
+    "terminated": 0,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "early": 0,
+     "missed": 0,
+     "beyond_horizon": 0,
+     "no_followup": 0
+    },
+    "positives_next_stage_within_H": 0,
+    "early": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "min": null,
+     "max": null
+    },
+    "early_and_top_stage_correct": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "negatives": 0,
+    "false_alarm": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     },
+     "false_alarm": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "early": 0,
+     "missed": 0,
+     "beyond_horizon": 0,
+     "no_followup": 0
+    },
+    "positives_next_stage_within_H": 0,
+    "early": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "min": null,
+     "max": null
+    },
+    "early_and_top_stage_correct": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "negatives": 0,
+    "false_alarm": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     },
+     "false_alarm": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 0,
+    "mean_nats": null
+   },
+   "brier_p_any_within_H": {
+    "n": 0,
+    "mean": null
+   },
+   "next_stage_top1": {
+    "k": 0,
+    "n": 0,
+    "rate": null,
+    "ci95_exact": [
+     null,
+     null
+    ]
+   }
+  },
+  "order0": {
+   "n_items": 0,
+   "resolution": {
+    "followed": 0,
+    "terminated": 0,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "early": 0,
+     "missed": 0,
+     "beyond_horizon": 0,
+     "no_followup": 0
+    },
+    "positives_next_stage_within_H": 0,
+    "early": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "min": null,
+     "max": null
+    },
+    "early_and_top_stage_correct": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "negatives": 0,
+    "false_alarm": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     },
+     "false_alarm": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "early": 0,
+     "missed": 0,
+     "beyond_horizon": 0,
+     "no_followup": 0
+    },
+    "positives_next_stage_within_H": 0,
+    "early": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "min": null,
+     "max": null
+    },
+    "early_and_top_stage_correct": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "negatives": 0,
+    "false_alarm": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     },
+     "false_alarm": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 0,
+    "mean_nats": null
+   },
+   "brier_p_any_within_H": {
+    "n": 0,
+    "mean": null
+   },
+   "next_stage_top1": {
+    "k": 0,
+    "n": 0,
+    "rate": null,
+    "ci95_exact": [
+     null,
+     null
+    ]
+   }
+  },
+  "order2": {
+   "n_items": 0,
+   "resolution": {
+    "followed": 0,
+    "terminated": 0,
+    "censored": 0
+   },
+   "thr_0.25": {
+    "outcomes": {
+     "early": 0,
+     "missed": 0,
+     "beyond_horizon": 0,
+     "no_followup": 0
+    },
+    "positives_next_stage_within_H": 0,
+    "early": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "min": null,
+     "max": null
+    },
+    "early_and_top_stage_correct": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "negatives": 0,
+    "false_alarm": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     },
+     "false_alarm": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     }
+    }
+   },
+   "thr_0.5": {
+    "outcomes": {
+     "early": 0,
+     "missed": 0,
+     "beyond_horizon": 0,
+     "no_followup": 0
+    },
+    "positives_next_stage_within_H": 0,
+    "early": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "missed": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "min": null,
+     "max": null
+    },
+    "early_and_top_stage_correct": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "negatives": 0,
+    "false_alarm": {
+     "k": 0,
+     "n": 0,
+     "rate": null,
+     "ci95_exact": [
+      null,
+      null
+     ]
+    },
+    "always_alarm_rule": {
+     "early": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     },
+     "false_alarm": {
+      "k": 0,
+      "n": 0,
+      "rate": null,
+      "ci95_exact": [
+       null,
+       null
+      ]
+     }
+    }
+   },
+   "next_outcome_log_loss": {
+    "n": 0,
+    "mean_nats": null
+   },
+   "brier_p_any_within_H": {
+    "n": 0,
+    "mean": null
+   },
+   "next_stage_top1": {
+    "k": 0,
+    "n": 0,
+    "rate": null,
+    "ci95_exact": [
+     null,
+     null
+    ]
+   }
+  },
+  "paired_logloss_order1_minus_order0": {
+   "n": 0,
+   "mean": null,
+   "n_entities_or_chains_independent": 0
+  }
+ },
+ "victim_ranking": {
+  "n_recon_events_with_successor": 1056,
+  "n": 1056,
+  "n_with_nonempty_ranking": 1056,
+  "hit@1": {
+   "k": 304,
+   "n": 1056,
+   "rate": 0.2878787878787879,
+   "ci95_exact": [
+    0.2607195161367859,
+    0.316225699519397
+   ]
+  },
+  "hit@3": {
+   "k": 830,
+   "n": 1056,
+   "rate": 0.7859848484848485,
+   "ci95_exact": [
+    0.7599942797601006,
+    0.8103705641126984
+   ]
+  }
+ },
+ "full_data_transition_table_DESCRIPTIVE_ONLY_in_sample": {
+  "reconnaissance": {
+   "n": 1500,
+   "counts": {
+    "<end>": 444,
+    "initial_access": 1056
+   },
+   "p_smoothed": {
+    "initial_access": 0.7019,
+    "lateral_movement": 0.0007,
+    "command_and_control": 0.0007,
+    "exfiltration": 0.0007,
+    "impact": 0.0007,
+    "<end>": 0.2955
+   },
+   "exposure_s": 444813.2431497574,
+   "rate_per_s": 0.0023739114161258302,
+   "mean_time_to_next_event_s": 421.24571001557314
+  },
+  "initial_access": {
+   "n": 1056,
+   "counts": {
+    "<end>": 1056
+   },
+   "p_smoothed": {
+    "reconnaissance": 0.0009,
+    "lateral_movement": 0.0009,
+    "command_and_control": 0.0009,
+    "exfiltration": 0.0009,
+    "impact": 0.0009,
+    "<end>": 0.9953
+   },
+   "exposure_s": 0.0,
+   "rate_per_s": 0.0022549320831005567,
+   "mean_time_to_next_event_s": 443.4723367033693
+  },
+  "lateral_movement": {
+   "n": 0,
+   "counts": {},
+   "p_smoothed": {
+    "reconnaissance": 0.1667,
+    "initial_access": 0.1667,
+    "command_and_control": 0.1667,
+    "exfiltration": 0.1667,
+    "impact": 0.1667,
+    "<end>": 0.1667
+   },
+   "exposure_s": 0.0,
+   "rate_per_s": 0.0022549320831005567,
+   "mean_time_to_next_event_s": 443.4723367033693
+  },
+  "command_and_control": {
+   "n": 627,
+   "counts": {
+    "exfiltration": 315,
+    "<end>": 312
+   },
+   "p_smoothed": {
+    "reconnaissance": 0.0016,
+    "initial_access": 0.0016,
+    "lateral_movement": 0.0016,
+    "exfiltration": 0.4992,
+    "impact": 0.0016,
+    "<end>": 0.4945
+   },
+   "exposure_s": 163187.33047056198,
+   "rate_per_s": 0.00193117673798988,
+   "mean_time_to_next_event_s": 517.8189962255233
+  },
+  "exfiltration": {
+   "n": 315,
+   "counts": {
+    "<end>": 315
+   },
+   "p_smoothed": {
+    "reconnaissance": 0.0031,
+    "initial_access": 0.0031,
+    "lateral_movement": 0.0031,
+    "command_and_control": 0.0031,
+    "impact": 0.0031,
+    "<end>": 0.9844
+   },
+   "exposure_s": 0.0,
+   "rate_per_s": 0.0022549320831005567,
+   "mean_time_to_next_event_s": 443.4723367033693
+  },
+  "impact": {
+   "n": 0,
+   "counts": {},
+   "p_smoothed": {
+    "reconnaissance": 0.1667,
+    "initial_access": 0.1667,
+    "lateral_movement": 0.1667,
+    "command_and_control": 0.1667,
+    "exfiltration": 0.1667,
+    "<end>": 0.1667
+   },
+   "exposure_s": 0.0,
+   "rate_per_s": 0.0022549320831005567,
+   "mean_time_to_next_event_s": 443.4723367033693
+  }
+ },
+ "chains": "omitted (>400 chains)"
+}

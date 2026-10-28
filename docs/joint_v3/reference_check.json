@@ -1,0 +1,350 @@
+{
+ "v2ref": {
+  "config": "configs/real_data_v2.yaml",
+  "checkpoint": "checkpoints_real_v2\\world_model_best.pt",
+  "datasets": {
+   "ctu_old_test": {
+    "n": 186520,
+    "n_positive": 5944,
+    "n_hosts": 1787,
+    "auroc": 0.7804040366214684,
+    "auprc": 0.0699500019981779,
+    "at_0.5": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "false_positive_rate": 0.0006423888002835372
+    },
+    "at_0.4": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "false_positive_rate": 0.0013456937799043063
+    },
+    "auroc_ci95_block_bootstrap": [
+     0.7470039933510252,
+     0.7985662407952407
+    ],
+    "auprc_ci95_block_bootstrap": [
+     0.048459155063331365,
+     0.07897627291372679
+    ],
+    "n_blocks": 2421
+   },
+   "ctu_old_all": {
+    "n": 1491560,
+    "n_positive": 24466,
+    "n_hosts": 8399,
+    "auroc": 0.5079446705366205,
+    "auprc": 0.01645793402036224,
+    "at_0.5": {
+     "f1": 0.000672997831451432,
+     "precision": 0.003947368421052632,
+     "recall": 0.00036785743480748795,
+     "false_positive_rate": 0.0015479580722162316
+    },
+    "at_0.4": {
+     "f1": 0.0007124536905101168,
+     "precision": 0.0027731558513588465,
+     "recall": 0.00040873048311943107,
+     "false_positive_rate": 0.0024511040192380313
+    },
+    "auroc_ci95_block_bootstrap": [
+     0.4605922187711909,
+     0.5509486895064558
+    ],
+    "auprc_ci95_block_bootstrap": [
+     0.01512216166805716,
+     0.01953638917330498
+    ],
+    "n_blocks": 14623
+   },
+   "unsw_old_v2_all": {
+    "n": 108372,
+    "n_positive": 18037,
+    "n_hosts": 34,
+    "auroc": 0.3684858168963885,
+    "auprc": 0.21573914236165298,
+    "at_0.5": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "false_positive_rate": 0.0005313555100459401
+    },
+    "at_0.4": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "false_positive_rate": 0.0006309846681795539
+    },
+    "auroc_ci95_block_bootstrap": [
+     0.3378103905950387,
+     0.3754347424570222
+    ],
+    "auprc_ci95_block_bootstrap": [
+     0.15902928127852822,
+     0.23181276435816578
+    ],
+    "n_blocks": 560
+   },
+   "ctu_new_contig": {
+    "n": 355302,
+    "n_positive": 21066,
+    "n_hosts": 311,
+    "auroc": 0.38426277563172945,
+    "auprc": 0.04490257316617026,
+    "at_0.5": {
+     "f1": 0.0007787825033530913,
+     "precision": 0.004396678065461651,
+     "recall": 0.0004272287097692965,
+     "false_positive_rate": 0.006097488002489259
+    },
+    "at_0.4": {
+     "f1": 0.0008195713641765357,
+     "precision": 0.0029967036260113876,
+     "recall": 0.00047469856641032946,
+     "false_positive_rate": 0.009954044447635802
+    },
+    "auroc_ci95_block_bootstrap": [
+     0.36081784198677164,
+     0.40985473951508494
+    ],
+    "auprc_ci95_block_bootstrap": [
+     0.039835829600849686,
+     0.05272035484182558
+    ],
+    "n_blocks": 1986
+   },
+   "ctu_new_noncontig": {
+    "n": 1554369,
+    "n_positive": 25364,
+    "n_hosts": 8527,
+    "auroc": 0.5272784659038682,
+    "auprc": 0.017225680484709432,
+    "at_0.5": {
+     "f1": 0.0010119628465069211,
+     "precision": 0.006073752711496746,
+     "recall": 0.0005519634127109288,
+     "false_positive_rate": 0.0014983600446041706
+    },
+    "at_0.4": {
+     "f1": 0.0010999965625107422,
+     "precision": 0.004292997048564529,
+     "recall": 0.0006308153288124901,
+     "false_positive_rate": 0.0024270685838175808
+    },
+    "auroc_ci95_block_bootstrap": [
+     0.49144011412511435,
+     0.5496923951907049
+    ],
+    "auprc_ci95_block_bootstrap": [
+     0.015821749678431887,
+     0.019398769583557456
+    ],
+    "n_blocks": 15037
+   },
+   "unsw_new_noncontig": {
+    "n": 117264,
+    "n_positive": 18057,
+    "n_hosts": 39,
+    "auroc": 0.40238303933054487,
+    "auprc": 0.2097307290353707,
+    "at_0.5": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "false_positive_rate": 0.0004132772889009848
+    },
+    "at_0.4": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "false_positive_rate": 0.000493916759906055
+    },
+    "auroc_ci95_block_bootstrap": [
+     0.37594464814197537,
+     0.42661486176530444
+    ],
+    "auprc_ci95_block_bootstrap": [
+     0.16784335326665986,
+     0.28210801947774955
+    ],
+    "n_blocks": 606
+   }
+  }
+ },
+ "seed1": {
+  "config": "configs/real_data_v2_converged_seed1.yaml",
+  "checkpoint": "C:\\Users\\Yash\\Documents\\Claude\\Projects\\Network Attack Forecasting\\checkpoints_real_v2_converged\\seed1\\world_model_best.pt",
+  "datasets": {
+   "ctu_old_test": {
+    "n": 186520,
+    "n_positive": 5944,
+    "n_hosts": 1787,
+    "auroc": 0.35309538171585036,
+    "auprc": 0.022671245446457516,
+    "at_0.5": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "false_positive_rate": 0.00040979975190501505
+    },
+    "at_0.4": {
+     "f1": 0.0,
+     "precision": 0.0,
+     "recall": 0.0,
+     "false_positive_rate": 0.0013180046074782916
+    },
+    "auroc_ci95_block_bootstrap": [
+     0.32346627761840335,
+     0.3749235194397326
+    ],
+    "auprc_ci95_block_bootstrap": [
+     0.017829593525025448,
+     0.02628494879018831
+    ],
+    "n_blocks": 2421
+   },
+   "ctu_old_all": {
+    "n": 1491560,
+    "n_positive": 24466,
+    "n_hosts": 8399,
+    "auroc": 0.39330701081058167,
+    "auprc": 0.012164099637876227,
+    "at_0.5": {
+     "f1": 0.0018611576400521124,
+     "precision": 0.010421008753647354,
+     "recall": 0.0010218262077985776,
+     "false_positive_rate": 0.0016181648892300015
+    },
+    "at_0.4": {
+     "f1": 0.0016568424406563644,
+     "precision": 0.0037577684636508164,
+     "recall": 0.0010626992561105207,
+     "false_positive_rate": 0.004698403783261332
+    },
+    "auroc_ci95_block_bootstrap": [
+     0.37764344061766353,
+     0.4132744492466433
+    ],
+    "auprc_ci95_block_bootstrap": [
+     0.011327664822801157,
+     0.014019362817979015
+    ],
+    "n_blocks": 14623
+   },
+   "unsw_old_v2_all": {
+    "n": 108372,
+    "n_positive": 18037,
+    "n_hosts": 34,
+    "auroc": 0.2831149499129694,
+    "auprc": 0.19639799365280652,
+    "at_0.5": {
+     "f1": 0.04632512003376774,
+     "precision": 0.47925764192139736,
+     "recall": 0.024338859012030825,
+     "false_positive_rate": 0.00528034538108153
+    },
+    "at_0.4": {
+     "f1": 0.06366130117488743,
+     "precision": 0.47897196261682246,
+     "recall": 0.03409657925375617,
+     "false_positive_rate": 0.007405767421265291
+    },
+    "auroc_ci95_block_bootstrap": [
+     0.24648403552828219,
+     0.2843227813224661
+    ],
+    "auprc_ci95_block_bootstrap": [
+     0.13321019740678922,
+     0.20832163916379337
+    ],
+    "n_blocks": 560
+   },
+   "ctu_new_contig": {
+    "n": 355302,
+    "n_positive": 21066,
+    "n_hosts": 311,
+    "auroc": 0.1551791704912996,
+    "auprc": 0.03270099044935639,
+    "at_0.5": {
+     "f1": 0.001743071291615827,
+     "precision": 0.010626992561105207,
+     "recall": 0.0009493971328206589,
+     "false_positive_rate": 0.0055709139649828265
+    },
+    "at_0.4": {
+     "f1": 0.0018365472910927456,
+     "precision": 0.007607192254495159,
+     "recall": 0.0010443368461027249,
+     "false_positive_rate": 0.008586747088883304
+    },
+    "auroc_ci95_block_bootstrap": [
+     0.12102862029345554,
+     0.16982315662818157
+    ],
+    "auprc_ci95_block_bootstrap": [
+     0.029085185196391267,
+     0.03881425687002397
+    ],
+    "n_blocks": 1986
+   },
+   "ctu_new_noncontig": {
+    "n": 1554369,
+    "n_positive": 25364,
+    "n_hosts": 8527,
+    "auroc": 0.3946573308599918,
+    "auprc": 0.012559148314949649,
+    "at_0.5": {
+     "f1": 0.006171289153600517,
+     "precision": 0.03430394894295971,
+     "recall": 0.0033906323923671346,
+     "false_positive_rate": 0.0015833826573490603
+    },
+    "at_0.4": {
+     "f1": 0.010216085691288465,
+     "precision": 0.023782069760737965,
+     "recall": 0.006505283078378805,
+     "false_positive_rate": 0.004429678124008751
+    },
+    "auroc_ci95_block_bootstrap": [
+     0.3720650948408628,
+     0.4098837762914091
+    ],
+    "auprc_ci95_block_bootstrap": [
+     0.011309629371458359,
+     0.014723459991916153
+    ],
+    "n_blocks": 15037
+   },
+   "unsw_new_noncontig": {
+    "n": 117264,
+    "n_positive": 18057,
+    "n_hosts": 39,
+    "auroc": 0.2924273687606942,
+    "auprc": 0.17955750013138677,
+    "at_0.5": {
+     "f1": 0.05314846909300982,
+     "precision": 0.5142276422764228,
+     "recall": 0.028022373594727805,
+     "false_positive_rate": 0.004818208392552945
+    },
+    "at_0.4": {
+     "f1": 0.07177058126962879,
+     "precision": 0.5102489019033675,
+     "recall": 0.038599988923963005,
+     "false_positive_rate": 0.006743475762798996
+    },
+    "auroc_ci95_block_bootstrap": [
+     0.2581069422634899,
+     0.3292208715413403
+    ],
+    "auprc_ci95_block_bootstrap": [
+     0.14217004988226892,
+     0.25336203839510896
+    ],
+    "n_blocks": 606
+   }
+  }
+ }
+}

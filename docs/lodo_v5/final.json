@@ -1,0 +1,180 @@
+{
+ "best": "C_S1_no_zero9_RF",
+ "variant": "S1_no_zero9",
+ "family": "RF",
+ "tuned": {
+  "best": 0,
+  "cfg": {
+   "min_samples_leaf": 5,
+   "class_weight": null
+  },
+  "inner_auc": [
+   [
+    0.988941411563198,
+    0.5636944226139718,
+    0.7458801738997816,
+    0.8815817275185936,
+    0.6349955675497572,
+    0.7152326977226934,
+    0.932484829868184
+   ],
+   [
+    0.959001528101963,
+    0.4579430506364047,
+    0.8043697882666478,
+    0.9353765212981744,
+    0.6060983454800775,
+    0.7259955659120785,
+    0.8505607290285726
+   ],
+   [
+    0.995402260247519,
+    0.4532238488709534,
+    0.4577409098758122,
+    0.5971834854631507,
+    0.6375138268912441,
+    0.719708379400837,
+    0.8813451389113433
+   ],
+   [
+    0.9654951218283488,
+    0.26827640274978015,
+    0.4188192401653968,
+    0.9357568458417851,
+    0.6178639512352022,
+    0.7091783878840288,
+    0.7708977772029474
+   ]
+  ],
+  "inner_folds": [
+   "2018-02-14",
+   "2018-02-15",
+   "2018-02-20",
+   "2018-02-21",
+   "2018-02-22",
+   "2018-02-28",
+   "2018-03-02"
+  ],
+  "inner_mean": [
+   0.7804015472480257,
+   0.7627636469605598,
+   0.6774454070944086,
+   0.6694696752724985
+  ],
+  "threshold_1pct": 0.4800146818161011
+ },
+ "incumbent_threshold_1pct": 0.6849364042282104,
+ "export_path": "checkpoints_baselines_v5\\final\\C_S1_no_zero9_RF.npz",
+ "export_roundtrip_max_abs_diff_5000_train_rows": 2.220446049250313e-16,
+ "n_columns": 192,
+ "external": {
+  "CTU-13": {
+   "n_seq": 355302,
+   "pos_seq": 21066,
+   "flow_count": {
+    "pooled_seq": 0.4875429818961105,
+    "unit_balanced": 0.7235344454638787,
+    "unit_balanced_by_ip": 0.8708315521635535,
+    "host_mean": 0.9073089700996678,
+    "n_hosts": 311,
+    "n_pos_hosts": 10
+   },
+   "HGB_stacked(current)": {
+    "pooled_seq": 0.2778974991433821,
+    "unit_balanced": 0.6147568466513853,
+    "unit_balanced_by_ip": 0.5288014619115795,
+    "host_mean": 0.7916943521594685,
+    "n_hosts": 311,
+    "n_pos_hosts": 10
+   },
+   "candidate=C_S1_no_zero9_RF": {
+    "pooled_seq": 0.24079709925356937,
+    "unit_balanced": 0.4534942352802825,
+    "unit_balanced_by_ip": 0.21036526833884273,
+    "host_mean": 0.20498338870431893,
+    "n_hosts": 311,
+    "n_pos_hosts": 10
+   },
+   "S3_log default HGB (post-hoc)": {
+    "pooled_seq": 0.3975282808691233,
+    "unit_balanced": 0.6474195830579222,
+    "unit_balanced_by_ip": 0.7389115180072168,
+    "host_mean": 0.8498338870431893,
+    "n_hosts": 311,
+    "n_pos_hosts": 10
+   }
+  },
+  "UNSW-NB15": {
+   "n_seq": 96299,
+   "pos_seq": 9997,
+   "flow_count": {
+    "pooled_seq": 0.29222267584078143,
+    "unit_balanced": 0.22928131172524865,
+    "unit_balanced_by_ip": 0.22928131172524865,
+    "host_mean": 0.5,
+    "n_hosts": 19,
+    "n_pos_hosts": 4
+   },
+   "HGB_stacked(current)": {
+    "pooled_seq": 0.080746539783121,
+    "unit_balanced": 0.08243057826212924,
+    "unit_balanced_by_ip": 0.08243057826212924,
+    "host_mean": 0.06666666666666665,
+    "n_hosts": 19,
+    "n_pos_hosts": 4
+   },
+   "candidate=C_S1_no_zero9_RF": {
+    "pooled_seq": 0.1424128705553336,
+    "unit_balanced": 0.1131989438449514,
+    "unit_balanced_by_ip": 0.1131989438449514,
+    "host_mean": 0.0,
+    "n_hosts": 19,
+    "n_pos_hosts": 4
+   },
+   "S3_log default HGB (post-hoc)": {
+    "pooled_seq": 0.013252496061209734,
+    "unit_balanced": 0.03714450095198065,
+    "unit_balanced_by_ip": 0.03714450095198065,
+    "host_mean": 0.09999999999999998,
+    "n_hosts": 19,
+    "n_pos_hosts": 4
+   }
+  },
+  "CIC-2017 60s": {
+   "n_seq": 41713,
+   "pos_seq": 901,
+   "flow_count": {
+    "pooled_seq": 0.709670424565559,
+    "unit_balanced": 0.8976097113415007,
+    "unit_balanced_by_ip": 0.8976097113415007,
+    "host_mean": 0.9950323974082073,
+    "n_hosts": 473,
+    "n_pos_hosts": 10
+   },
+   "HGB_stacked(current)": {
+    "pooled_seq": 0.7843162274202176,
+    "unit_balanced": 0.8539719705118711,
+    "unit_balanced_by_ip": 0.8539719705118711,
+    "host_mean": 0.9840172786177107,
+    "n_hosts": 473,
+    "n_pos_hosts": 10
+   },
+   "candidate=C_S1_no_zero9_RF": {
+    "pooled_seq": 0.713971867754941,
+    "unit_balanced": 0.842004554109577,
+    "unit_balanced_by_ip": 0.842004554109577,
+    "host_mean": 0.9892008639308855,
+    "n_hosts": 473,
+    "n_pos_hosts": 10
+   },
+   "S3_log default HGB (post-hoc)": {
+    "pooled_seq": 0.8439789096001556,
+    "unit_balanced": 0.9388333846234778,
+    "unit_balanced_by_ip": 0.9388333846234778,
+    "host_mean": 0.994816414686825,
+    "n_hosts": 473,
+    "n_pos_hosts": 10
+   }
+  }
+ }
+}

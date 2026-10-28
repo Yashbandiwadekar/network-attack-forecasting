@@ -381,3 +381,70 @@ def test_spa_fallback_cannot_escape_the_build_directory(client: TestClient):
     resp = client.get("/../../app/server.py")
     assert resp.status_code in (200, 404)
     assert "uvicorn.run" not in resp.text
+
+
+# ----------------------------------------------------------------- A1: served model's own metrics
+
+def _results():
+    return json.loads((PROJECT_ROOT / "docs" / "v2_converged_seed_results.json").read_text())
+
+
+def test_eval_metrics_report_served_model_separately_from_the_mean(client: TestClient):
+    from app.server import DEFAULT_CONFIG, STATE
+    saved = STATE.config_path  # other test modules leave STATE on a different model
+    STATE.config_path = DEFAULT_CONFIG
+    try:
+        body = client.get("/api/v1/eval/metrics").json()
+    finally:
+        STATE.config_path = saved
+    served = body["served_model"]
+    assert served["available"] is True
+    assert served["model_name"] == "real_data_v2_converged_seed1"
+    assert served["results_key"] == "seed1"
+    row = _results()["per_run"]["seed1"]
+    assert served["metrics"]["auroc"] == round(row["auroc"], 4)
+    assert served["metrics"]["f1_at_0.5"] == round(row["f1@0.5"], 4)
+    # separate from, and not equal to, the 3-seed mean
+    assert served["metrics"]["auroc"] != body["auroc"]["mean"]
+    assert body["auroc"]["mean"] == round(_results()["across_seeds"]["auroc"]["mean"], 4)
+    # selection was by validation loss: the served seed has the lowest recorded val loss
+    losses = served["seed_val_losses"]
+    assert served["results_key"] == min(losses, key=losses.get)
+
+
+def test_eval_metrics_follow_the_active_model(client: TestClient):
+    from app.server import STATE
+    saved = STATE.config_path
+    try:
+        STATE.config_path = "configs/real_data_v2_converged.yaml"
+        served = client.get("/api/v1/eval/metrics").json()["served_model"]
+        assert served["results_key"] == "unseeded (shipped)"
+        assert served["metrics"]["auroc"] == round(_results()["per_run"]["unseeded (shipped)"]["auroc"], 4)
+        STATE.config_path = "configs/real_data.yaml"
+        served = client.get("/api/v1/eval/metrics").json()["served_model"]
+        assert served["available"] is False and served["metrics"] is None
+    finally:
+        STATE.config_path = saved
+
+
+# ----------------------------------------------------------------- docs/17: per-day table (additive field)
+
+def test_eval_metrics_serve_the_per_day_table_from_the_results_file(client: TestClient):
+    path = PROJECT_ROOT / "docs" / "results_per_day_v4.json"
+    if not path.exists():
+        pytest.skip("docs/results_per_day_v4.json not generated (python -m eval.report_v4)")
+    truth = json.loads(path.read_text())
+    body = client.get("/api/v1/eval/metrics").json()
+    assert body["auroc"]["mean"] == round(_results()["across_seeds"]["auroc"]["mean"], 4)   # existing fields untouched
+    pd = body["per_day_v4"]
+    assert [d["day"] for d in pd["test"]["days"]] == ["2018-02-16", "2018-02-23", "2018-03-01"]
+    d0 = pd["test"]["days"][1]
+    assert d0["episodes"] == truth["cic2018"]["test"]["days"]["2018-02-23"]["episodes"] == 8
+    assert d0["truncated_source"] is True and pd["test"]["days"][2]["truncated_source"] is False
+    assert d0["scores"]["seed1"]["auroc"] == truth["cic2018"]["test"]["days"]["2018-02-23"]["scores"]["seed1"]["auroc"]
+    for b in ("persistence_oracle", "flow_count", "HGB_last", "LR_last"):
+        assert b in d0["scores"]                                    # baselines beside the model
+    assert pd["test"]["n_episodes"] == 12 and pd["val"]["n_episodes"] == 14
+    assert "1,048,575" in pd["truncation_note"]
+    ctu = pd["cross_dataset_unit_balanced"]["ctu13"]
+    assert ctu["n_units"] == ctu["n_pos_units"] + ctu["n_neg_units"] and "unit_balanced" in ctu["scores"]["seed1"]

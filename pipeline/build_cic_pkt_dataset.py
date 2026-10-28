@@ -28,7 +28,7 @@ from pipeline.graph_builder import build_window_graphs, save_window_graphs
 from pipeline.graph_embedding_features import build_graph_embedding_window_features
 from pipeline.graph_features import build_graph_window_features
 from pipeline.windowing import (
-    apply_reconnaissance_heuristic, build_flow_windows, build_sequences,
+    apply_reconnaissance_heuristic, build_flow_windows, build_sequences, sequence_gap_stats,
     merge_graph_embedding_features, merge_graph_features, merge_packet_features,
 )
 
@@ -116,6 +116,8 @@ def build(config_path: str) -> None:
         "sequence_length": int(config["windowing"]["sequence_length"]), "forecast_horizon": horizon,
         "window_seconds": window_s, "flow_only": False, "packet_features_available": True,
         "num_windows": int(len(windows)), "num_sequences": int(n),
+        "require_contiguous_windows": bool(config["windowing"].get("require_contiguous_windows", False)),
+        "sequence_gap_stats": sequence_gap_stats(seq["window_times"], window_s),
         "splits": {k: int(len(v["X"])) for k, v in splits.items()},
         "caveat": "Flow records assembled from PCAP (120 s timeout, no FIN split); packet windows for outside sources seen "
                   "by several victims are averaged across captures; retransmit_ratio counts repeated seq incl. pure ACKs.",

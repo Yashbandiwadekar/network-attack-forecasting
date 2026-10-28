@@ -1,0 +1,54 @@
+{
+ "alpha": 1.0,
+ "beta": 2.0,
+ "counts1": {
+  "command_and_control": {
+   "<end>": 6
+  },
+  "impact": {
+   "<end>": 1,
+   "initial_access": 1
+  },
+  "initial_access": {
+   "<end>": 4
+  },
+  "lateral_movement": {
+   "<end>": 1
+  },
+  "reconnaissance": {
+   "impact": 1
+  }
+ },
+ "counts2": {},
+ "exposure": {
+  "command_and_control": 0.0,
+  "impact": 6840.0,
+  "initial_access": 0.0,
+  "lateral_movement": 0.0,
+  "reconnaissance": 10260.0
+ },
+ "fit_info": {
+  "n_censored": 1,
+  "n_chains": 13,
+  "n_end": 12,
+  "n_events": 15,
+  "n_transitions": 2
+ },
+ "max_chain_gap_s": 7200.0,
+ "min_support2": 2,
+ "order": 1,
+ "rate_prior_events": 1.0,
+ "schema": "naf.stage_forecaster/1",
+ "stages": [
+  "reconnaissance",
+  "initial_access",
+  "lateral_movement",
+  "command_and_control",
+  "exfiltration",
+  "impact"
+ ],
+ "target": {
+  "hits": 1,
+  "pairs": 1
+ }
+}

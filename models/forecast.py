@@ -373,23 +373,65 @@ def or_gate_alarm(
     return infiltration_prob >= prob_threshold or reconstruction_error >= recon_threshold
 
 
-def latest_sequence(windows_df, feature_cols: list[str], src_ip: str, sequence_length: int) -> np.ndarray | None:
-    """Pull the most recent `sequence_length` windows for one source IP out of a windows
-    DataFrame (as produced by pipeline/windowing.py), ready for ForecastEngine.rollout. Returns
-    None if that source IP doesn't have enough history yet."""
+def _is_contiguous(window_starts, window_seconds: int) -> bool:
+    """True iff every adjacent pair of window_start values is exactly `window_seconds` apart."""
+    ts = np.asarray(window_starts).astype("datetime64[ns]").astype(np.int64)
+    return bool(len(ts) < 2 or (np.diff(ts) == int(window_seconds) * 10**9).all())
+
+
+def _need_seconds(window_seconds: int | None) -> int:
+    if window_seconds is None:
+        raise ValueError("window_seconds is required when checking window contiguity")
+    return int(window_seconds)
+
+
+def latest_sequence_is_contiguous(
+    windows_df, src_ip: str, sequence_length: int, window_seconds: int
+) -> bool | None:
+    """QC-1: whether the sequence latest_sequence() would return for `src_ip` has NO wall-clock
+    gaps (windows exist only for slots with flows, so the last L rows can span much more than
+    L*window_seconds). None if the host lacks `sequence_length` windows. Lets the UI qualify
+    lead-time claims; numeric forecast outputs are unaffected."""
     group = windows_df[windows_df["src_ip"] == src_ip].sort_values("window_start")
     if len(group) < sequence_length:
+        return None
+    return _is_contiguous(group["window_start"].to_numpy()[-sequence_length:], window_seconds)
+
+
+def latest_sequence(
+    windows_df, feature_cols: list[str], src_ip: str, sequence_length: int,
+    window_seconds: int | None = None, require_contiguous: bool = False,
+) -> np.ndarray | None:
+    """Pull the most recent `sequence_length` windows for one source IP out of a windows
+    DataFrame (as produced by pipeline/windowing.py), ready for ForecastEngine.rollout. Returns
+    None if that source IP doesn't have enough history yet.
+
+    Opt-in (QC-1): `require_contiguous=True` (needs `window_seconds`) also returns None when those
+    windows are not all exactly one window apart. Default = old behaviour."""
+    group = windows_df[windows_df["src_ip"] == src_ip].sort_values("window_start")
+    if len(group) < sequence_length:
+        return None
+    if require_contiguous and not _is_contiguous(
+        group["window_start"].to_numpy()[-sequence_length:], _need_seconds(window_seconds)
+    ):
         return None
     return group[feature_cols].to_numpy(dtype=np.float32)[-sequence_length:]
 
 
 def latest_sequences_batch(
-    windows_df, feature_cols: list[str], sequence_length: int
+    windows_df, feature_cols: list[str], sequence_length: int,
+    window_seconds: int | None = None, require_contiguous: bool = False,
+    contiguous_out: dict[str, bool] | None = None,
 ) -> tuple[list[str], np.ndarray]:
     """The batched counterpart to latest_sequence: every eligible host's most recent
     `sequence_length` windows, stacked into one (N, L, F) array. One groupby pass over
     `windows_df` rather than one filter per host — needed for the alert dashboard to stay fast
     when scoring thousands of hosts (real CIC-IDS-2018 has ~9,150 of them).
+
+    QC-1 (opt-in, defaults keep the old behaviour and return value; both need `window_seconds`):
+    `require_contiguous=True` skips hosts whose latest sequence has wall-clock gaps, and a dict
+    passed as `contiguous_out` is filled with {host: is_contiguous} for the returned hosts, so
+    callers can qualify lead-time claims.
     """
     host_ids: list[str] = []
     sequences: list[np.ndarray] = []
@@ -397,6 +439,14 @@ def latest_sequences_batch(
         if len(group) < sequence_length:
             continue
         group = group.sort_values("window_start")
+        if require_contiguous or contiguous_out is not None:
+            contiguous = _is_contiguous(
+                group["window_start"].to_numpy()[-sequence_length:], _need_seconds(window_seconds)
+            )
+            if require_contiguous and not contiguous:
+                continue
+            if contiguous_out is not None:
+                contiguous_out[host] = contiguous
         sequences.append(group[feature_cols].to_numpy(dtype=np.float32)[-sequence_length:])
         host_ids.append(host)
 

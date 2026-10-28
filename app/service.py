@@ -21,7 +21,7 @@ import pandas as pd
 from common.config import feature_columns, load_config, resolve_path
 from models.dataset import FeatureScaler, load_split
 from models.forecast import ForecastEngine, latest_sequences_batch, load_world_model
-from pipeline.flow_features import clean_and_normalize, load_flow_csv, load_flow_dir
+from pipeline.flow_features import clean_and_normalize, csv_has_label_column, load_flow_csv, load_flow_dir
 from pipeline.graph_embedding_features import build_graph_embedding_window_features
 from pipeline.graph_features import build_graph_window_features
 from pipeline.packet_features import build_flow_records, compute_packet_window_features, load_pcap
@@ -32,10 +32,20 @@ from pipeline.windowing import (
 
 # Ported from streamlit_app.py. The frontend renders these as CSS classes, and treats anything
 # below the lowest threshold as "good" -- the Streamlit UI showed no alert card at all there.
+# ONE alert threshold (docs/11 "Thresholds"). A host is "at risk" / "high risk" / alerting when its peak
+# forecast probability reaches ALERT_THRESHOLD, which is exactly the "serious" tier below. It is what
+# /system/status and the upload response call high_risk, what the live engine alerts on, and the default of
+# scripts/live_forecast.py. UNCALIBRATED: it was never tuned on any live network (docs/07 T6). The other
+# numbers in the codebase are not alert thresholds: 0.15 is the "warning" display tier, 0.70 the "critical"
+# one, and windowing.alert_threshold (0.3) only gates a stage-LABELLING heuristic inside the model code
+# (models/forecast.py); it is left unchanged so batch and live outputs stay identical.
+ALERT_THRESHOLD = 0.40
+WARNING_THRESHOLD = 0.15
+CRITICAL_THRESHOLD = 0.70
 SEVERITY_LEVELS: list[tuple[float, str]] = [
-    (0.70, "critical"),
-    (0.40, "serious"),
-    (0.15, "warning"),
+    (CRITICAL_THRESHOLD, "critical"),
+    (ALERT_THRESHOLD, "serious"),
+    (WARNING_THRESHOLD, "warning"),
 ]
 
 MAX_CSV_UPLOAD_MB = 300
@@ -68,7 +78,12 @@ def stage_disclosure_note(stage: str, is_heuristic: bool) -> str:
 def load_backend(config_path: str):
     """(config, model, scaler, shap_background). model/scaler are None when no checkpoint is
     present -- callers must handle that rather than substituting invented output."""
+    from common.bundle import bundle_dir_of, verify_bundle
+    if bundle_dir_of(config_path):
+        verify_bundle(bundle_dir_of(config_path))  # before parsing config.yaml: a tampered file must say so
     config = load_config(config_path)
+    if config.get("_bundle_dir"):
+        return _load_bundle_backend(config)
     checkpoint_dir = resolve_path(config, "checkpoint_dir")
     checkpoint_path = checkpoint_dir / "world_model_best.pt"
     scaler_path = resolve_path(config, "processed_dir") / "scaler.npz"
@@ -96,9 +111,35 @@ def load_backend(config_path: str):
     return config, model, scaler, background
 
 
+# bundle dir -> verify_bundle() summary, filled by _load_bundle_backend (read by /api/v1/health).
+BUNDLE_STATUS: dict[str, dict] = {}
+
+
+def _load_bundle_backend(config: dict):
+    """Bundle path of load_backend. Unlike the config path it NEVER returns (config, None, ...):
+    a bundle that fails verification raises BundleError, because serving a model whose checksum or
+    feature schema does not match its manifest is worse than not serving. Nothing here reads data/,
+    writes into the bundle, or regenerates shap_background.npy (the API never uses it, QC-20)."""
+    from common.bundle import verify_bundle
+
+    bundle_dir = config["_bundle_dir"]
+    status = verify_bundle(bundle_dir)  # raises BundleError on checksum / schema / encoder mismatch
+    model, _ = load_world_model(resolve_path(config, "checkpoint_dir") / "world_model_best.pt")
+    scaler = FeatureScaler.load(resolve_path(config, "processed_dir") / "scaler.npz")
+    BUNDLE_STATUS[bundle_dir] = status
+    return config, model, scaler, None
+
+
+def bundle_status(config: dict) -> dict | None:
+    """Verification summary for a bundle-backed config, else None."""
+    bundle_dir = config.get("_bundle_dir")
+    return BUNDLE_STATUS.get(bundle_dir) if bundle_dir else None
+
+
 def clear_backend_cache() -> None:
     """Clear cached model and scaler instances."""
     load_backend.cache_clear()
+    BUNDLE_STATUS.clear()
 
 
 def is_flow_only_model(config: dict) -> bool:
@@ -136,6 +177,11 @@ def process_uploads(flow_csv_path: Path | None, pcap_path: Path | None, config: 
     embedding_windows = build_graph_embedding_window_features(flow_df, config)
     windows = merge_graph_embedding_features(windows, embedding_windows, config)
     windows = apply_reconnaissance_heuristic(windows, config)
+    # Ground truth exists only for a CSV that carries a Label column. For a CSV without one, or a
+    # PCAP, the BENIGN label above is a placeholder so windowing could run; mark the windows so
+    # consumers (app/server.py::_observed_stage) report the observed stage as unknown, not Benign.
+    labelled = flow_csv_path is not None and csv_has_label_column(flow_csv_path)
+    windows["stage_observed"] = labelled
     return flow_df, windows
 
 

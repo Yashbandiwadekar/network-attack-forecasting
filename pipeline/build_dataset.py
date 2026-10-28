@@ -24,6 +24,7 @@ from pipeline.windowing import (
     merge_packet_features,
     apply_reconnaissance_heuristic,
     build_sequences,
+    sequence_gap_stats,
 )
 
 
@@ -699,6 +700,14 @@ def build_dataset(config_path: str = "configs/default.yaml") -> dict[str, dict[s
 
         "num_sequences": int(
             num_sequences
+        ),
+
+        # QC-1: how many sequences span wall-clock gaps (see build_sequences docstring).
+        "require_contiguous_windows": bool(
+            config["windowing"].get("require_contiguous_windows", False)
+        ),
+        "sequence_gap_stats": sequence_gap_stats(
+            sequences["window_times"], config["windowing"]["window_seconds"]
         ),
 
         "splits": {

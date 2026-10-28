@@ -43,3 +43,7 @@ logs/
 # Demo capture: 14 MB of redistributed CIC-IDS-2018. Regenerate with
 # `python -m scripts.make_demo_capture` rather than committing it.
 demo/
+
+# Deployable model bundles + archives (docs/10). Weights are never committed. Anchored so it does
+# not also match frontend/dist (the dashboard build).
+/dist/

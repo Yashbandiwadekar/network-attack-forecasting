@@ -20,13 +20,24 @@ def threshold_at_fpr(y_true: np.ndarray, y_prob: np.ndarray, target_fpr: float =
     on whatever split is passed in — callers MUST fit this on val, never on test, or the reported
     test metrics are no longer honest. This is the "defender picks a fixed false-alarm budget"
     operating point, not the default-0.5 threshold `binary_metrics` uses on its own.
+
+    Always returns a finite float (QC-16): when the best eligible operating point is sklearn's
+    `inf` "alarm on nothing" threshold, the next representable float above the maximum score is
+    returned instead (same behaviour, valid JSON).
     """
     fpr, tpr, thresholds = roc_curve(y_true, y_prob)
     eligible = fpr <= target_fpr
     if not eligible.any():
         return 1.0  # no threshold meets the budget — predict nothing positive
     best_idx = np.where(eligible)[0][np.argmax(tpr[eligible])]
-    return float(thresholds[best_idx])
+    threshold = float(thresholds[best_idx])
+    if not np.isfinite(threshold):
+        # sklearn's roc_curve prepends an `inf` threshold ("alarm on nothing"); inf is not valid
+        # JSON and breaks results files. Return the smallest finite value strictly above every
+        # score instead, which keeps the exact same "predict nothing positive" semantics under
+        # the `y_prob >= threshold` rule binary_metrics uses.
+        threshold = float(np.nextafter(float(np.max(y_prob)), np.inf))
+    return threshold
 
 
 def binary_metrics(y_true: np.ndarray, y_prob: np.ndarray, threshold: float = 0.5) -> dict[str, float]:
@@ -83,9 +94,9 @@ def stage_metrics(y_true: np.ndarray, y_pred: np.ndarray, valid_mask: np.ndarray
         "n_classes_present": len(present_classes),
         "classes_present": present_classes,
         "support": support,
-        "f1_macro": f1_score(yt, yp, average="macro", zero_division=0),
-        "precision_macro": precision_score(yt, yp, average="macro", zero_division=0),
-        "recall_macro": recall_score(yt, yp, average="macro", zero_division=0),
+        "f1_macro": f1_score(yt, yp, labels=present_classes, average="macro", zero_division=0),
+        "precision_macro": precision_score(yt, yp, labels=present_classes, average="macro", zero_division=0),
+        "recall_macro": recall_score(yt, yp, labels=present_classes, average="macro", zero_division=0),
         "f1_macro_attack_only": (
             f1_score(yt, yp, labels=attack_classes, average="macro", zero_division=0)
             if attack_classes else None
@@ -130,15 +141,24 @@ def lead_time_metrics(
     (true early-warning alarms / all alarms raised), so a defender can see the actual cost of the
     threshold that produced the lead-time numbers above, not just the lead time in isolation.
 
+    QC-3: ONLY an alarm at a step strictly before the attack onset counts as an early detection
+    and contributes a (positive) lead time. A sequence whose first alarm is exactly at the onset
+    step (`n_alarm_on_time`) or after it (`n_alarm_late`) bought the defender no warning, so it is
+    reported separately and counted in `n_missed`/`miss_rate` (= transitions with NO early
+    warning; `n_no_alarm` is the subset with no alarm at all, so n_missed = n_no_alarm +
+    n_alarm_on_time + n_alarm_late). `mean/median_lead_time_s` are over early detections only,
+    hence never negative, and `alarm_precision` = early detections / all sequences alarmed.
+
     Returns None if there are no eligible benign-to-attack transitions in this test set at all
     (e.g. an all-benign or already-all-attack sample) rather than a misleading zero.
     """
     eligible = current_infiltration == 0
     lead_steps: list[int] = []
     n_transitions = 0
-    n_missed = 0
+    n_no_alarm = 0
     n_detected_early = 0
-    n_true_alarms = 0
+    n_on_time = 0
+    n_late = 0
     n_false_alarm_eligible = 0
     n_false_alarms = 0
 
@@ -157,28 +177,36 @@ def lead_time_metrics(
         n_transitions += 1
 
         if len(alarm_steps) == 0:
-            n_missed += 1
+            n_no_alarm += 1
             continue
 
-        n_true_alarms += 1
-        steps_early = onset - int(alarm_steps[0])
-        lead_steps.append(steps_early)
-        if steps_early > 0:
+        first_alarm = int(alarm_steps[0])
+        if first_alarm < onset:
+            # Only an alarm strictly BEFORE the attack onset is advance warning.
             n_detected_early += 1
+            lead_steps.append(onset - first_alarm)
+        elif first_alarm == onset:
+            n_on_time += 1
+        else:
+            n_late += 1
 
     if n_transitions == 0:
         return None
 
-    n_alarms_raised = n_true_alarms + n_false_alarms
+    n_alarms_raised = n_detected_early + n_on_time + n_late + n_false_alarms
+    n_missed = n_transitions - n_detected_early
     return {
         "n_transitions": n_transitions,
         "n_missed": n_missed,
         "miss_rate": n_missed / n_transitions,
+        "n_no_alarm": n_no_alarm,
+        "n_alarm_on_time": n_on_time,
+        "n_alarm_late": n_late,
         "pct_detected_early": n_detected_early / n_transitions,
         "mean_lead_time_s": float(np.mean(lead_steps) * window_seconds) if lead_steps else None,
         "median_lead_time_s": float(np.median(lead_steps) * window_seconds) if lead_steps else None,
         "n_false_alarm_eligible": n_false_alarm_eligible,
         "n_false_alarms": n_false_alarms,
         "false_alarm_rate": (n_false_alarms / n_false_alarm_eligible) if n_false_alarm_eligible else None,
-        "alarm_precision": (n_true_alarms / n_alarms_raised) if n_alarms_raised else None,
+        "alarm_precision": (n_detected_early / n_alarms_raised) if n_alarms_raised else None,
     }

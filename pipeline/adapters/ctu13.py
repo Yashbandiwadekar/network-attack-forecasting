@@ -108,6 +108,14 @@ def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
 
     df["protocol"] = df["protocol"].map(protocol_map)
 
+    # ICMP flows carry a hex ICMP type/code in Sport/Dport (e.g. "0x0303") instead of a port, which
+    # to_numeric turns into NaN. They used to be removed by the dropna below -- 114,997 of 444,699
+    # botnet flows (25.9%) over the 13 scenarios. ICMP has no ports: keep the rows with port 0.
+    # (Non-ICMP rows with an unparsable port are still dropped, as before.)
+    is_icmp = df["protocol"] == 1
+    df.loc[is_icmp, "dst_port"] = df.loc[is_icmp, "dst_port"].fillna(0)
+    df.loc[is_icmp, "src_port"] = df.loc[is_icmp, "src_port"].fillna(0)
+
     # Parse CTU-13 timestamps
     df["timestamp"] = pd.to_datetime(
         df["timestamp"],

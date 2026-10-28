@@ -115,3 +115,9 @@ mitre_stages:
 baseline:
   model: logistic_regression
   max_iter: 1000
+
+# A1 (docs/09): this is the old UNSEEDED run, below all three seeds (F1 0.370 / AUROC 0.706). It is
+# no longer the served default (see configs/real_data_v2_converged_seed1.yaml); kept selectable as
+# `v2-unseeded`. /eval/metrics uses results_key to show this checkpoint's own row.
+serving:
+  results_key: "unseeded (shipped)"

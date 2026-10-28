@@ -1,0 +1,112 @@
+{
+ "clopper_pearson": {
+  "0/12": [
+   0.0,
+   0.2646484693970512
+  ],
+  "0/15": [
+   0.0,
+   0.21801936091053403
+  ],
+  "0/27": [
+   0.0,
+   0.12770286761543234
+  ],
+  "3/15": [
+   0.043312005105836604,
+   0.480891133806853
+  ],
+  "2/15": [
+   0.016575913440083623,
+   0.40460269660337206
+  ]
+ },
+ "n_for_zero_events_to_exclude": {
+  "0.10": 29,
+  "0.20": 14,
+  "0.25": 11,
+  "0.30": 9,
+  "0.50": 5
+ },
+ "episodes_needed_to_show_early_rate_above_10pct_if_true_30pct": 25,
+ "episodes_needed_to_show_early_rate_above_20pct_if_true_50pct": 17,
+ "hanley_mcneil_mde_vs_0.5": {
+  "12pos/12neg": 0.337,
+  "12pos/60neg": 0.258,
+  "10pos/301neg": 0.26,
+  "4pos/15neg": 0.467,
+  "50pos/50neg": 0.163,
+  "200pos/200neg": 0.081
+ },
+ "sd_of_paired_model_differences_per_day": 0.024,
+ "per_day_sd_across_models": {
+  "2018-02-16": 0.014,
+  "2018-02-23": 0.009,
+  "2018-03-01": 0.025
+ },
+ "mde_paired_days": {
+  "3": 0.076,
+  "5": 0.041,
+  "10": 0.024,
+  "20": 0.016
+ },
+ "note_mde_paired_days": "MDE of a paired per-day AUROC difference between two models, 80% power, two-sided 5%, using the observed SD of seed-to-seed paired differences (all pairs of the 7 trained models) as the noise; it ignores training-seed variance beyond these 7 models and day-to-day heterogeneity in the true difference, so it is a floor.",
+ "noise_perfect_ranker_ceiling": {
+  "test fn=0.0 fp=0.0": [
+   1.0,
+   0.0
+  ],
+  "test fn=0.07 fp=0.07": [
+   0.879,
+   0.005
+  ],
+  "test fn=0.1 fp=0.01": [
+   0.967,
+   0.003
+  ],
+  "test fn=0.25 fp=0.01": [
+   0.945,
+   0.003
+  ],
+  "test fn=0.0 fp=0.02": [
+   0.965,
+   0.003
+  ],
+  "test fn=0.0 fp=0.05": [
+   0.92,
+   0.004
+  ],
+  "val fn=0.0 fp=0.0": [
+   1.0,
+   0.0
+  ],
+  "val fn=0.07 fp=0.07": [
+   0.757,
+   0.005
+  ],
+  "val fn=0.1 fp=0.01": [
+   0.937,
+   0.005
+  ],
+  "val fn=0.25 fp=0.01": [
+   0.92,
+   0.006
+  ],
+  "val fn=0.0 fp=0.02": [
+   0.902,
+   0.006
+  ],
+  "val fn=0.0 fp=0.05": [
+   0.811,
+   0.007
+  ]
+ },
+ "any_flow_amplification": {
+  "e=0.0001, 50 flows/window": 0.005,
+  "e=0.0001, 250 flows/window": 0.025,
+  "e=0.0005, 50 flows/window": 0.025,
+  "e=0.0005, 250 flows/window": 0.118,
+  "e=0.001, 50 flows/window": 0.049,
+  "e=0.001, 250 flows/window": 0.221
+ }
+}

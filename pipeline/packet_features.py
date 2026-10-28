@@ -32,6 +32,15 @@ UDP_PROTO = 17
 _TCP_FLAG_LETTERS = {"syn": "S", "ack": "A", "fin": "F", "rst": "R", "psh": "P", "urg": "U"}
 
 
+def _bounded_payload(payload_len: int, ip, l4_header_len: int) -> int:
+    """L4 payload length, never more than the IPv4 total length allows. Scapy keeps Ethernet padding
+    (a 60-byte minimum frame carrying a 40-byte datagram) as trailing payload bytes, which would
+    count 6 phantom bytes on every pure ACK. IP total length 0 (segmentation offload) is ignored."""
+    if ip.len:
+        return max(min(payload_len, int(ip.len) - int(ip.ihl) * 4 - l4_header_len), 0)
+    return payload_len
+
+
 def load_pcap(path: str | Path) -> pd.DataFrame:
     """Parse a PCAP or PCAPNG file into one row per IP packet. Non-IP packets are skipped."""
     rows = []
@@ -60,13 +69,13 @@ def load_pcap(path: str | Path) -> pd.DataFrame:
                 row.update(
                     src_port=int(tcp.sport), dst_port=int(tcp.dport),
                     window_size=int(tcp.window), seq=int(tcp.seq), protocol="TCP",
-                    l4_payload_size=len(bytes(tcp.payload)),
+                    l4_payload_size=_bounded_payload(len(bytes(tcp.payload)), ip, int(tcp.dataofs) * 4),
                     **{f"flag_{name}": int(letter in tcp.flags) for name, letter in _TCP_FLAG_LETTERS.items()},
                 )
             elif UDP in pkt:
                 udp = pkt[UDP]
                 row.update(src_port=int(udp.sport), dst_port=int(udp.dport), protocol="UDP",
-                           l4_payload_size=len(bytes(udp.payload)))
+                           l4_payload_size=_bounded_payload(len(bytes(udp.payload)), ip, 8))
             rows.append(row)
     if not rows:
         raise ValueError(f"No IP packets found in {path}")

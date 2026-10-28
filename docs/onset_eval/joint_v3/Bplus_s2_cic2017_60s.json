@@ -1,0 +1,2018 @@
+{
+ "window_seconds": 60,
+ "L": 12,
+ "K": 6,
+ "n_sequences": 41713,
+ "timeline_label_mismatches": 0,
+ "merge_gap_windows": 6,
+ "sequences": {
+  "benign_throughout": 40511,
+  "onset": 302,
+  "already_attacking": 900
+ },
+ "hosts": {
+  "n_hosts": 473,
+  "n_hosts_with_onset_episode": 9,
+  "n_hosts_benign_throughout_only": 463,
+  "n_hosts_whose_first_observed_window_is_already_attacking": 2
+ },
+ "episodes": {
+  "n_episodes_merged": 15,
+  "n_raw_onset_events": 220,
+  "n_unresolved_time": 0,
+  "n_clean_history": 11,
+  "n_contiguous": 7,
+  "n_gapped_or_unverifiable": 8,
+  "n_hosts": 9,
+  "by_stage": {
+   "impact": 3,
+   "reconnaissance": 1,
+   "initial_access": 1,
+   "lateral_movement": 3,
+   "command_and_control": 7
+  }
+ },
+ "thresholds": {
+  "served_0.40": {
+   "threshold": 0.4,
+   "episodes_all": {
+    "n_episodes": 15,
+    "n_unresolved_time": 0,
+    "n_scored": 15,
+    "n_hosts": 9,
+    "early": {
+     "k": 0,
+     "n": 15,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.21801936091053403
+     ]
+    },
+    "on_time": {
+     "k": 1,
+     "n": 15,
+     "rate": 0.06666666666666667,
+     "ci95_exact": [
+      0.0016864302413527015,
+      0.3194845665783034
+     ]
+    },
+    "late": {
+     "k": 2,
+     "n": 15,
+     "rate": 0.13333333333333333,
+     "ci95_exact": [
+      0.016575913440083623,
+      0.40460269660337206
+     ]
+    },
+    "missed": {
+     "k": 12,
+     "n": 15,
+     "rate": 0.8,
+     "ci95_exact": [
+      0.5191088661931469,
+      0.9566879948941633
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 1,
+     "n": 15,
+     "rate": 0.06666666666666667,
+     "ci95_exact": [
+      0.0016864302413527015,
+      0.3194845665783034
+     ]
+    },
+    "detected_at_all": {
+     "k": 3,
+     "n": 15,
+     "rate": 0.2,
+     "ci95_exact": [
+      0.043312005105836604,
+      0.480891133806853
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 3,
+     "median": 480.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 82,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.043989454186842365
+     ]
+    }
+   },
+   "episodes_contiguous": {
+    "n_episodes": 7,
+    "n_unresolved_time": 0,
+    "n_scored": 7,
+    "n_hosts": 6,
+    "early": {
+     "k": 0,
+     "n": 7,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.40961639722500337
+     ]
+    },
+    "on_time": {
+     "k": 0,
+     "n": 7,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.40961639722500337
+     ]
+    },
+    "late": {
+     "k": 1,
+     "n": 7,
+     "rate": 0.14285714285714285,
+     "ci95_exact": [
+      0.0036102968619005837,
+      0.5787231970431952
+     ]
+    },
+    "missed": {
+     "k": 6,
+     "n": 7,
+     "rate": 0.8571428571428571,
+     "ci95_exact": [
+      0.4212768029568048,
+      0.9963897031380994
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 0,
+     "n": 7,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.40961639722500337
+     ]
+    },
+    "detected_at_all": {
+     "k": 1,
+     "n": 7,
+     "rate": 0.14285714285714285,
+     "ci95_exact": [
+      0.0036102968619005837,
+      0.5787231970431952
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 1,
+     "median": 3780.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 39,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.0902511009603343
+     ]
+    }
+   },
+   "episodes_clean_history": {
+    "n_episodes": 11,
+    "n_unresolved_time": 0,
+    "n_scored": 11,
+    "n_hosts": 8,
+    "early": {
+     "k": 0,
+     "n": 11,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.28491415291815436
+     ]
+    },
+    "on_time": {
+     "k": 0,
+     "n": 11,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.28491415291815436
+     ]
+    },
+    "late": {
+     "k": 1,
+     "n": 11,
+     "rate": 0.09090909090909091,
+     "ci95_exact": [
+      0.002298972213814267,
+      0.4127799169883827
+     ]
+    },
+    "missed": {
+     "k": 10,
+     "n": 11,
+     "rate": 0.9090909090909091,
+     "ci95_exact": [
+      0.5872200830116173,
+      0.9977010277861857
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 0,
+     "n": 11,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.28491415291815436
+     ]
+    },
+    "detected_at_all": {
+     "k": 1,
+     "n": 11,
+     "rate": 0.09090909090909091,
+     "ci95_exact": [
+      0.002298972213814267,
+      0.4127799169883827
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 1,
+     "median": 480.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 66,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.054358847170121974
+     ]
+    }
+   },
+   "episodes_gapped_or_unverifiable": {
+    "n_episodes": 8,
+    "n_unresolved_time": 0,
+    "n_scored": 8,
+    "n_hosts": 4,
+    "early": {
+     "k": 0,
+     "n": 8,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.36941664755281917
+     ]
+    },
+    "on_time": {
+     "k": 1,
+     "n": 8,
+     "rate": 0.125,
+     "ci95_exact": [
+      0.0031597235312519063,
+      0.5265096708752065
+     ]
+    },
+    "late": {
+     "k": 1,
+     "n": 8,
+     "rate": 0.125,
+     "ci95_exact": [
+      0.0031597235312519063,
+      0.5265096708752065
+     ]
+    },
+    "missed": {
+     "k": 6,
+     "n": 8,
+     "rate": 0.75,
+     "ci95_exact": [
+      0.3491442055871758,
+      0.9681459737500557
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 1,
+     "n": 8,
+     "rate": 0.125,
+     "ci95_exact": [
+      0.0031597235312519063,
+      0.5265096708752065
+     ]
+    },
+    "detected_at_all": {
+     "k": 2,
+     "n": 8,
+     "rate": 0.25,
+     "ci95_exact": [
+      0.03185402624994421,
+      0.6508557944128242
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 2,
+     "median": 270.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 43,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.08221112115413848
+     ]
+    }
+   },
+   "false_alarm_benign_throughout_sequences": {
+    "all": {
+     "k": 9,
+     "n": 40511,
+     "n_clusters": 1128,
+     "rate": 0.00022216188195798672,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.000563985305261304
+     ]
+    },
+    "contiguous": {
+     "k": 1,
+     "n": 10775,
+     "n_clusters": 110,
+     "rate": 9.280742459396752e-05,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.0003544324119760226
+     ]
+    },
+    "gapped_or_unverifiable": {
+     "k": 8,
+     "n": 29736,
+     "n_clusters": 1126,
+     "rate": 0.0002690341673392521,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.0006869400427737216
+     ]
+    },
+    "clean_history": {
+     "k": 0,
+     "n": 31464,
+     "n_clusters": 575,
+     "rate": 0.0,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.0
+     ]
+    },
+    "same_hosts_as_episodes": {
+     "k": 5,
+     "n": 12216,
+     "n_clusters": 68,
+     "rate": 0.00040929927963326783,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.001220589092489056
+     ]
+    },
+    "n_alarm_bursts": 4,
+    "n_sequences": 40511
+   },
+   "alarm_rate_on_onset_sequences": {
+    "k": 15,
+    "n": 302,
+    "n_clusters": 15,
+    "rate": 0.04966887417218543,
+    "ci95_cluster_bootstrap": [
+     0.0,
+     0.1724137931034483
+    ]
+   },
+   "alarm_rate_on_already_attacking_sequences": {
+    "k": 77,
+    "n": 900,
+    "rate": 0.08555555555555555
+   },
+   "already_attacking_runs_with_any_alarm": {
+    "k": 14,
+    "n": 224
+   },
+   "alarm_rate_by_steps_to_onset": {
+    "1": {
+     "n_sequences": 220,
+     "n_episodes": 15,
+     "alarm_rate": 0.045454545454545456
+    },
+    "2": {
+     "n_sequences": 26,
+     "n_episodes": 14,
+     "alarm_rate": 0.19230769230769232
+    },
+    "3": {
+     "n_sequences": 15,
+     "n_episodes": 14,
+     "alarm_rate": 0.0
+    },
+    "4": {
+     "n_sequences": 14,
+     "n_episodes": 14,
+     "alarm_rate": 0.0
+    },
+    "5": {
+     "n_sequences": 14,
+     "n_episodes": 14,
+     "alarm_rate": 0.0
+    },
+    "6": {
+     "n_sequences": 13,
+     "n_episodes": 13,
+     "alarm_rate": 0.0
+    }
+   },
+   "per_episode": [
+    {
+     "key": "192.168.10.5",
+     "stage": "command_and_control",
+     "contiguous": true,
+     "n_raw_onsets": 46,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.50",
+     "stage": "impact",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.9",
+     "stage": "command_and_control",
+     "contiguous": false,
+     "n_raw_onsets": 53,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.12",
+     "stage": "command_and_control",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": false
+    },
+    {
+     "key": "192.168.10.14",
+     "stage": "command_and_control",
+     "contiguous": true,
+     "n_raw_onsets": 45,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.17",
+     "stage": "command_and_control",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.8",
+     "stage": "lateral_movement",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.8",
+     "stage": "lateral_movement",
+     "contiguous": false,
+     "n_raw_onsets": 7,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": false
+    },
+    {
+     "key": "192.168.10.8",
+     "stage": "lateral_movement",
+     "contiguous": false,
+     "n_raw_onsets": 17,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "late",
+     "lead_s": null,
+     "delay_s": 480.0,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.8",
+     "stage": "command_and_control",
+     "contiguous": false,
+     "n_raw_onsets": 14,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.15",
+     "stage": "command_and_control",
+     "contiguous": true,
+     "n_raw_onsets": 26,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "172.16.0.1",
+     "stage": "impact",
+     "contiguous": true,
+     "n_raw_onsets": 5,
+     "n_early_origins": 3,
+     "n_early_origins_alarmed": 0,
+     "outcome": "late",
+     "lead_s": null,
+     "delay_s": 3780.0,
+     "clean_history": false
+    },
+    {
+     "key": "172.16.0.1",
+     "stage": "impact",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "172.16.0.1",
+     "stage": "initial_access",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "172.16.0.1",
+     "stage": "reconnaissance",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 1,
+     "n_early_origins_alarmed": 0,
+     "outcome": "on_time",
+     "lead_s": null,
+     "delay_s": 60.0,
+     "clean_history": false
+    }
+   ]
+  },
+  "val_fixed_fa0.05": {
+   "threshold": 0.1535158157348633,
+   "episodes_all": {
+    "n_episodes": 15,
+    "n_unresolved_time": 0,
+    "n_scored": 15,
+    "n_hosts": 9,
+    "early": {
+     "k": 0,
+     "n": 15,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.21801936091053403
+     ]
+    },
+    "on_time": {
+     "k": 1,
+     "n": 15,
+     "rate": 0.06666666666666667,
+     "ci95_exact": [
+      0.0016864302413527015,
+      0.3194845665783034
+     ]
+    },
+    "late": {
+     "k": 2,
+     "n": 15,
+     "rate": 0.13333333333333333,
+     "ci95_exact": [
+      0.016575913440083623,
+      0.40460269660337206
+     ]
+    },
+    "missed": {
+     "k": 12,
+     "n": 15,
+     "rate": 0.8,
+     "ci95_exact": [
+      0.5191088661931469,
+      0.9566879948941633
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 1,
+     "n": 15,
+     "rate": 0.06666666666666667,
+     "ci95_exact": [
+      0.0016864302413527015,
+      0.3194845665783034
+     ]
+    },
+    "detected_at_all": {
+     "k": 3,
+     "n": 15,
+     "rate": 0.2,
+     "ci95_exact": [
+      0.043312005105836604,
+      0.480891133806853
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 3,
+     "median": 420.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 82,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.043989454186842365
+     ]
+    }
+   },
+   "episodes_contiguous": {
+    "n_episodes": 7,
+    "n_unresolved_time": 0,
+    "n_scored": 7,
+    "n_hosts": 6,
+    "early": {
+     "k": 0,
+     "n": 7,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.40961639722500337
+     ]
+    },
+    "on_time": {
+     "k": 0,
+     "n": 7,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.40961639722500337
+     ]
+    },
+    "late": {
+     "k": 1,
+     "n": 7,
+     "rate": 0.14285714285714285,
+     "ci95_exact": [
+      0.0036102968619005837,
+      0.5787231970431952
+     ]
+    },
+    "missed": {
+     "k": 6,
+     "n": 7,
+     "rate": 0.8571428571428571,
+     "ci95_exact": [
+      0.4212768029568048,
+      0.9963897031380994
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 0,
+     "n": 7,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.40961639722500337
+     ]
+    },
+    "detected_at_all": {
+     "k": 1,
+     "n": 7,
+     "rate": 0.14285714285714285,
+     "ci95_exact": [
+      0.0036102968619005837,
+      0.5787231970431952
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 1,
+     "median": 3600.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 39,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.0902511009603343
+     ]
+    }
+   },
+   "episodes_clean_history": {
+    "n_episodes": 11,
+    "n_unresolved_time": 0,
+    "n_scored": 11,
+    "n_hosts": 8,
+    "early": {
+     "k": 0,
+     "n": 11,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.28491415291815436
+     ]
+    },
+    "on_time": {
+     "k": 0,
+     "n": 11,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.28491415291815436
+     ]
+    },
+    "late": {
+     "k": 1,
+     "n": 11,
+     "rate": 0.09090909090909091,
+     "ci95_exact": [
+      0.002298972213814267,
+      0.4127799169883827
+     ]
+    },
+    "missed": {
+     "k": 10,
+     "n": 11,
+     "rate": 0.9090909090909091,
+     "ci95_exact": [
+      0.5872200830116173,
+      0.9977010277861857
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 0,
+     "n": 11,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.28491415291815436
+     ]
+    },
+    "detected_at_all": {
+     "k": 1,
+     "n": 11,
+     "rate": 0.09090909090909091,
+     "ci95_exact": [
+      0.002298972213814267,
+      0.4127799169883827
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 1,
+     "median": 420.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 66,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.054358847170121974
+     ]
+    }
+   },
+   "episodes_gapped_or_unverifiable": {
+    "n_episodes": 8,
+    "n_unresolved_time": 0,
+    "n_scored": 8,
+    "n_hosts": 4,
+    "early": {
+     "k": 0,
+     "n": 8,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.36941664755281917
+     ]
+    },
+    "on_time": {
+     "k": 1,
+     "n": 8,
+     "rate": 0.125,
+     "ci95_exact": [
+      0.0031597235312519063,
+      0.5265096708752065
+     ]
+    },
+    "late": {
+     "k": 1,
+     "n": 8,
+     "rate": 0.125,
+     "ci95_exact": [
+      0.0031597235312519063,
+      0.5265096708752065
+     ]
+    },
+    "missed": {
+     "k": 6,
+     "n": 8,
+     "rate": 0.75,
+     "ci95_exact": [
+      0.3491442055871758,
+      0.9681459737500557
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 1,
+     "n": 8,
+     "rate": 0.125,
+     "ci95_exact": [
+      0.0031597235312519063,
+      0.5265096708752065
+     ]
+    },
+    "detected_at_all": {
+     "k": 2,
+     "n": 8,
+     "rate": 0.25,
+     "ci95_exact": [
+      0.03185402624994421,
+      0.6508557944128242
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 2,
+     "median": 240.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 43,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.08221112115413848
+     ]
+    }
+   },
+   "false_alarm_benign_throughout_sequences": {
+    "all": {
+     "k": 13,
+     "n": 40511,
+     "n_clusters": 1128,
+     "rate": 0.0003209004961615364,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.000778951893189327
+     ]
+    },
+    "contiguous": {
+     "k": 2,
+     "n": 10775,
+     "n_clusters": 110,
+     "rate": 0.00018561484918793505,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.0007088648239520452
+     ]
+    },
+    "gapped_or_unverifiable": {
+     "k": 11,
+     "n": 29736,
+     "n_clusters": 1126,
+     "rate": 0.00036992198009147163,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.0009656469818003334
+     ]
+    },
+    "clean_history": {
+     "k": 0,
+     "n": 31464,
+     "n_clusters": 575,
+     "rate": 0.0,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.0
+     ]
+    },
+    "same_hosts_as_episodes": {
+     "k": 7,
+     "n": 12216,
+     "n_clusters": 68,
+     "rate": 0.000573018991486575,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.0016145997842752266
+     ]
+    },
+    "n_alarm_bursts": 4,
+    "n_sequences": 40511
+   },
+   "alarm_rate_on_onset_sequences": {
+    "k": 20,
+    "n": 302,
+    "n_clusters": 15,
+    "rate": 0.06622516556291391,
+    "ci95_cluster_bootstrap": [
+     0.0,
+     0.21984126984126978
+    ]
+   },
+   "alarm_rate_on_already_attacking_sequences": {
+    "k": 84,
+    "n": 900,
+    "rate": 0.09333333333333334
+   },
+   "already_attacking_runs_with_any_alarm": {
+    "k": 18,
+    "n": 224
+   },
+   "alarm_rate_by_steps_to_onset": {
+    "1": {
+     "n_sequences": 220,
+     "n_episodes": 15,
+     "alarm_rate": 0.06363636363636363
+    },
+    "2": {
+     "n_sequences": 26,
+     "n_episodes": 14,
+     "alarm_rate": 0.23076923076923078
+    },
+    "3": {
+     "n_sequences": 15,
+     "n_episodes": 14,
+     "alarm_rate": 0.0
+    },
+    "4": {
+     "n_sequences": 14,
+     "n_episodes": 14,
+     "alarm_rate": 0.0
+    },
+    "5": {
+     "n_sequences": 14,
+     "n_episodes": 14,
+     "alarm_rate": 0.0
+    },
+    "6": {
+     "n_sequences": 13,
+     "n_episodes": 13,
+     "alarm_rate": 0.0
+    }
+   },
+   "per_episode": [
+    {
+     "key": "192.168.10.5",
+     "stage": "command_and_control",
+     "contiguous": true,
+     "n_raw_onsets": 46,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.50",
+     "stage": "impact",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.9",
+     "stage": "command_and_control",
+     "contiguous": false,
+     "n_raw_onsets": 53,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.12",
+     "stage": "command_and_control",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": false
+    },
+    {
+     "key": "192.168.10.14",
+     "stage": "command_and_control",
+     "contiguous": true,
+     "n_raw_onsets": 45,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.17",
+     "stage": "command_and_control",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.8",
+     "stage": "lateral_movement",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.8",
+     "stage": "lateral_movement",
+     "contiguous": false,
+     "n_raw_onsets": 7,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": false
+    },
+    {
+     "key": "192.168.10.8",
+     "stage": "lateral_movement",
+     "contiguous": false,
+     "n_raw_onsets": 17,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "late",
+     "lead_s": null,
+     "delay_s": 420.0,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.8",
+     "stage": "command_and_control",
+     "contiguous": false,
+     "n_raw_onsets": 14,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.15",
+     "stage": "command_and_control",
+     "contiguous": true,
+     "n_raw_onsets": 26,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "172.16.0.1",
+     "stage": "impact",
+     "contiguous": true,
+     "n_raw_onsets": 5,
+     "n_early_origins": 3,
+     "n_early_origins_alarmed": 0,
+     "outcome": "late",
+     "lead_s": null,
+     "delay_s": 3600.0,
+     "clean_history": false
+    },
+    {
+     "key": "172.16.0.1",
+     "stage": "impact",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "172.16.0.1",
+     "stage": "initial_access",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "172.16.0.1",
+     "stage": "reconnaissance",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 1,
+     "n_early_origins_alarmed": 0,
+     "outcome": "on_time",
+     "lead_s": null,
+     "delay_s": 60.0,
+     "clean_history": false
+    }
+   ]
+  },
+  "val_fixed_fa0.01": {
+   "threshold": 0.6728714108467103,
+   "episodes_all": {
+    "n_episodes": 15,
+    "n_unresolved_time": 0,
+    "n_scored": 15,
+    "n_hosts": 9,
+    "early": {
+     "k": 0,
+     "n": 15,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.21801936091053403
+     ]
+    },
+    "on_time": {
+     "k": 1,
+     "n": 15,
+     "rate": 0.06666666666666667,
+     "ci95_exact": [
+      0.0016864302413527015,
+      0.3194845665783034
+     ]
+    },
+    "late": {
+     "k": 2,
+     "n": 15,
+     "rate": 0.13333333333333333,
+     "ci95_exact": [
+      0.016575913440083623,
+      0.40460269660337206
+     ]
+    },
+    "missed": {
+     "k": 12,
+     "n": 15,
+     "rate": 0.8,
+     "ci95_exact": [
+      0.5191088661931469,
+      0.9566879948941633
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 1,
+     "n": 15,
+     "rate": 0.06666666666666667,
+     "ci95_exact": [
+      0.0016864302413527015,
+      0.3194845665783034
+     ]
+    },
+    "detected_at_all": {
+     "k": 3,
+     "n": 15,
+     "rate": 0.2,
+     "ci95_exact": [
+      0.043312005105836604,
+      0.480891133806853
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 3,
+     "median": 540.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 82,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.043989454186842365
+     ]
+    }
+   },
+   "episodes_contiguous": {
+    "n_episodes": 7,
+    "n_unresolved_time": 0,
+    "n_scored": 7,
+    "n_hosts": 6,
+    "early": {
+     "k": 0,
+     "n": 7,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.40961639722500337
+     ]
+    },
+    "on_time": {
+     "k": 0,
+     "n": 7,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.40961639722500337
+     ]
+    },
+    "late": {
+     "k": 1,
+     "n": 7,
+     "rate": 0.14285714285714285,
+     "ci95_exact": [
+      0.0036102968619005837,
+      0.5787231970431952
+     ]
+    },
+    "missed": {
+     "k": 6,
+     "n": 7,
+     "rate": 0.8571428571428571,
+     "ci95_exact": [
+      0.4212768029568048,
+      0.9963897031380994
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 0,
+     "n": 7,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.40961639722500337
+     ]
+    },
+    "detected_at_all": {
+     "k": 1,
+     "n": 7,
+     "rate": 0.14285714285714285,
+     "ci95_exact": [
+      0.0036102968619005837,
+      0.5787231970431952
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 1,
+     "median": 3900.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 39,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.0902511009603343
+     ]
+    }
+   },
+   "episodes_clean_history": {
+    "n_episodes": 11,
+    "n_unresolved_time": 0,
+    "n_scored": 11,
+    "n_hosts": 8,
+    "early": {
+     "k": 0,
+     "n": 11,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.28491415291815436
+     ]
+    },
+    "on_time": {
+     "k": 0,
+     "n": 11,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.28491415291815436
+     ]
+    },
+    "late": {
+     "k": 1,
+     "n": 11,
+     "rate": 0.09090909090909091,
+     "ci95_exact": [
+      0.002298972213814267,
+      0.4127799169883827
+     ]
+    },
+    "missed": {
+     "k": 10,
+     "n": 11,
+     "rate": 0.9090909090909091,
+     "ci95_exact": [
+      0.5872200830116173,
+      0.9977010277861857
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 0,
+     "n": 11,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.28491415291815436
+     ]
+    },
+    "detected_at_all": {
+     "k": 1,
+     "n": 11,
+     "rate": 0.09090909090909091,
+     "ci95_exact": [
+      0.002298972213814267,
+      0.4127799169883827
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 1,
+     "median": 540.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 66,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.054358847170121974
+     ]
+    }
+   },
+   "episodes_gapped_or_unverifiable": {
+    "n_episodes": 8,
+    "n_unresolved_time": 0,
+    "n_scored": 8,
+    "n_hosts": 4,
+    "early": {
+     "k": 0,
+     "n": 8,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.36941664755281917
+     ]
+    },
+    "on_time": {
+     "k": 1,
+     "n": 8,
+     "rate": 0.125,
+     "ci95_exact": [
+      0.0031597235312519063,
+      0.5265096708752065
+     ]
+    },
+    "late": {
+     "k": 1,
+     "n": 8,
+     "rate": 0.125,
+     "ci95_exact": [
+      0.0031597235312519063,
+      0.5265096708752065
+     ]
+    },
+    "missed": {
+     "k": 6,
+     "n": 8,
+     "rate": 0.75,
+     "ci95_exact": [
+      0.3491442055871758,
+      0.9681459737500557
+     ]
+    },
+    "any_alarm_before_or_at_onset_window": {
+     "k": 1,
+     "n": 8,
+     "rate": 0.125,
+     "ci95_exact": [
+      0.0031597235312519063,
+      0.5265096708752065
+     ]
+    },
+    "detected_at_all": {
+     "k": 2,
+     "n": 8,
+     "rate": 0.25,
+     "ci95_exact": [
+      0.03185402624994421,
+      0.6508557944128242
+     ]
+    },
+    "lead_s": {
+     "n": 0,
+     "median": null,
+     "mean": null,
+     "min": null,
+     "max": null,
+     "median_ci95_bootstrap": [
+      null,
+      null
+     ],
+     "n_within_nominal_horizon": 0
+    },
+    "detection_delay_s_on_time_or_late": {
+     "n": 2,
+     "median": 300.0
+    },
+    "frac_pre_onset_origins_alarmed": {
+     "k": 0,
+     "n": 43,
+     "rate": 0.0,
+     "ci95_exact": [
+      0.0,
+      0.08221112115413848
+     ]
+    }
+   },
+   "false_alarm_benign_throughout_sequences": {
+    "all": {
+     "k": 4,
+     "n": 40511,
+     "n_clusters": 1128,
+     "rate": 9.873861420354965e-05,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.00035347157928907705
+     ]
+    },
+    "contiguous": {
+     "k": 0,
+     "n": 10775,
+     "n_clusters": 110,
+     "rate": 0.0,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.0
+     ]
+    },
+    "gapped_or_unverifiable": {
+     "k": 4,
+     "n": 29736,
+     "n_clusters": 1126,
+     "rate": 0.00013451708366962604,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.00042897939854549713
+     ]
+    },
+    "clean_history": {
+     "k": 0,
+     "n": 31464,
+     "n_clusters": 575,
+     "rate": 0.0,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.0
+     ]
+    },
+    "same_hosts_as_episodes": {
+     "k": 4,
+     "n": 12216,
+     "n_clusters": 68,
+     "rate": 0.0003274394237066143,
+     "ci95_cluster_bootstrap": [
+      0.0,
+      0.0011248022167968852
+     ]
+    },
+    "n_alarm_bursts": 1,
+    "n_sequences": 40511
+   },
+   "alarm_rate_on_onset_sequences": {
+    "k": 10,
+    "n": 302,
+    "n_clusters": 15,
+    "rate": 0.033112582781456956,
+    "ci95_cluster_bootstrap": [
+     0.0,
+     0.11494252873563218
+    ]
+   },
+   "alarm_rate_on_already_attacking_sequences": {
+    "k": 30,
+    "n": 900,
+    "rate": 0.03333333333333333
+   },
+   "already_attacking_runs_with_any_alarm": {
+    "k": 13,
+    "n": 224
+   },
+   "alarm_rate_by_steps_to_onset": {
+    "1": {
+     "n_sequences": 220,
+     "n_episodes": 15,
+     "alarm_rate": 0.031818181818181815
+    },
+    "2": {
+     "n_sequences": 26,
+     "n_episodes": 14,
+     "alarm_rate": 0.11538461538461539
+    },
+    "3": {
+     "n_sequences": 15,
+     "n_episodes": 14,
+     "alarm_rate": 0.0
+    },
+    "4": {
+     "n_sequences": 14,
+     "n_episodes": 14,
+     "alarm_rate": 0.0
+    },
+    "5": {
+     "n_sequences": 14,
+     "n_episodes": 14,
+     "alarm_rate": 0.0
+    },
+    "6": {
+     "n_sequences": 13,
+     "n_episodes": 13,
+     "alarm_rate": 0.0
+    }
+   },
+   "per_episode": [
+    {
+     "key": "192.168.10.5",
+     "stage": "command_and_control",
+     "contiguous": true,
+     "n_raw_onsets": 46,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.50",
+     "stage": "impact",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.9",
+     "stage": "command_and_control",
+     "contiguous": false,
+     "n_raw_onsets": 53,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.12",
+     "stage": "command_and_control",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": false
+    },
+    {
+     "key": "192.168.10.14",
+     "stage": "command_and_control",
+     "contiguous": true,
+     "n_raw_onsets": 45,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.17",
+     "stage": "command_and_control",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.8",
+     "stage": "lateral_movement",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.8",
+     "stage": "lateral_movement",
+     "contiguous": false,
+     "n_raw_onsets": 7,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": false
+    },
+    {
+     "key": "192.168.10.8",
+     "stage": "lateral_movement",
+     "contiguous": false,
+     "n_raw_onsets": 17,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "late",
+     "lead_s": null,
+     "delay_s": 540.0,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.8",
+     "stage": "command_and_control",
+     "contiguous": false,
+     "n_raw_onsets": 14,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "192.168.10.15",
+     "stage": "command_and_control",
+     "contiguous": true,
+     "n_raw_onsets": 26,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "172.16.0.1",
+     "stage": "impact",
+     "contiguous": true,
+     "n_raw_onsets": 5,
+     "n_early_origins": 3,
+     "n_early_origins_alarmed": 0,
+     "outcome": "late",
+     "lead_s": null,
+     "delay_s": 3900.0,
+     "clean_history": false
+    },
+    {
+     "key": "172.16.0.1",
+     "stage": "impact",
+     "contiguous": true,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "172.16.0.1",
+     "stage": "initial_access",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 6,
+     "n_early_origins_alarmed": 0,
+     "outcome": "missed",
+     "lead_s": null,
+     "delay_s": null,
+     "clean_history": true
+    },
+    {
+     "key": "172.16.0.1",
+     "stage": "reconnaissance",
+     "contiguous": false,
+     "n_raw_onsets": 1,
+     "n_early_origins": 1,
+     "n_early_origins_alarmed": 0,
+     "outcome": "on_time",
+     "lead_s": null,
+     "delay_s": 60.0,
+     "clean_history": false
+    }
+   ]
+  }
+ },
+ "already_attacking_runs": {
+  "n_runs": 224,
+  "n_left_censored_runs(first observed window already attacking)": 6
+ },
+ "auroc_onset_vs_benign_throughout_same_hosts_only": {
+  "n_pos": 302,
+  "n_pos_episodes": 15,
+  "n_neg": 12216,
+  "n_neg_stretches": 68,
+  "auroc": 0.5230358242582738,
+  "ci95_cluster_bootstrap": [
+   0.40310913140683513,
+   0.7245896221738797
+  ]
+ },
+ "auroc_onset_vs_benign_throughout_clean_history": {
+  "n_pos": 71,
+  "n_pos_episodes": 12,
+  "n_neg": 31464,
+  "n_neg_stretches": 575,
+  "auroc": 0.6057819712580083,
+  "ci95_cluster_bootstrap": [
+   0.42376157745085974,
+   0.7562878917305538
+  ]
+ },
+ "auroc_onset_vs_benign_throughout": {
+  "n_pos": 302,
+  "n_pos_episodes": 15,
+  "n_neg": 40511,
+  "n_neg_stretches": 1128,
+  "auroc": 0.419403707046455,
+  "ci95_cluster_bootstrap": [
+   0.31086903919938474,
+   0.6182092783214561
+  ]
+ },
+ "meta": {
+  "label": "Bplus_s2_cic2017_60s",
+  "config": "configs/joint_v3_Bplus.yaml",
+  "checkpoint": "checkpoints_joint_v3\\Bplus\\seed2\\world_model_best.pt",
+  "data_dir": "data\\processed_adapter\\cic2017_zeroshot_60s_noMon",
+  "splits": "train,val,test",
+  "window_seconds_eval": 60,
+  "window_seconds_training": 10,
+  "score": "max over K rollout infiltration probabilities",
+  "threshold_source": "served = app.service.ALERT_THRESHOLD; val_fixed = fit on C:\\Users\\Yash\\Documents\\Claude\\Projects\\Network Attack Forecasting\\data\\processed_adapter\\cic18c_mon17_v3 val split (benign-throughout sequences), never on the evaluated data",
+  "device": "cuda:0"
+ },
+ "validation_reference": {
+  "n_val_sequences": 6651,
+  "val_sequences_by_category": {
+   "benign_throughout": 5571,
+   "onset": 575,
+   "already_attacking": 505
+  }
+ },
+ "legacy_qc3_lead_time_sequence_level": {
+  "benchmark_val_5pct_fpr_t1": {
+   "threshold": 0.11285945028066635,
+   "n_transitions": 302,
+   "n_missed": 296,
+   "miss_rate": 0.9801324503311258,
+   "n_no_alarm": 281,
+   "n_alarm_on_time": 14,
+   "n_alarm_late": 1,
+   "pct_detected_early": 0.019867549668874173,
+   "mean_lead_time_s": 60.0,
+   "median_lead_time_s": 60.0,
+   "n_false_alarm_eligible": 40511,
+   "n_false_alarms": 13,
+   "false_alarm_rate": 0.0003209004961615364,
+   "alarm_precision": 0.17647058823529413
+  },
+  "served_0.40": {
+   "threshold": 0.4,
+   "n_transitions": 302,
+   "n_missed": 298,
+   "miss_rate": 0.9867549668874173,
+   "n_no_alarm": 287,
+   "n_alarm_on_time": 9,
+   "n_alarm_late": 2,
+   "pct_detected_early": 0.013245033112582781,
+   "mean_lead_time_s": 60.0,
+   "median_lead_time_s": 60.0,
+   "n_false_alarm_eligible": 40511,
+   "n_false_alarms": 9,
+   "false_alarm_rate": 0.00022216188195798672,
+   "alarm_precision": 0.16666666666666666
+  }
+ }
+}
