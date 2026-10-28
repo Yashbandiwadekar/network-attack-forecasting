@@ -1,0 +1,18 @@
+{
+ "HGB_last": {
+  "file": "checkpoints_lodo_v4\\final\\hgb_last_flat.npz",
+  "n_trees": 200,
+  "n_nodes": 12200,
+  "bytes": 373382,
+  "max_abs_diff_vs_sklearn_on_train_rows": 1.1102230246251565e-16,
+  "alert_threshold_oof_1pct_fpr": 0.5792486860347659
+ },
+ "HGB_stacked": {
+  "file": "checkpoints_lodo_v4\\final\\hgb_stacked_flat.npz",
+  "n_trees": 200,
+  "n_nodes": 12200,
+  "bytes": 390822,
+  "max_abs_diff_vs_sklearn_on_train_rows": 1.3877787807814457e-17,
+  "alert_threshold_oof_1pct_fpr": 0.6815821150083959
+ }
+}

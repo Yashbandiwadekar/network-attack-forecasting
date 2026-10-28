@@ -1,0 +1,1146 @@
+{
+ "generated": "2026-10-18",
+ "truncation_note": "The processed CIC-2018 CSVs on AWS stop at 1,048,575 rows on 7 of the 10 days (02-14, 02-15, 02-16, 02-21, 02-22, 02-23, 03-02; local files are byte-identical to the official bucket), so those days are partial prefixes of unknown extent. Only 02-20, 02-28 and 03-01 are complete.",
+ "truncated_days": [
+  "2018-02-14",
+  "2018-02-15",
+  "2018-02-16",
+  "2018-02-21",
+  "2018-02-22",
+  "2018-02-23",
+  "2018-03-02"
+ ],
+ "models": [
+  "seed1",
+  "seed2",
+  "seed3",
+  "B_s1",
+  "B_s2",
+  "B_s3",
+  "Bplus_s1",
+  "Bplus_s2",
+  "Bplus_s3"
+ ],
+ "baselines": [
+  "persistence_oracle",
+  "flow_count",
+  "HGB_last",
+  "HGB_stacked",
+  "LR_last"
+ ],
+ "baseline_train": {
+  "rows": 40373,
+  "positives": 4316
+ },
+ "cic2018": {
+  "test": {
+   "days": {
+    "2018-02-16": {
+     "n": 483,
+     "pos": 297,
+     "episodes": 2,
+     "truncated": true,
+     "scores": {
+      "seed1": {
+       "auroc": 0.9886861446001233,
+       "auprc": 0.9845499864679603
+      },
+      "seed2": {
+       "auroc": 0.9916911045943304,
+       "auprc": 0.994774657193864
+      },
+      "seed3": {
+       "auroc": 0.9903515441149849,
+       "auprc": 0.9867580523039903
+      },
+      "B_s1": {
+       "auroc": 0.9719235364396654,
+       "auprc": 0.9469518716653136
+      },
+      "B_s2": {
+       "auroc": 0.961677708989537,
+       "auprc": 0.9332071169193993
+      },
+      "B_s3": {
+       "auroc": 0.9525361138264364,
+       "auprc": 0.9222511448756985
+      },
+      "Bplus_s1": {
+       "auroc": 0.9556677890011224,
+       "auprc": 0.9247081838459361
+      },
+      "Bplus_s2": {
+       "auroc": 0.9834365156945801,
+       "auprc": 0.9638297110560418
+      },
+      "Bplus_s3": {
+       "auroc": 0.9561746497230368,
+       "auprc": 0.9273535313598071
+      },
+      "flow_count": {
+       "auroc": 0.9916277470040911,
+       "auprc": 0.9909880951755169
+      },
+      "LR_last": {
+       "auroc": 0.9900257050794685,
+       "auprc": 0.9860954902711084
+      },
+      "HGB_last": {
+       "auroc": 0.9621755186271317,
+       "auprc": 0.9747975655877021
+      },
+      "HGB_stacked": {
+       "auroc": 0.9879982621918105,
+       "auprc": 0.9912108907575922
+      },
+      "persistence_oracle": {
+       "auroc": 0.9916277470040911,
+       "auprc": 0.9909880951755169
+      }
+     }
+    },
+    "2018-02-23": {
+     "n": 3318,
+     "pos": 255,
+     "episodes": 8,
+     "truncated": true,
+     "scores": {
+      "seed1": {
+       "auroc": 0.49989053407846973,
+       "auprc": 0.08410272241196438
+      },
+      "seed2": {
+       "auroc": 0.5187442786451831,
+       "auprc": 0.09075718452490994
+      },
+      "seed3": {
+       "auroc": 0.5194945363061972,
+       "auprc": 0.08950805364915325
+      },
+      "B_s1": {
+       "auroc": 0.5145756115048044,
+       "auprc": 0.0832774703562545
+      },
+      "B_s2": {
+       "auroc": 0.5250190445097399,
+       "auprc": 0.09471849875277893
+      },
+      "B_s3": {
+       "auroc": 0.5017559358055987,
+       "auprc": 0.08927309759315954
+      },
+      "Bplus_s1": {
+       "auroc": 0.5044560952033441,
+       "auprc": 0.09412999348557387
+      },
+      "Bplus_s2": {
+       "auroc": 0.5116872475402174,
+       "auprc": 0.07923512903579641
+      },
+      "Bplus_s3": {
+       "auroc": 0.5152234449117551,
+       "auprc": 0.09489531379399545
+      },
+      "flow_count": {
+       "auroc": 0.5160524412180805,
+       "auprc": 0.09169274689950346
+      },
+      "LR_last": {
+       "auroc": 0.564497833086875,
+       "auprc": 0.09927757293140498
+      },
+      "HGB_last": {
+       "auroc": 0.5933232189382446,
+       "auprc": 0.10743002326085627
+      },
+      "HGB_stacked": {
+       "auroc": 0.5743017546555025,
+       "auprc": 0.09926993292163087
+      },
+      "persistence_oracle": {
+       "auroc": 0.614276020561669,
+       "auprc": 0.2028639955649354
+      }
+     }
+    },
+    "2018-03-01": {
+     "n": 3390,
+     "pos": 930,
+     "episodes": 2,
+     "truncated": false,
+     "scores": {
+      "seed1": {
+       "auroc": 0.7776108051403094,
+       "auprc": 0.6548244347079752
+      },
+      "seed2": {
+       "auroc": 0.6752168021680217,
+       "auprc": 0.5632357894551303
+      },
+      "seed3": {
+       "auroc": 0.8565713786170119,
+       "auprc": 0.7181786220361366
+      },
+      "B_s1": {
+       "auroc": 0.7970333945274936,
+       "auprc": 0.6743026977111236
+      },
+      "B_s2": {
+       "auroc": 0.8402758108226243,
+       "auprc": 0.719889018127421
+      },
+      "B_s3": {
+       "auroc": 0.8270521898767375,
+       "auprc": 0.6995369601419622
+      },
+      "Bplus_s1": {
+       "auroc": 0.828997727074045,
+       "auprc": 0.7013764509805487
+      },
+      "Bplus_s2": {
+       "auroc": 0.8105433167234898,
+       "auprc": 0.6890896241819576
+      },
+      "Bplus_s3": {
+       "auroc": 0.849652504589562,
+       "auprc": 0.7262279691956812
+      },
+      "flow_count": {
+       "auroc": 0.6205852784334295,
+       "auprc": 0.36506604458174385
+      },
+      "LR_last": {
+       "auroc": 0.5970578721916251,
+       "auprc": 0.39036752323082263
+      },
+      "HGB_last": {
+       "auroc": 0.7061591922370836,
+       "auprc": 0.5006873890239774
+      },
+      "HGB_stacked": {
+       "auroc": 0.7447670250896057,
+       "auprc": 0.6155750660394896
+      },
+      "persistence_oracle": {
+       "auroc": 0.9987142669813796,
+       "auprc": 0.9979797935124803
+      }
+     }
+    }
+   },
+   "n_sequences": 7191,
+   "n_pos": 1482,
+   "n_episodes": 12,
+   "mean_within": {
+    "seed1": {
+     "auroc": 0.7553958279396342,
+     "auprc": 0.5744923811959667
+    },
+    "seed2": {
+     "auroc": 0.7285507284691785,
+     "auprc": 0.5495892103913015
+    },
+    "seed3": {
+     "auroc": 0.7888058196793981,
+     "auprc": 0.5981482426630934
+    },
+    "B_s1": {
+     "auroc": 0.7611775141573212,
+     "auprc": 0.5681773465775639
+    },
+    "B_s2": {
+     "auroc": 0.7756575214406337,
+     "auprc": 0.5826048779331998
+    },
+    "B_s3": {
+     "auroc": 0.7604480798362575,
+     "auprc": 0.5703537342036067
+    },
+    "Bplus_s1": {
+     "auroc": 0.763040537092837,
+     "auprc": 0.5734048761040196
+    },
+    "Bplus_s2": {
+     "auroc": 0.7685556933194291,
+     "auprc": 0.5773848214245986
+    },
+    "Bplus_s3": {
+     "auroc": 0.7736835330747845,
+     "auprc": 0.5828256047831613
+    },
+    "flow_count": {
+     "auroc": 0.7094218222185337,
+     "auprc": 0.4825822955522547
+    },
+    "LR_last": {
+     "auroc": 0.7171938034526563,
+     "auprc": 0.491913528811112
+    },
+    "HGB_last": {
+     "auroc": 0.75388597660082,
+     "auprc": 0.5276383259575119
+    },
+    "HGB_stacked": {
+     "auroc": 0.7690223473123062,
+     "auprc": 0.5686852965729042
+    },
+    "persistence_oracle": {
+     "auroc": 0.8682060115157132,
+     "auprc": 0.7306106280843109
+    }
+   },
+   "pooled": {
+    "seed1": 0.8002566679171487,
+    "seed2": 0.7481095029771634,
+    "seed3": 0.8328064289427234,
+    "B_s1": 0.7862275134864122,
+    "B_s2": 0.7738354502881427,
+    "B_s3": 0.8200910487950341,
+    "Bplus_s1": 0.7647322254867128,
+    "Bplus_s2": 0.8096257087738683,
+    "Bplus_s3": 0.8073363103785983,
+    "flow_count": 0.5237765310780218,
+    "LR_last": 0.6630696991208096,
+    "HGB_last": 0.7586300982254739,
+    "HGB_stacked": 0.7639358410578367,
+    "persistence_oracle": 0.9404054941779311
+   },
+   "day_constant": {
+    "seed1": 0.7151828244770138,
+    "seed2": 0.7151828244770138,
+    "seed3": 0.7151828244770138,
+    "B_s1": 0.7151828244770138,
+    "B_s2": 0.7151828244770138,
+    "B_s3": 0.7151828244770138,
+    "Bplus_s1": 0.7151828244770138,
+    "Bplus_s2": 0.7151828244770138,
+    "Bplus_s3": 0.7151828244770138,
+    "flow_count": 0.45264189719620207,
+    "LR_last": 0.45264189719620207,
+    "HGB_last": 0.7151828244770138,
+    "HGB_stacked": 0.7151828244770138,
+    "persistence_oracle": 0.7151828244770138
+   }
+  },
+  "val": {
+   "days": {
+    "2018-02-15": {
+     "n": 3412,
+     "pos": 341,
+     "episodes": 5,
+     "truncated": true,
+     "scores": {
+      "seed1": {
+       "auroc": 0.6916514436918634,
+       "auprc": 0.3708887062532899
+      },
+      "seed2": {
+       "auroc": 0.665751219190784,
+       "auprc": 0.30682828096377196
+      },
+      "seed3": {
+       "auroc": 0.5575380701692401,
+       "auprc": 0.26425947677152295
+      },
+      "B_s1": {
+       "auroc": 0.2560878371216498,
+       "auprc": 0.14448558916233287
+      },
+      "B_s2": {
+       "auroc": 0.31999186410379576,
+       "auprc": 0.22457458105492462
+      },
+      "B_s3": {
+       "auroc": 0.4103060414758821,
+       "auprc": 0.21575361206286525
+      },
+      "Bplus_s1": {
+       "auroc": 0.35865837925690247,
+       "auprc": 0.1818724811204081
+      },
+      "Bplus_s2": {
+       "auroc": 0.2257453368996315,
+       "auprc": 0.14392651515023197
+      },
+      "Bplus_s3": {
+       "auroc": 0.4118616019121266,
+       "auprc": 0.20112824612714622
+      },
+      "flow_count": {
+       "auroc": 0.8011217414637547,
+       "auprc": 0.3238819143656193
+      },
+      "LR_last": {
+       "auroc": 0.6508545078308001,
+       "auprc": 0.31876606516012973
+      },
+      "HGB_last": {
+       "auroc": 0.47432943313238685,
+       "auprc": 0.1632833363225362
+      },
+      "HGB_stacked": {
+       "auroc": 0.45343775036740447,
+       "auprc": 0.08527538660507836
+      },
+      "persistence_oracle": {
+       "auroc": 0.9918717431348602,
+       "auprc": 0.9742040796670515
+      }
+     }
+    },
+    "2018-02-22": {
+     "n": 3273,
+     "pos": 164,
+     "episodes": 9,
+     "truncated": true,
+     "scores": {
+      "seed1": {
+       "auroc": 0.4822898116404773,
+       "auprc": 0.06254848690522193
+      },
+      "seed2": {
+       "auroc": 0.48529054122963233,
+       "auprc": 0.05600630240373131
+      },
+      "seed3": {
+       "auroc": 0.528924679726051,
+       "auprc": 0.06982965661949278
+      },
+      "B_s1": {
+       "auroc": 0.554166110976002,
+       "auprc": 0.06185214287193343
+      },
+      "B_s2": {
+       "auroc": 0.6571578187637779,
+       "auprc": 0.09640038716133684
+      },
+      "B_s3": {
+       "auroc": 0.6107288831009893,
+       "auprc": 0.08181913678022613
+      },
+      "Bplus_s1": {
+       "auroc": 0.6443958923346068,
+       "auprc": 0.09672148182347419
+      },
+      "Bplus_s2": {
+       "auroc": 0.5942915532403957,
+       "auprc": 0.07387379662146613
+      },
+      "Bplus_s3": {
+       "auroc": 0.6425209266566773,
+       "auprc": 0.09271003031034664
+      },
+      "flow_count": {
+       "auroc": 0.6040360793604719,
+       "auprc": 0.07401773067422157
+      },
+      "LR_last": {
+       "auroc": 0.5284657446124156,
+       "auprc": 0.06242062885505134
+      },
+      "HGB_last": {
+       "auroc": 0.4802971702923848,
+       "auprc": 0.05799538993888675
+      },
+      "HGB_stacked": {
+       "auroc": 0.5551487028218626,
+       "auprc": 0.055292660502874576
+      },
+      "persistence_oracle": {
+       "auroc": 0.6776657461814245,
+       "auprc": 0.13569191947826875
+      }
+     }
+    }
+   },
+   "n_sequences": 6685,
+   "n_pos": 505,
+   "n_episodes": 14,
+   "mean_within": {
+    "seed1": {
+     "auroc": 0.5869706276661704,
+     "auprc": 0.2167185965792559
+    },
+    "seed2": {
+     "auroc": 0.5755208802102081,
+     "auprc": 0.18141729168375165
+    },
+    "seed3": {
+     "auroc": 0.5432313749476455,
+     "auprc": 0.16704456669550788
+    },
+    "B_s1": {
+     "auroc": 0.4051269740488259,
+     "auprc": 0.10316886601713315
+    },
+    "B_s2": {
+     "auroc": 0.4885748414337868,
+     "auprc": 0.16048748410813074
+    },
+    "B_s3": {
+     "auroc": 0.5105174622884356,
+     "auprc": 0.1487863744215457
+    },
+    "Bplus_s1": {
+     "auroc": 0.5015271357957547,
+     "auprc": 0.13929698147194114
+    },
+    "Bplus_s2": {
+     "auroc": 0.4100184450700136,
+     "auprc": 0.10890015588584906
+    },
+    "Bplus_s3": {
+     "auroc": 0.5271912642844019,
+     "auprc": 0.14691913821874641
+    },
+    "flow_count": {
+     "auroc": 0.7025789104121133,
+     "auprc": 0.19894982251992044
+    },
+    "LR_last": {
+     "auroc": 0.5896601262216079,
+     "auprc": 0.19059334700759054
+    },
+    "HGB_last": {
+     "auroc": 0.47731330171238584,
+     "auprc": 0.11063936313071147
+    },
+    "HGB_stacked": {
+     "auroc": 0.5042932265946335,
+     "auprc": 0.07028402355397646
+    },
+    "persistence_oracle": {
+     "auroc": 0.8347687446581423,
+     "auprc": 0.5549479995726601
+    }
+   },
+   "pooled": {
+    "seed1": 0.6404306450062482,
+    "seed2": 0.6102034669486366,
+    "seed3": 0.594420519721875,
+    "B_s1": 0.35056522157070075,
+    "B_s2": 0.42980198019801974,
+    "B_s3": 0.4910464929988145,
+    "Bplus_s1": 0.45409593386523117,
+    "Bplus_s2": 0.33972091383895675,
+    "Bplus_s3": 0.4967134480438335,
+    "flow_count": 0.7349362363420808,
+    "LR_last": 0.6102531321093274,
+    "HGB_last": 0.48949982376878465,
+    "HGB_stacked": 0.47403825819475154,
+    "persistence_oracle": 0.8928541446377648
+   },
+   "day_constant": {
+    "seed1": 0.5891609792047167,
+    "seed2": 0.5891609792047167,
+    "seed3": 0.5891609792047167,
+    "B_s1": 0.5891609792047167,
+    "B_s2": 0.5891609792047167,
+    "B_s3": 0.5891609792047167,
+    "Bplus_s1": 0.5891609792047167,
+    "Bplus_s2": 0.5891609792047167,
+    "Bplus_s3": 0.5891609792047167,
+    "flow_count": 0.41083902079528345,
+    "LR_last": 0.5891609792047167,
+    "HGB_last": 0.5891609792047167,
+    "HGB_stacked": 0.5891609792047167,
+    "persistence_oracle": 0.5891609792047167
+   }
+  }
+ },
+ "anchors": {
+  "seed1_test_pooled": 0.8002566679171487,
+  "seed1_test_days": {
+   "2018-02-16": 0.9886861446001233,
+   "2018-02-23": 0.49989053407846973,
+   "2018-03-01": 0.7776108051403094
+  },
+  "hgb_last_test_pooled": 0.7586300982254739,
+  "lr_last_test_pooled": 0.6630696991208096,
+  "hgb_stacked_test_pooled": 0.7639358410578367
+ },
+ "cross_dataset": {
+  "ctu13": {
+   "unit_definition": "(scenario, source IP) series",
+   "episodes": "0 (labels are constant per host, so no benign-to-attack transitions exist)",
+   "scores": {
+    "seed1": {
+     "n_sequences": 355302,
+     "n_units": 621,
+     "n_pos_units": 29,
+     "n_neg_units": 592,
+     "seq_weighted": 0.1551791704912996,
+     "unit_balanced": 0.6114412349311764,
+     "host_mean": 0.7310694315004659,
+     "host_mean_ci95": [
+      0.6362564072693383,
+      0.8153002679403543
+     ]
+    },
+    "seed2": {
+     "n_sequences": 355302,
+     "n_units": 621,
+     "n_pos_units": 29,
+     "n_neg_units": 592,
+     "seq_weighted": 0.6060541105810501,
+     "unit_balanced": 0.44928339840372133,
+     "host_mean": 0.5971575023299162,
+     "host_mean_ci95": [
+      0.49676141658900275,
+      0.7001791123019571
+     ]
+    },
+    "seed3": {
+     "n_sequences": 355302,
+     "n_units": 621,
+     "n_pos_units": 29,
+     "n_neg_units": 592,
+     "seq_weighted": 0.13064131943343396,
+     "unit_balanced": 0.5909083786513787,
+     "host_mean": 0.662278657968313,
+     "host_mean_ci95": [
+      0.5549175792171482,
+      0.7580993709226467
+     ]
+    },
+    "B_s1": {
+     "n_sequences": 355302,
+     "n_units": 621,
+     "n_pos_units": 29,
+     "n_neg_units": 592,
+     "seq_weighted": 0.2398764363278835,
+     "unit_balanced": 0.47260829305922414,
+     "host_mean": 0.5279007455731594,
+     "host_mean_ci95": [
+      0.4180670433364399,
+      0.6422486602982291
+     ]
+    },
+    "B_s2": {
+     "n_sequences": 355302,
+     "n_units": 621,
+     "n_pos_units": 29,
+     "n_neg_units": 592,
+     "seq_weighted": 0.14411729523207065,
+     "unit_balanced": 0.559768437400622,
+     "host_mean": 0.5983224603914259,
+     "host_mean_ci95": [
+      0.5060650629077353,
+      0.6933073159366262
+     ]
+    },
+    "B_s3": {
+     "n_sequences": 355302,
+     "n_units": 621,
+     "n_pos_units": 29,
+     "n_neg_units": 592,
+     "seq_weighted": 0.16244564717321397,
+     "unit_balanced": 0.5538759285285596,
+     "host_mean": 0.5895852749301025,
+     "host_mean_ci95": [
+      0.47561305917986957,
+      0.6962633970177072
+     ]
+    },
+    "Bplus_s1": {
+     "n_sequences": 355302,
+     "n_units": 621,
+     "n_pos_units": 29,
+     "n_neg_units": 592,
+     "seq_weighted": 0.11685838976192602,
+     "unit_balanced": 0.5274503741886227,
+     "host_mean": 0.5583643988816402,
+     "host_mean_ci95": [
+      0.4684762348555452,
+      0.6522308946877912
+     ]
+    },
+    "Bplus_s2": {
+     "n_sequences": 355302,
+     "n_units": 621,
+     "n_pos_units": 29,
+     "n_neg_units": 592,
+     "seq_weighted": 0.29878360462243636,
+     "unit_balanced": 0.5134576628826505,
+     "host_mean": 0.560111835973905,
+     "host_mean_ci95": [
+      0.4567174394221808,
+      0.668270910997204
+     ]
+    },
+    "Bplus_s3": {
+     "n_sequences": 355302,
+     "n_units": 621,
+     "n_pos_units": 29,
+     "n_neg_units": 592,
+     "seq_weighted": 0.11324648545274005,
+     "unit_balanced": 0.5588516362290901,
+     "host_mean": 0.5971575023299162,
+     "host_mean_ci95": [
+      0.490547821528425,
+      0.6896478914259087
+     ]
+    },
+    "flow_count": {
+     "n_sequences": 355302,
+     "n_units": 621,
+     "n_pos_units": 29,
+     "n_neg_units": 592,
+     "seq_weighted": 0.4875429818961105,
+     "unit_balanced": 0.7235344454638787,
+     "host_mean": 0.7624359273066169,
+     "host_mean_ci95": [
+      0.6935395794501399,
+      0.8264372670083877
+     ]
+    },
+    "LR_last": {
+     "n_sequences": 355302,
+     "n_units": 621,
+     "n_pos_units": 29,
+     "n_neg_units": 592,
+     "seq_weighted": 0.4668323199999692,
+     "unit_balanced": 0.6022971483568565,
+     "host_mean": 0.7215167753960857,
+     "host_mean_ci95": [
+      0.6331306791705499,
+      0.7997611835973905
+     ]
+    },
+    "HGB_last": {
+     "n_sequences": 355302,
+     "n_units": 621,
+     "n_pos_units": 29,
+     "n_neg_units": 592,
+     "seq_weighted": 0.345270969757048,
+     "unit_balanced": 0.5879744448634159,
+     "host_mean": 0.6293103448275863,
+     "host_mean_ci95": [
+      0.5328765726933831,
+      0.7219492660764212
+     ]
+    },
+    "HGB_stacked": {
+     "n_sequences": 355302,
+     "n_units": 621,
+     "n_pos_units": 29,
+     "n_neg_units": 592,
+     "seq_weighted": 0.3477302558945511,
+     "unit_balanced": 0.6371297958584152,
+     "host_mean": 0.6717730661696178,
+     "host_mean_ci95": [
+      0.5942989864864865,
+      0.7501703751164959
+     ]
+    },
+    "persistence_oracle": {
+     "n_sequences": 355302,
+     "n_units": 621,
+     "n_pos_units": 29,
+     "n_neg_units": 592,
+     "seq_weighted": 1.0,
+     "unit_balanced": 1.0,
+     "host_mean": 1.0,
+     "host_mean_ci95": [
+      0.9999999999999999,
+      1.0
+     ]
+    }
+   },
+   "counts": {
+    "n_sequences": 355302,
+    "n_units": 621,
+    "n_pos_units": 29,
+    "n_neg_units": 592
+   }
+  },
+  "unsw": {
+   "unit_definition": "source IP",
+   "episodes": "79 (docs/13 definition; counted inside the positive units only)",
+   "scores": {
+    "seed1": {
+     "n_sequences": 96299,
+     "n_units": 19,
+     "n_pos_units": 4,
+     "n_neg_units": 15,
+     "seq_weighted": 0.4536080465631196,
+     "unit_balanced": 0.3375379518414987,
+     "host_mean": 0.6666666666666667,
+     "host_mean_ci95": [
+      0.4316666666666667,
+      0.8666666666666667
+     ]
+    },
+    "seed2": {
+     "n_sequences": 96299,
+     "n_units": 19,
+     "n_pos_units": 4,
+     "n_neg_units": 15,
+     "seq_weighted": 0.9508666271638809,
+     "unit_balanced": 0.693243276337496,
+     "host_mean": 0.6333333333333333,
+     "host_mean_ci95": [
+      0.38333333333333336,
+      0.8587499999999997
+     ]
+    },
+    "seed3": {
+     "n_sequences": 96299,
+     "n_units": 19,
+     "n_pos_units": 4,
+     "n_neg_units": 15,
+     "seq_weighted": 0.5050612980005331,
+     "unit_balanced": 0.3712945379043231,
+     "host_mean": 0.7000000000000001,
+     "host_mean_ci95": [
+      0.4666666666666667,
+      0.9
+     ]
+    },
+    "B_s1": {
+     "n_sequences": 96299,
+     "n_units": 19,
+     "n_pos_units": 4,
+     "n_neg_units": 15,
+     "seq_weighted": 0.9665660416300599,
+     "unit_balanced": 0.6937737875918477,
+     "host_mean": 0.6666666666666667,
+     "host_mean_ci95": [
+      0.4316666666666667,
+      0.8666666666666667
+     ]
+    },
+    "B_s2": {
+     "n_sequences": 96299,
+     "n_units": 19,
+     "n_pos_units": 4,
+     "n_neg_units": 15,
+     "seq_weighted": 0.5609332854316215,
+     "unit_balanced": 0.4060688207593489,
+     "host_mean": 0.6666666666666667,
+     "host_mean_ci95": [
+      0.4316666666666667,
+      0.8666666666666667
+     ]
+    },
+    "B_s3": {
+     "n_sequences": 96299,
+     "n_units": 19,
+     "n_pos_units": 4,
+     "n_neg_units": 15,
+     "seq_weighted": 0.9676219915405688,
+     "unit_balanced": 0.6851036881583887,
+     "host_mean": 0.6666666666666667,
+     "host_mean_ci95": [
+      0.4316666666666667,
+      0.8666666666666667
+     ]
+    },
+    "Bplus_s1": {
+     "n_sequences": 96299,
+     "n_units": 19,
+     "n_pos_units": 4,
+     "n_neg_units": 15,
+     "seq_weighted": 0.9198571418196102,
+     "unit_balanced": 0.665173103043723,
+     "host_mean": 0.6666666666666667,
+     "host_mean_ci95": [
+      0.4316666666666667,
+      0.8666666666666667
+     ]
+    },
+    "Bplus_s2": {
+     "n_sequences": 96299,
+     "n_units": 19,
+     "n_pos_units": 4,
+     "n_neg_units": 15,
+     "seq_weighted": 0.6355526672601673,
+     "unit_balanced": 0.45144503749121256,
+     "host_mean": 0.6666666666666667,
+     "host_mean_ci95": [
+      0.4316666666666667,
+      0.8666666666666667
+     ]
+    },
+    "Bplus_s3": {
+     "n_sequences": 96299,
+     "n_units": 19,
+     "n_pos_units": 4,
+     "n_neg_units": 15,
+     "seq_weighted": 0.9401813058575402,
+     "unit_balanced": 0.6804234978379786,
+     "host_mean": 0.6666666666666667,
+     "host_mean_ci95": [
+      0.4316666666666667,
+      0.8666666666666667
+     ]
+    },
+    "flow_count": {
+     "n_sequences": 96299,
+     "n_units": 19,
+     "n_pos_units": 4,
+     "n_neg_units": 15,
+     "seq_weighted": 0.29222267584078143,
+     "unit_balanced": 0.22928131172524865,
+     "host_mean": 0.5,
+     "host_mean_ci95": [
+      0.18250000000000002,
+      0.8
+     ]
+    },
+    "LR_last": {
+     "n_sequences": 96299,
+     "n_units": 19,
+     "n_pos_units": 4,
+     "n_neg_units": 15,
+     "seq_weighted": 0.4386183082799049,
+     "unit_balanced": 0.3383601646230243,
+     "host_mean": 0.7333333333333334,
+     "host_mean_ci95": [
+      0.5,
+      0.9254166666666663
+     ]
+    },
+    "HGB_last": {
+     "n_sequences": 96299,
+     "n_units": 19,
+     "n_pos_units": 4,
+     "n_neg_units": 15,
+     "seq_weighted": 0.5784777830976231,
+     "unit_balanced": 0.4077222055304861,
+     "host_mean": 0.6666666666666667,
+     "host_mean_ci95": [
+      0.4316666666666667,
+      0.8666666666666667
+     ]
+    },
+    "HGB_stacked": {
+     "n_sequences": 96299,
+     "n_units": 19,
+     "n_pos_units": 4,
+     "n_neg_units": 15,
+     "seq_weighted": 0.018683769599837793,
+     "unit_balanced": 0.03553208682782788,
+     "host_mean": 0.08333333333333331,
+     "host_mean_ci95": [
+      0.0,
+      0.23333333333333334
+     ]
+    },
+    "persistence_oracle": {
+     "n_sequences": 96299,
+     "n_units": 19,
+     "n_pos_units": 4,
+     "n_neg_units": 15,
+     "seq_weighted": 0.9895381472776518,
+     "unit_balanced": 0.9878598709076334,
+     "host_mean": 1.0,
+     "host_mean_ci95": [
+      1.0,
+      1.0
+     ]
+    }
+   },
+   "counts": {
+    "n_sequences": 96299,
+    "n_units": 19,
+    "n_pos_units": 4,
+    "n_neg_units": 15
+   }
+  },
+  "cic2017": {
+   "unit_definition": "source IP",
+   "episodes": "15 (docs/13 definition; counted inside the positive units only)",
+   "scores": {
+    "seed1": {
+     "n_sequences": 41713,
+     "n_units": 473,
+     "n_pos_units": 10,
+     "n_neg_units": 463,
+     "seq_weighted": 0.6896346834074067,
+     "unit_balanced": 0.959186328588278,
+     "host_mean": 0.9762419006479482,
+     "host_mean_ci95": [
+      0.9586123110151188,
+      0.9906425485961122
+     ]
+    },
+    "seed2": {
+     "n_sequences": 41713,
+     "n_units": 473,
+     "n_pos_units": 10,
+     "n_neg_units": 463,
+     "seq_weighted": 0.7787357268971511,
+     "unit_balanced": 0.8557835309098376,
+     "host_mean": 0.9911447084233261,
+     "host_mean_ci95": [
+      0.9808801295896328,
+      0.9987041036717063
+     ]
+    },
+    "seed3": {
+     "n_sequences": 41713,
+     "n_units": 473,
+     "n_pos_units": 10,
+     "n_neg_units": 463,
+     "seq_weighted": 0.5925615118532198,
+     "unit_balanced": 0.8908400210327613,
+     "host_mean": 0.9151187904967603,
+     "host_mean_ci95": [
+      0.8637958963282938,
+      0.9645788336933045
+     ]
+    },
+    "B_s1": {
+     "n_sequences": 41713,
+     "n_units": 473,
+     "n_pos_units": 10,
+     "n_neg_units": 463,
+     "seq_weighted": 0.4281138123615576,
+     "unit_balanced": 0.721941744169172,
+     "host_mean": 0.5736501079913607,
+     "host_mean_ci95": [
+      0.3462958963282937,
+      0.7990442764578835
+     ]
+    },
+    "B_s2": {
+     "n_sequences": 41713,
+     "n_units": 473,
+     "n_pos_units": 10,
+     "n_neg_units": 463,
+     "seq_weighted": 0.40185806920838824,
+     "unit_balanced": 0.6671405186029824,
+     "host_mean": 0.550755939524838,
+     "host_mean_ci95": [
+      0.3267494600431965,
+      0.7844114470842332
+     ]
+    },
+    "B_s3": {
+     "n_sequences": 41713,
+     "n_units": 473,
+     "n_pos_units": 10,
+     "n_neg_units": 463,
+     "seq_weighted": 0.41039711557926806,
+     "unit_balanced": 0.6903454237883797,
+     "host_mean": 0.66414686825054,
+     "host_mean_ci95": [
+      0.44586933045356375,
+      0.8779913606911447
+     ]
+    },
+    "Bplus_s1": {
+     "n_sequences": 41713,
+     "n_units": 473,
+     "n_pos_units": 10,
+     "n_neg_units": 463,
+     "seq_weighted": 0.35914691474499405,
+     "unit_balanced": 0.6792916187767721,
+     "host_mean": 0.7846652267818575,
+     "host_mean_ci95": [
+      0.6284233261339093,
+      0.9241090712742981
+     ]
+    },
+    "Bplus_s2": {
+     "n_sequences": 41713,
+     "n_units": 473,
+     "n_pos_units": 10,
+     "n_neg_units": 463,
+     "seq_weighted": 0.477410141823535,
+     "unit_balanced": 0.7651035929838843,
+     "host_mean": 0.4650107991360691,
+     "host_mean_ci95": [
+      0.21769438444924405,
+      0.7355021598272137
+     ]
+    },
+    "Bplus_s3": {
+     "n_sequences": 41713,
+     "n_units": 473,
+     "n_pos_units": 10,
+     "n_neg_units": 463,
+     "seq_weighted": 0.3899275207189721,
+     "unit_balanced": 0.7140091113257088,
+     "host_mean": 0.8298056155507559,
+     "host_mean_ci95": [
+      0.6985583153347733,
+      0.9351025917926566
+     ]
+    },
+    "flow_count": {
+     "n_sequences": 41713,
+     "n_units": 473,
+     "n_pos_units": 10,
+     "n_neg_units": 463,
+     "seq_weighted": 0.709670424565559,
+     "unit_balanced": 0.8976097113415007,
+     "host_mean": 0.9950323974082073,
+     "host_mean_ci95": [
+      0.9879859611231102,
+      0.9997840172786178
+     ]
+    },
+    "LR_last": {
+     "n_sequences": 41713,
+     "n_units": 473,
+     "n_pos_units": 10,
+     "n_neg_units": 463,
+     "seq_weighted": 0.6644081853142582,
+     "unit_balanced": 0.8353610586234836,
+     "host_mean": 0.9652267818574516,
+     "host_mean_ci95": [
+      0.9319600431965442,
+      0.9944978401727862
+     ]
+    },
+    "HGB_last": {
+     "n_sequences": 41713,
+     "n_units": 473,
+     "n_pos_units": 10,
+     "n_neg_units": 463,
+     "seq_weighted": 0.7717444369857922,
+     "unit_balanced": 0.9209698870239467,
+     "host_mean": 0.9909287257019439,
+     "host_mean_ci95": [
+      0.9828239740820734,
+      0.9976241900647949
+     ]
+    },
+    "HGB_stacked": {
+     "n_sequences": 41713,
+     "n_units": 473,
+     "n_pos_units": 10,
+     "n_neg_units": 463,
+     "seq_weighted": 0.7933313475623534,
+     "unit_balanced": 0.915745401544143,
+     "host_mean": 0.9907127429805616,
+     "host_mean_ci95": [
+      0.9818466522678185,
+      0.9968736501079913
+     ]
+    },
+    "persistence_oracle": {
+     "n_sequences": 41713,
+     "n_units": 473,
+     "n_pos_units": 10,
+     "n_neg_units": 463,
+     "seq_weighted": 0.9146666591608765,
+     "unit_balanced": 0.9891729562561316,
+     "host_mean": 1.0,
+     "host_mean_ci95": [
+      0.9999999999999999,
+      1.0
+     ]
+    }
+   },
+   "counts": {
+    "n_sequences": 41713,
+    "n_units": 473,
+    "n_pos_units": 10,
+    "n_neg_units": 463
+   }
+  }
+ }
+}

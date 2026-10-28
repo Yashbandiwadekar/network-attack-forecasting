@@ -55,6 +55,7 @@ import numpy as np
 import torch
 
 from common.config import feature_columns, load_config, resolve_path
+from eval.baseline_gate import baseline_scores, fit_baselines, gate_markdown, gate_unit_ids, run_gate
 from eval.metrics import binary_metrics, lead_time_metrics, stage_metrics, threshold_at_fpr, threshold_free_metrics
 from models.baseline_lr import BaselineModel, PersistenceBaseline, PersistenceOnPredictedLabel
 from eval.lofo import _predict_infiltration
@@ -156,6 +157,44 @@ def _evaluate_model(
         result[key] = binary_metrics(infiltration_target, test_prob, threshold=thr)
     result["threshold_free"] = threshold_free_metrics(infiltration_target, test_prob)
     return result
+
+
+# ---------------------------------------------------------------------------
+# Baseline gate (docs/16 action 3 / docs/18): HGB (last + stacked window), LR and flow_count, on RAW features
+# ---------------------------------------------------------------------------
+
+def baseline_gate_section(feature_config: dict, train_split: dict, eval_split: dict, model_name: str,
+                          model_prob: np.ndarray, scope: str, max_train_rows: int | None = None,
+                          per_day_cap: int | None = 30_000) -> str:
+    """Markdown section for one evaluation path. `train_split` / `eval_split` are RAW splits (models.dataset.load_split) -
+    the baselines are fitted on unscaled features, not on the clipped tensors the Transformer sees. The gate's units are
+    days (or scenarios); pooled AUROC/AUPRC are printed as a secondary table only."""
+    names = feature_columns(feature_config)
+    # Training rows for the baselines: at most `per_day_cap` rows per day (docs/16 'train A' rule, fixed before any result). Using ALL rows of
+    # a split that is 99% one day lets HGB learn that day's identity-like features and drops it to 0.56 mean per-day AUROC on the v2 test
+    # (measured: docs/18); a uniform 200k subsample did the same (0.65). The rule is stated in the section so the gate is not tilted.
+    day = gate_unit_ids(train_split) if train_split.get("window_end_time") is not None else None
+    models = fit_baselines(train_split["X"], train_split["infiltration"][:, 0] > 0, names.index("flow_count"),
+                           max_train_rows=max_train_rows, day=day, per_day_cap=per_day_cap)
+    scores = {model_name: np.asarray(model_prob, float), **baseline_scores(models, eval_split["X"])}
+    y = eval_split["infiltration"][:, 0] > 0
+    unit = gate_unit_ids(eval_split)
+    g = run_gate(y, scores, unit, model_name)
+    pooled = []
+    for n, sc in scores.items():
+        m = threshold_free_metrics(y.astype(float), sc)
+        pooled.append(f"| {n} | {m['auroc']:.4f} | {m['auprc']:.4f} |" if m["auroc"] is not None else f"| {n} | n/a | n/a |")
+    n_tr = len(train_split["X"])
+    scenario_units = eval_split.get("scenario_id") is not None and len(np.unique(eval_split["scenario_id"])) > 1
+    return (
+        f"\n## Baseline gate ({scope})\n\n"
+        f"Baselines fitted on RAW features of the {scope} train split ({n_tr:,} sequences; "
+        f"{f'at most {per_day_cap:,} rows per day' if per_day_cap else 'all rows'}), fixed hyper-parameters, no tuning. Gate units: {len(set(map(str, unit)))} "
+        f"({'scenarios' if scenario_units else 'days'}); {g['n_units_with_both_classes']} contain both classes. "
+        f"Pooled AUROC is secondary: it mixes units.\n\n"
+        + gate_markdown(g, title=f"Per-unit AUROC and gate - {model_name}")
+        + "\n\n| score (pooled, secondary) | AUROC | AUPRC |\n|---|---|---|\n" + "\n".join(pooled) + "\n"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -264,6 +303,10 @@ def run(config_path: str = "configs/default.yaml") -> str:
     )
 
     report = _format_report(config, len(test_ds), results, attack_persistence_rate, lead_time)
+    processed_dir = resolve_path(config, "processed_dir")
+    report += baseline_gate_section(
+        config, load_split(processed_dir, "train"), load_split(processed_dir, "test"),
+        "World Model (Transformer)", wm_test_prob, scope="single-dataset")
 
     report_path = resolve_path(config, "eval_report")
     report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -484,6 +527,10 @@ def run_cross_dataset(
         train_label, test_label,
         len(test_ds), cross_results, lead_time,
     )
+    report += baseline_gate_section(
+        test_config, native_train_split, test_split,
+        f"World Model (Train: {train_label} / Test: {test_label})", wm_test_prob,
+        scope=f"native {test_label}")
 
     if combined_report_path:
         out_path = Path(combined_report_path)

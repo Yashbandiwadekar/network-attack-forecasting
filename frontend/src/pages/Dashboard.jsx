@@ -286,8 +286,8 @@ const Dashboard = () => {
                   <>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', fontFamily: 'var(--font-mono)' }}>
                       {[
-                        { label: 'AUROC', stat: evalMetrics.auroc, color: 'var(--color-accent-amber)', note: 'Ranking quality' },
-                        { label: 'AUPRC', stat: evalMetrics.auprc, color: 'var(--c-green)', note: 'Precision-recall area' },
+                        { label: 'AUROC (POOLED, SECONDARY)', stat: evalMetrics.auroc, color: 'var(--color-accent-amber)', note: 'Ranking quality' },
+                        { label: 'AUPRC (POOLED, SECONDARY)', stat: evalMetrics.auprc, color: 'var(--c-green)', note: 'Precision-recall area' },
                         { label: 'PRECISION @ 0.5', stat: evalMetrics['precision_at_0.5'], color: 'var(--color-accent-orange)', note: 'Of what it flags' },
                         { label: 'RECALL @ 0.5', stat: evalMetrics['recall_at_0.5'], color: 'var(--color-accent-red)', note: 'Of attacks caught' },
                         { label: 'F1 @ 0.5', stat: evalMetrics['f1_at_0.5'], color: 'var(--c-orange)', note: 'Harmonic mean' },
@@ -332,6 +332,49 @@ const Dashboard = () => {
                           {evalMetrics.served_model.note}
                           {evalMetrics.served_model.selection_rule && ` Selection rule: ${evalMetrics.served_model.selection_rule}`}
                           {evalMetrics.served_model.val_loss != null && ` (val loss ${evalMetrics.served_model.val_loss}).`}
+                        </div>
+                      </div>
+                    )}
+                    {evalMetrics.per_day_v4 && (
+                      <div data-testid="per-day-results" style={{ marginTop: '1.2rem' }}>
+                        <div className="panel-header-mono" style={{ marginBottom: '0.6rem', fontSize: '0.92rem', color: 'var(--text-1-dim)' }}>
+                          <span>PER-DAY RESULTS (HEADLINE)</span>
+                          <span style={{ color: 'var(--text-2-hi)' }}>WITHIN-DAY AUROC · BASELINES BESIDE THE MODEL</span>
+                        </div>
+                        {['test', 'val'].map((sp) => {
+                          const block = evalMetrics.per_day_v4[sp];
+                          const cols = ['seed1', 'persistence_oracle', 'flow_count', 'HGB_last', 'LR_last'];
+                          const fmt = (x) => (x == null ? 'n/a' : x.toFixed(3));
+                          return (
+                            <table key={sp} className="hosts-table" data-testid={`per-day-${sp}`} style={{ marginBottom: '0.8rem', fontSize: '0.74rem' }}>
+                              <thead>
+                                <tr>
+                                  <th>{sp === 'test' ? 'TEST DAY' : 'VAL DAY'}</th><th>SEQ</th><th>POS</th><th>EPISODES</th>
+                                  <th>SEED 1 (default served model)</th><th>ORACLE*</th><th>FLOW_COUNT</th><th>HGB</th><th>LR</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {block.days.map((d) => (
+                                  <tr key={d.day}>
+                                    <td>{d.day.slice(5)}{d.truncated_source ? ' †' : ''}</td>
+                                    <td>{d.n_sequences.toLocaleString()}</td>
+                                    <td>{d.n_positive.toLocaleString()}</td>
+                                    <td>{d.episodes}</td>
+                                    {cols.map((c) => <td key={c}>{c === 'seed1' ? <strong>{fmt(d.scores[c]?.auroc)}</strong> : fmt(d.scores[c]?.auroc)}</td>)}
+                                  </tr>
+                                ))}
+                                <tr>
+                                  <td><strong>mean of days</strong></td><td>{block.n_sequences.toLocaleString()}</td>
+                                  <td>{block.n_positive.toLocaleString()}</td><td><strong>{block.n_episodes}</strong></td>
+                                  {cols.map((c) => <td key={c}><strong>{fmt(block.mean_of_days[c]?.auroc)}</strong></td>)}
+                                </tr>
+                              </tbody>
+                            </table>
+                          );
+                        })}
+                        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--text-3)', lineHeight: 1.6 }}>
+                          † {evalMetrics.per_day_v4.truncation_note}
+                          <div>* ORACLE reads the true current label: not deployable, an upper reference. HGB = gradient-boosted tree on the last window; LR = logistic regression; FLOW_COUNT = last-window flow count, no training. Each day is one independent unit; the pooled figures above are secondary because they mix days.</div>
                         </div>
                       </div>
                     )}

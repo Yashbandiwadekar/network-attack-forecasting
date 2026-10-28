@@ -168,3 +168,51 @@ def load(spec: str) -> dict[str, np.ndarray]:
 def day_of(arr: dict) -> np.ndarray:
     """Calendar day (YYYY-MM-DD string) of each sequence's last input window, from `window_end_time`."""
     return arr["window_end_time"].astype("datetime64[D]").astype(str)
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# docs/18: paired minimum detectable effect and the "beat the baseline" gate
+# ---------------------------------------------------------------------------------------------------------------------
+
+#: observed SD of seed-to-seed paired per-day AUROC differences among the 7 trained models (docs/16 F9,
+#: docs/diagnostics16/units_mde_noise.json, 0.024 rounded; 0.0245 reproduces the published 0.076 / 0.041 / 0.024 / 0.016).
+PAIRED_SD_FLOOR = 0.0245
+
+
+def paired_mde(sd_pair: float, n_units: int, alpha: float = 0.05, power: float = 0.8) -> float:
+    """Minimum detectable mean paired difference (80% power, two-sided 5%) over `n_units` independent units
+    (days) when the SD of the per-unit paired difference is `sd_pair`: (t_{1-alpha/2,n-1} + t_{power,n-1}) * sd / sqrt(n).
+    Same formula as docs/16 exp13 (0.076 / 0.041 / 0.024 / 0.016 for n = 3 / 5 / 10 / 20 at sd 0.0245)."""
+    from scipy.stats import t as tdist
+    if n_units < 2:
+        return float("inf")
+    df = n_units - 1
+    return float((tdist.ppf(1 - alpha / 2, df) + tdist.ppf(power, df)) * sd_pair / np.sqrt(n_units))
+
+
+def baseline_gate(model_by_unit: dict, baseline_by_unit: dict, sd_floor: float = PAIRED_SD_FLOOR,
+                  n_boot: int = 10_000, seed: int = 0) -> dict:
+    """PASS/FAIL for 'the model beats the baseline by more than the paired minimum detectable effect'.
+
+    model_by_unit / baseline_by_unit: {unit (e.g. day): metric (e.g. within-day AUROC) or None}. Only units where both
+    are defined are used. diff_u = model_u - baseline_u. The SD used for the MDE is max(sd_floor, observed SD of the
+    diffs) - fixed this way BEFORE any result so that a noisy comparison cannot shrink its own bar.
+    PASS iff mean(diff) > MDE. `ci95_day_bootstrap` is a percentile bootstrap over units (resampling days);
+    `ci_excludes_zero` is reported beside the verdict but does not change it."""
+    units = [u for u in model_by_unit if model_by_unit[u] is not None and baseline_by_unit.get(u) is not None]
+    d = np.array([model_by_unit[u] - baseline_by_unit[u] for u in units], dtype=float)
+    n = len(d)
+    if n < 2:
+        return {"verdict": "FAIL", "reason": "fewer than 2 comparable units", "n_units": n, "mean_diff": None,
+                "mde": None, "units": units}
+    sd_obs = float(d.std(ddof=1))
+    sd_used = max(sd_floor, sd_obs)
+    mde = paired_mde(sd_used, n)
+    rng = np.random.default_rng(seed)
+    boots = d[rng.integers(0, n, size=(n_boot, n))].mean(axis=1)
+    lo, hi = (float(x) for x in np.percentile(boots, [2.5, 97.5]))
+    mean = float(d.mean())
+    return {"verdict": "PASS" if mean > mde else "FAIL", "n_units": n, "units": units, "mean_diff": mean,
+            "sd_diff_observed": sd_obs, "sd_used": sd_used, "mde": mde, "mde_at_floor_sd": paired_mde(sd_floor, n),
+            "ci95_day_bootstrap": [lo, hi], "ci_excludes_zero": bool(lo > 0 or hi < 0),
+            "wins": int((d > 0).sum()), "per_unit_diff": {u: float(x) for u, x in zip(units, d)}}

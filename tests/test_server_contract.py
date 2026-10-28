@@ -425,3 +425,26 @@ def test_eval_metrics_follow_the_active_model(client: TestClient):
         assert served["available"] is False and served["metrics"] is None
     finally:
         STATE.config_path = saved
+
+
+# ----------------------------------------------------------------- docs/17: per-day table (additive field)
+
+def test_eval_metrics_serve_the_per_day_table_from_the_results_file(client: TestClient):
+    path = PROJECT_ROOT / "docs" / "results_per_day_v4.json"
+    if not path.exists():
+        pytest.skip("docs/results_per_day_v4.json not generated (python -m eval.report_v4)")
+    truth = json.loads(path.read_text())
+    body = client.get("/api/v1/eval/metrics").json()
+    assert body["auroc"]["mean"] == round(_results()["across_seeds"]["auroc"]["mean"], 4)   # existing fields untouched
+    pd = body["per_day_v4"]
+    assert [d["day"] for d in pd["test"]["days"]] == ["2018-02-16", "2018-02-23", "2018-03-01"]
+    d0 = pd["test"]["days"][1]
+    assert d0["episodes"] == truth["cic2018"]["test"]["days"]["2018-02-23"]["episodes"] == 8
+    assert d0["truncated_source"] is True and pd["test"]["days"][2]["truncated_source"] is False
+    assert d0["scores"]["seed1"]["auroc"] == truth["cic2018"]["test"]["days"]["2018-02-23"]["scores"]["seed1"]["auroc"]
+    for b in ("persistence_oracle", "flow_count", "HGB_last", "LR_last"):
+        assert b in d0["scores"]                                    # baselines beside the model
+    assert pd["test"]["n_episodes"] == 12 and pd["val"]["n_episodes"] == 14
+    assert "1,048,575" in pd["truncation_note"]
+    ctu = pd["cross_dataset_unit_balanced"]["ctu13"]
+    assert ctu["n_units"] == ctu["n_pos_units"] + ctu["n_neg_units"] and "unit_balanced" in ctu["scores"]["seed1"]

@@ -49,6 +49,7 @@ from pipeline.mitre_mapping import CIC_LABEL_TO_STAGE, STAGE_CLASSIFICATION_LABE
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 RESULTS_PATH = PROJECT_ROOT / "docs" / "v2_converged_seed_results.json"
 LOFO_PATH = PROJECT_ROOT / "docs" / "lofo_seed_summary.json"
+PER_DAY_PATH = PROJECT_ROOT / "docs" / "results_per_day_v4.json"      # written by `python -m eval.report_v4` (docs/17)
 
 MAX_UPLOAD_MB = service.MAX_PCAP_UPLOAD_MB
 
@@ -1404,6 +1405,41 @@ def _served_model_metrics(data: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _per_day_payload() -> dict[str, Any] | None:
+    """The per-day headline table of docs/17 (read from docs/results_per_day_v4.json, never literals). Additive: the pooled
+    fields of get_eval_metrics are unchanged. Returns None when the file has not been generated."""
+    if not PER_DAY_PATH.exists():
+        return None
+    r = json.loads(PER_DAY_PATH.read_text(encoding="utf-8"))
+
+    def split(sp: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "n_sequences": sp["n_sequences"], "n_positive": sp["n_pos"], "n_episodes": sp["n_episodes"],
+            "days": [{"day": d, "n_sequences": v["n"], "n_positive": v["pos"], "episodes": v["episodes"],
+                      "truncated_source": v["truncated"], "scores": v["scores"]} for d, v in sorted(sp["days"].items())],
+            "mean_of_days": sp["mean_within"],
+            "pooled_secondary": sp["pooled"],
+        }
+
+    return {
+        "source": "docs/results_per_day_v4.json (docs/17-results-per-day.md)",
+        "headline_rule": "within-day AUROC per day, with episodes beside it; pooled AUROC is a secondary row",
+        "truncation_note": r["truncation_note"], "truncated_days": r["truncated_days"],
+        "models": r["models"], "baselines": r["baselines"], "served_column": "seed1",
+        "baseline_notes": {"persistence_oracle": "reads the true current label - not deployable, upper reference only",
+                           "flow_count": "last-window flow_count, no training",
+                           "HGB_last": "HistGradientBoosting, last window", "HGB_stacked": "HistGradientBoosting, 12-window stack",
+                           "LR_last": "logistic regression, last window"},
+        "test": split(r["cic2018"]["test"]), "val": split(r["cic2018"]["val"]),
+        "cross_dataset_unit_balanced": {
+            k: {"unit_definition": v["unit_definition"], **v["counts"], "onset_episodes": v["episodes"],
+                "scores": {n: {"unit_balanced": s["unit_balanced"], "host_mean": s["host_mean"],
+                               "host_mean_ci95": s["host_mean_ci95"], "sequence_weighted_secondary": s["seq_weighted"]}
+                           for n, s in v["scores"].items()}}
+            for k, v in r["cross_dataset"].items()},
+    }
+
+
 @app.get("/api/v1/eval/metrics")
 def get_eval_metrics():
     """The project's measured results, read from the seed-summary files -- never literals.
@@ -1441,6 +1477,7 @@ def get_eval_metrics():
         ),
     }
     payload["served_model"] = _served_model_metrics(data)
+    payload["per_day_v4"] = _per_day_payload()
     if LOFO_PATH.exists():
         lofo = json.loads(LOFO_PATH.read_text(encoding="utf-8"))
         payload["generalisation_lofo"] = {
