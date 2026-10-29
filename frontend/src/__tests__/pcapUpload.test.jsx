@@ -22,6 +22,7 @@ vi.mock('../api', () => ({
     getNarrative: vi.fn().mockResolvedValue({ narrative: 'Test narrative', cve_details: [] }),
     getMitre: vi.fn().mockResolvedValue({ techniques: [] }),
   },
+  demoApi: { listScenarios: vi.fn().mockResolvedValue({ scenarios: [] }), loadScenario: vi.fn() },
   analysisApi: {
     uploadFile: vi.fn(),
   },

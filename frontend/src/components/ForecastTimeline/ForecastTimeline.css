@@ -145,3 +145,8 @@
     transform: none;
   }
 }
+
+.timeline-card.empty-state {
+  border-style: dashed;
+  background: transparent;
+}

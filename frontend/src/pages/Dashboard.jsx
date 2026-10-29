@@ -3,12 +3,13 @@ import Sidebar from '../components/Dashboard/Sidebar';
 import Header from '../components/Dashboard/Header';
 import TelemetryStrip from '../components/TelemetryStrip/TelemetryStrip';
 import ForecastTimeline from '../components/ForecastTimeline/ForecastTimeline';
+import DemoScenarios from '../components/DemoScenarios/DemoScenarios';
 import ThreatScoreGauge from '../components/ThreatScoreGauge/ThreatScoreGauge';
 import ForecastProbabilityCurve from '../components/ForecastProbabilityCurve/ForecastProbabilityCurve';
 import WhatIfPanel from '../components/WhatIfPanel/WhatIfPanel';
 import AuditLedger from '../components/AuditLedger/AuditLedger';
 import LiveBadge from '../components/LiveBadge/LiveBadge';
-import { systemApi, datasetApi, forecastApi, explainApi, analysisApi, reportApi, evalApi, responseApi } from '../api';
+import { systemApi, datasetApi, forecastApi, explainApi, analysisApi, reportApi, evalApi, responseApi, demoApi } from '../api';
 // BUG-007: removed unused imports FileText and ShieldCheck
 import { UploadCloud, CheckCircle, AlertTriangle, Activity, Database, RefreshCw } from 'lucide-react';
 import './Dashboard.css';
@@ -27,6 +28,7 @@ const Dashboard = () => {
   // it was declared here but never consumed by JSX — removing the top-level declaration.
   const [evalMetrics, setEvalMetrics] = useState(null);
   const [uploadStatus, setUploadStatus] = useState(null);
+  const [demoLoadingId, setDemoLoadingId] = useState(null);
   const [reportResult, setReportResult] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -104,6 +106,8 @@ const Dashboard = () => {
       setNarrativeData(narr);
     } catch (err) {
       console.error('Error fetching host details:', err);
+      // Do not keep showing the previous host's / capture's forecast and observed history.
+      setForecastData(null);
     }
   }, []);
 
@@ -158,12 +162,40 @@ const Dashboard = () => {
     try {
       const res = await analysisApi.uploadFile(file);
       setUploadStatus({ state: 'success', message: res.message, data: res });
-      if (res.new_host_ip) {
-        setSelectedHostIp(res.new_host_ip);
-      }
-      fetchInitialData();
+      showIngested(res);
     } catch (err) {
       setUploadStatus({ state: 'error', message: err.message });
+    }
+  };
+
+  // After an upload or a demo load the server's data was replaced. The selected host may keep the
+  // same name (every CIC-2018 day without source IPs is a single NETWORK-<day> pseudo-host), in
+  // which case the selectedHostIp effect would not re-fire and the panels would keep showing the
+  // previous capture -- so refetch the host explicitly.
+  const showIngested = (res) => {
+    if (res.new_host_ip) {
+      setSelectedHostIp(res.new_host_ip);
+      fetchHostDetails(res.new_host_ip);
+    } else {
+      setSelectedHostIp('');
+      setForecastData(null);
+      setAttributionData(null);
+      setNarrativeData(null);
+    }
+    fetchInitialData();
+  };
+
+  const handleDemoLoad = async (id, title) => {
+    setDemoLoadingId(id);
+    setUploadStatus({ state: 'uploading', message: `Loading demo scenario "${title}" and scoring every host...` });
+    try {
+      const res = await demoApi.loadScenario(id);
+      setUploadStatus({ state: 'success', message: res.message, data: res });
+      showIngested(res);
+    } catch (err) {
+      setUploadStatus({ state: 'error', message: err.message });
+    } finally {
+      setDemoLoadingId(null);
     }
   };
 
@@ -492,10 +524,13 @@ const Dashboard = () => {
                   <span>OBSERVED VS PREDICTED</span>
                 </div>
                 <ForecastTimeline
-                  probabilities={forecastData?.infiltration_probs}
+                  probabilities={selectedHostIp ? forecastData?.infiltration_probs : undefined}
                   predictedStages={forecastData?.predicted_stages}
                   stageIsHeuristic={forecastData?.stage_is_heuristic}
                   horizon={forecastData?.horizon_k || 6}
+                  horizonSeconds={forecastData?.horizon_seconds}
+                  observedHistory={selectedHostIp ? forecastData?.observed_history : null}
+                  hostIp={selectedHostIp}
                 />
               </div>
 
@@ -536,6 +571,8 @@ const Dashboard = () => {
                     </span>
                   </div>
                 )}
+
+                <DemoScenarios onLoad={handleDemoLoad} loadingId={demoLoadingId} />
               </div>
             </div>
           )}
@@ -598,10 +635,13 @@ const Dashboard = () => {
                   <span>MARKOV / NEURAL SEQUENCE</span>
                 </div>
                 <ForecastTimeline
-                  probabilities={forecastData?.infiltration_probs}
+                  probabilities={selectedHostIp ? forecastData?.infiltration_probs : undefined}
                   predictedStages={forecastData?.predicted_stages}
                   stageIsHeuristic={forecastData?.stage_is_heuristic}
                   horizon={forecastData?.horizon_k || 6}
+                  horizonSeconds={forecastData?.horizon_seconds}
+                  observedHistory={selectedHostIp ? forecastData?.observed_history : null}
+                  hostIp={selectedHostIp}
                 />
               </div>
             </div>
