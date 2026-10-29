@@ -1,0 +1,1178 @@
+{
+  "generated_by": "scripts/build_demo_files.py",
+  "pandas_version": "3.0.5",
+  "slicing_rule": {
+    "n_rows": 40000,
+    "pre_context_rows": 2000,
+    "size_cap_mb": 15.0,
+    "shrink_step": 5000,
+    "grow_step": 20000,
+    "sequence_length": 12
+  },
+  "served_model": "dist/models/seed1 (configs/real_data_v2_converged_seed1.yaml)",
+  "alert_threshold": 0.4,
+  "measured_with": {
+    "model": "bundle dist/models/seed1",
+    "bundle_name": "seed1",
+    "bundle_manifest_sha256": "6751ca5734731058f5b5d88356894bc5f441712a5278a47c533c6a5a92c67df0",
+    "bundle_checksums_ok": true,
+    "status": "online"
+  },
+  "scenarios": [
+    {
+      "id": "ftp-bruteforce-0214",
+      "title": "Brute force (FTP)",
+      "description": "Credential guessing against an FTP server.",
+      "scenario": "brute-force-ftp",
+      "target_labels": [
+        "FTP-BruteForce"
+      ],
+      "file": "demo-ftp-bruteforce-0214.csv",
+      "format": "csv",
+      "size_bytes": 1169026,
+      "size_mb": 1.1,
+      "sha256": "190e3639da4bc978a2fbbd63f950764140977dc5979543b838e6b533561157a5",
+      "n_rows": 5000,
+      "label_mix": {
+        "FTP-BruteForce": 4999,
+        "Benign": 1
+      },
+      "structure": {
+        "flows": 5000,
+        "windows": 17,
+        "hosts": 1,
+        "max_windows_per_host": 17,
+        "hosts_with_full_sequence": 1
+      },
+      "family_in_scored_windows": {
+        "host": "NETWORK-2018-02-14",
+        "share": 1.0,
+        "labels": {
+          "FTP-BruteForce": 3634,
+          "Benign": 1
+        }
+      },
+      "search": {
+        "day": "02-14",
+        "labels": [
+          "FTP-BruteForce"
+        ],
+        "slices_tried": 48,
+        "slices_scored": 26,
+        "best_search_peak": 0.7044,
+        "best_slice": [
+          58942,
+          63942
+        ]
+      },
+      "source": {
+        "dataset": "CSE-CIC-IDS2018",
+        "day": "14 Feb 2018",
+        "day_mmdd": "02-14",
+        "file": "Wednesday-14-02-2018_TrafficForML_CICFlowMeter.csv",
+        "row_start": 58942,
+        "row_end": 63942,
+        "rule": "rows 58942..63941: the slice with the strongest alert for this family in the search grid (scripts/search_demo_slices.py)",
+        "citation": "CSE-CIC-IDS2018 (Canadian Institute for Cybersecurity / Communications Security Establishment), https://www.unb.ca/cic/datasets/ids-2018.html. Redistribution is allowed with citation: I. Sharafaldin, A. Habibi Lashkari, A. A. Ghorbani, 'Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization', ICISSP 2018."
+      },
+      "split": "train",
+      "split_tag": "TRAIN DAY (in-sample)",
+      "measured": {
+        "status": "success",
+        "flows": 5000,
+        "windows": 17,
+        "hosts_scored": 1,
+        "high_risk_hosts": 1,
+        "peak_prob": 0.7044,
+        "top_host": "NETWORK-2018-02-14",
+        "top_host_severity": "critical",
+        "top_host_predicted_stage": "Benign",
+        "top_host_observed_runs": [
+          {
+            "stage": "Initial Access",
+            "observed": true,
+            "n_windows": 11,
+            "flow_count": 3634,
+            "from": "2018-02-14T11:03:40",
+            "to": "2018-02-14T11:05:30",
+            "may_be_heuristic": false
+          },
+          {
+            "stage": "Benign",
+            "observed": true,
+            "n_windows": 1,
+            "flow_count": 1,
+            "from": "2018-02-14T11:08:40",
+            "to": "2018-02-14T11:08:50",
+            "may_be_heuristic": false
+          }
+        ],
+        "catch": {
+          "host": "NETWORK-2018-02-14",
+          "peak_prob": 0.7044,
+          "observed_runs": [
+            {
+              "stage": "Initial Access",
+              "observed": true,
+              "n_windows": 11,
+              "flow_count": 3634,
+              "from": "2018-02-14T11:03:40",
+              "to": "2018-02-14T11:05:30",
+              "may_be_heuristic": false
+            },
+            {
+              "stage": "Benign",
+              "observed": true,
+              "n_windows": 1,
+              "flow_count": 1,
+              "from": "2018-02-14T11:08:40",
+              "to": "2018-02-14T11:08:50",
+              "may_be_heuristic": false
+            }
+          ]
+        },
+        "alert_threshold": 0.4
+      },
+      "expected_behaviour": {
+        "verdict": "flagged",
+        "text": "Alerts: peak 0.70 on the alerting host. Scored windows: Initial Access x11, Benign x1. Training day (in-sample)."
+      }
+    },
+    {
+      "id": "dos-attacks-slowhttptest-0216",
+      "title": "DoS (SlowHTTPTest)",
+      "description": "Slow HTTP denial-of-service using SlowHTTPTest.",
+      "scenario": "dos-slowhttptest",
+      "target_labels": [
+        "DoS attacks-SlowHTTPTest"
+      ],
+      "file": "demo-dos-attacks-slowhttptest-0216.csv",
+      "format": "csv",
+      "size_bytes": 1205727,
+      "size_mb": 1.1,
+      "sha256": "6c126895b95780a25b0d85b84eba3c314c3098017e3e47422bf39cf99341b62f",
+      "n_rows": 5000,
+      "label_mix": {
+        "DoS attacks-SlowHTTPTest": 4999,
+        "Benign": 1
+      },
+      "structure": {
+        "flows": 5000,
+        "windows": 17,
+        "hosts": 1,
+        "max_windows_per_host": 17,
+        "hosts_with_full_sequence": 1
+      },
+      "family_in_scored_windows": {
+        "host": "NETWORK-2018-02-16",
+        "share": 1.0,
+        "labels": {
+          "DoS attacks-SlowHTTPTest": 3498,
+          "Benign": 1
+        }
+      },
+      "search": {
+        "day": "02-16",
+        "labels": [
+          "DoS attacks-SlowHTTPTest"
+        ],
+        "slices_tried": 49,
+        "slices_scored": 7,
+        "best_search_peak": 0.6245,
+        "best_slice": [
+          82470,
+          87470
+        ]
+      },
+      "source": {
+        "dataset": "CSE-CIC-IDS2018",
+        "day": "16 Feb 2018",
+        "day_mmdd": "02-16",
+        "file": "Friday-16-02-2018_TrafficForML_CICFlowMeter.csv",
+        "row_start": 82470,
+        "row_end": 87470,
+        "rule": "rows 82470..87469: the slice with the strongest alert for this family in the search grid (scripts/search_demo_slices.py)",
+        "citation": "CSE-CIC-IDS2018 (Canadian Institute for Cybersecurity / Communications Security Establishment), https://www.unb.ca/cic/datasets/ids-2018.html. Redistribution is allowed with citation: I. Sharafaldin, A. Habibi Lashkari, A. A. Ghorbani, 'Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization', ICISSP 2018."
+      },
+      "split": "test",
+      "split_tag": "HELD-OUT TEST DAY",
+      "measured": {
+        "status": "success",
+        "flows": 5000,
+        "windows": 17,
+        "hosts_scored": 1,
+        "high_risk_hosts": 1,
+        "peak_prob": 0.6245,
+        "top_host": "NETWORK-2018-02-16",
+        "top_host_severity": "serious",
+        "top_host_predicted_stage": "Benign",
+        "top_host_observed_runs": [
+          {
+            "stage": "Impact",
+            "observed": true,
+            "n_windows": 11,
+            "flow_count": 3498,
+            "from": "2018-02-16T10:54:20",
+            "to": "2018-02-16T10:56:10",
+            "may_be_heuristic": false
+          },
+          {
+            "stage": "Benign",
+            "observed": true,
+            "n_windows": 1,
+            "flow_count": 1,
+            "from": "2018-02-16T10:59:20",
+            "to": "2018-02-16T10:59:30",
+            "may_be_heuristic": false
+          }
+        ],
+        "catch": {
+          "host": "NETWORK-2018-02-16",
+          "peak_prob": 0.6245,
+          "observed_runs": [
+            {
+              "stage": "Impact",
+              "observed": true,
+              "n_windows": 11,
+              "flow_count": 3498,
+              "from": "2018-02-16T10:54:20",
+              "to": "2018-02-16T10:56:10",
+              "may_be_heuristic": false
+            },
+            {
+              "stage": "Benign",
+              "observed": true,
+              "n_windows": 1,
+              "flow_count": 1,
+              "from": "2018-02-16T10:59:20",
+              "to": "2018-02-16T10:59:30",
+              "may_be_heuristic": false
+            }
+          ]
+        },
+        "alert_threshold": 0.4
+      },
+      "expected_behaviour": {
+        "verdict": "flagged",
+        "text": "Alerts: peak 0.62 on the alerting host. Scored windows: Impact x11, Benign x1. Held-out test day."
+      }
+    },
+    {
+      "id": "ddos-attacks-loic-http-0220",
+      "title": "DDoS (LOIC-HTTP)",
+      "description": "Distributed HTTP flood from many attacker hosts. This day carries real source IPs, so several hosts are scored.",
+      "scenario": "ddos-loic-http",
+      "target_labels": [
+        "DDoS attacks-LOIC-HTTP"
+      ],
+      "file": "demo-ddos-attacks-loic-http-0220.csv",
+      "format": "csv",
+      "size_bytes": 8833835,
+      "size_mb": 8.4,
+      "sha256": "7685c117795d8459992a61fc5b7734a26dea084f054c69b8262b93b29095bf3c",
+      "n_rows": 20000,
+      "label_mix": {
+        "DDoS attacks-LOIC-HTTP": 19246,
+        "Benign": 754
+      },
+      "structure": {
+        "flows": 20000,
+        "windows": 2215,
+        "hosts": 73,
+        "max_windows_per_host": 211,
+        "hosts_with_full_sequence": 12
+      },
+      "family_in_scored_windows": {
+        "host": "18.216.200.189",
+        "share": 1.0,
+        "labels": {
+          "DDoS attacks-LOIC-HTTP": 230
+        }
+      },
+      "search": {
+        "day": "02-20",
+        "labels": [
+          "DDoS attacks-LOIC-HTTP"
+        ],
+        "slices_tried": 49,
+        "slices_scored": 21,
+        "best_search_peak": 0.9902,
+        "best_slice": [
+          413355,
+          433355
+        ]
+      },
+      "source": {
+        "dataset": "CSE-CIC-IDS2018",
+        "day": "20 Feb 2018",
+        "day_mmdd": "02-20",
+        "file": "Thuesday-20-02-2018_TrafficForML_CICFlowMeter.csv",
+        "row_start": 413355,
+        "row_end": 433355,
+        "rule": "rows 413355..433354: the slice with the strongest alert for this family in the search grid (scripts/search_demo_slices.py)",
+        "citation": "CSE-CIC-IDS2018 (Canadian Institute for Cybersecurity / Communications Security Establishment), https://www.unb.ca/cic/datasets/ids-2018.html. Redistribution is allowed with citation: I. Sharafaldin, A. Habibi Lashkari, A. A. Ghorbani, 'Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization', ICISSP 2018."
+      },
+      "split": "train",
+      "split_tag": "TRAIN DAY (in-sample)",
+      "measured": {
+        "status": "success",
+        "flows": 20000,
+        "windows": 2215,
+        "hosts_scored": 12,
+        "high_risk_hosts": 4,
+        "peak_prob": 0.9902,
+        "top_host": "18.219.9.1",
+        "top_host_severity": "critical",
+        "top_host_predicted_stage": "Initial Access",
+        "top_host_observed_runs": [
+          {
+            "stage": "Impact",
+            "observed": true,
+            "n_windows": 12,
+            "flow_count": 496,
+            "from": "2018-02-20T11:14:20",
+            "to": "2018-02-20T11:16:50",
+            "may_be_heuristic": false
+          }
+        ],
+        "catch": {
+          "host": "18.219.9.1",
+          "peak_prob": 0.9902,
+          "observed_runs": [
+            {
+              "stage": "Impact",
+              "observed": true,
+              "n_windows": 12,
+              "flow_count": 496,
+              "from": "2018-02-20T11:14:20",
+              "to": "2018-02-20T11:16:50",
+              "may_be_heuristic": false
+            }
+          ]
+        },
+        "alert_threshold": 0.4
+      },
+      "expected_behaviour": {
+        "verdict": "flagged",
+        "text": "Alerts: peak 0.99 on the alerting host, 4 of 12 hosts flagged. Scored windows: Impact x12. Training day (in-sample)."
+      }
+    },
+    {
+      "id": "ddos-attack-loic-udp-0221",
+      "title": "DDoS (LOIC-UDP)",
+      "description": "Distributed UDP flood using LOIC.",
+      "scenario": "ddos-loic-udp",
+      "target_labels": [
+        "DDOS attack-LOIC-UDP"
+      ],
+      "file": "demo-ddos-attack-loic-udp-0221.csv",
+      "format": "csv",
+      "size_bytes": 1891587,
+      "size_mb": 1.8,
+      "sha256": "7aa93966a8256db5285ca99ebd3421bbde8249870583add93e6f1bd5e7a849e9",
+      "n_rows": 5000,
+      "label_mix": {
+        "Benign": 2200,
+        "DDOS attack-LOIC-UDP": 1730,
+        "DDOS attack-HOIC": 1070
+      },
+      "structure": {
+        "flows": 5000,
+        "windows": 498,
+        "hosts": 1,
+        "max_windows_per_host": 498,
+        "hosts_with_full_sequence": 1
+      },
+      "family_in_scored_windows": {
+        "host": "NETWORK-2018-02-21",
+        "share": 0.532,
+        "labels": {
+          "DDOS attack-LOIC-UDP": 66,
+          "Benign": 58
+        }
+      },
+      "search": {
+        "day": "02-21",
+        "labels": [
+          "DDOS attack-LOIC-UDP"
+        ],
+        "slices_tried": 3,
+        "slices_scored": 3,
+        "best_search_peak": 0.7413,
+        "best_slice": [
+          0,
+          5000
+        ]
+      },
+      "source": {
+        "dataset": "CSE-CIC-IDS2018",
+        "day": "21 Feb 2018",
+        "day_mmdd": "02-21",
+        "file": "Wednesday-21-02-2018_TrafficForML_CICFlowMeter.csv",
+        "row_start": 0,
+        "row_end": 5000,
+        "rule": "rows 0..4999: the slice with the strongest alert for this family in the search grid (scripts/search_demo_slices.py)",
+        "citation": "CSE-CIC-IDS2018 (Canadian Institute for Cybersecurity / Communications Security Establishment), https://www.unb.ca/cic/datasets/ids-2018.html. Redistribution is allowed with citation: I. Sharafaldin, A. Habibi Lashkari, A. A. Ghorbani, 'Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization', ICISSP 2018."
+      },
+      "split": "train",
+      "split_tag": "TRAIN DAY (in-sample)",
+      "measured": {
+        "status": "success",
+        "flows": 5000,
+        "windows": 498,
+        "hosts_scored": 1,
+        "high_risk_hosts": 1,
+        "peak_prob": 0.7413,
+        "top_host": "NETWORK-2018-02-21",
+        "top_host_severity": "critical",
+        "top_host_predicted_stage": "Benign",
+        "top_host_observed_runs": [
+          {
+            "stage": "Impact",
+            "observed": true,
+            "n_windows": 2,
+            "flow_count": 46,
+            "from": "2018-02-21T10:41:30",
+            "to": "2018-02-21T10:41:50",
+            "may_be_heuristic": false
+          },
+          {
+            "stage": "Benign",
+            "observed": true,
+            "n_windows": 1,
+            "flow_count": 7,
+            "from": "2018-02-21T10:41:50",
+            "to": "2018-02-21T10:42:00",
+            "may_be_heuristic": false
+          },
+          {
+            "stage": "Impact",
+            "observed": true,
+            "n_windows": 2,
+            "flow_count": 21,
+            "from": "2018-02-21T10:42:00",
+            "to": "2018-02-21T10:42:20",
+            "may_be_heuristic": false
+          },
+          {
+            "stage": "Benign",
+            "observed": true,
+            "n_windows": 1,
+            "flow_count": 1,
+            "from": "2018-02-21T10:42:20",
+            "to": "2018-02-21T10:42:30",
+            "may_be_heuristic": false
+          },
+          {
+            "stage": "Impact",
+            "observed": true,
+            "n_windows": 1,
+            "flow_count": 17,
+            "from": "2018-02-21T10:42:30",
+            "to": "2018-02-21T10:42:40",
+            "may_be_heuristic": false
+          },
+          {
+            "stage": "Benign",
+            "observed": true,
+            "n_windows": 1,
+            "flow_count": 5,
+            "from": "2018-02-21T10:42:40",
+            "to": "2018-02-21T10:42:50",
+            "may_be_heuristic": false
+          },
+          {
+            "stage": "Impact",
+            "observed": true,
+            "n_windows": 3,
+            "flow_count": 26,
+            "from": "2018-02-21T10:42:50",
+            "to": "2018-02-21T10:43:20",
+            "may_be_heuristic": false
+          },
+          {
+            "stage": "Benign",
+            "observed": true,
+            "n_windows": 1,
+            "flow_count": 1,
+            "from": "2018-02-21T10:43:20",
+            "to": "2018-02-21T10:43:30",
+            "may_be_heuristic": false
+          }
+        ],
+        "catch": {
+          "host": "NETWORK-2018-02-21",
+          "peak_prob": 0.7413,
+          "observed_runs": [
+            {
+              "stage": "Impact",
+              "observed": true,
+              "n_windows": 2,
+              "flow_count": 46,
+              "from": "2018-02-21T10:41:30",
+              "to": "2018-02-21T10:41:50",
+              "may_be_heuristic": false
+            },
+            {
+              "stage": "Benign",
+              "observed": true,
+              "n_windows": 1,
+              "flow_count": 7,
+              "from": "2018-02-21T10:41:50",
+              "to": "2018-02-21T10:42:00",
+              "may_be_heuristic": false
+            },
+            {
+              "stage": "Impact",
+              "observed": true,
+              "n_windows": 2,
+              "flow_count": 21,
+              "from": "2018-02-21T10:42:00",
+              "to": "2018-02-21T10:42:20",
+              "may_be_heuristic": false
+            },
+            {
+              "stage": "Benign",
+              "observed": true,
+              "n_windows": 1,
+              "flow_count": 1,
+              "from": "2018-02-21T10:42:20",
+              "to": "2018-02-21T10:42:30",
+              "may_be_heuristic": false
+            },
+            {
+              "stage": "Impact",
+              "observed": true,
+              "n_windows": 1,
+              "flow_count": 17,
+              "from": "2018-02-21T10:42:30",
+              "to": "2018-02-21T10:42:40",
+              "may_be_heuristic": false
+            },
+            {
+              "stage": "Benign",
+              "observed": true,
+              "n_windows": 1,
+              "flow_count": 5,
+              "from": "2018-02-21T10:42:40",
+              "to": "2018-02-21T10:42:50",
+              "may_be_heuristic": false
+            },
+            {
+              "stage": "Impact",
+              "observed": true,
+              "n_windows": 3,
+              "flow_count": 26,
+              "from": "2018-02-21T10:42:50",
+              "to": "2018-02-21T10:43:20",
+              "may_be_heuristic": false
+            },
+            {
+              "stage": "Benign",
+              "observed": true,
+              "n_windows": 1,
+              "flow_count": 1,
+              "from": "2018-02-21T10:43:20",
+              "to": "2018-02-21T10:43:30",
+              "may_be_heuristic": false
+            }
+          ]
+        },
+        "alert_threshold": 0.4
+      },
+      "expected_behaviour": {
+        "verdict": "flagged",
+        "text": "Alerts: peak 0.74 on the alerting host. Scored windows: Impact x2, Benign x1, Impact x2, Benign x1, Impact x1, Benign x1, Impact x3, Benign x1. Training day (in-sample)."
+      }
+    },
+    {
+      "id": "infilteration-0301",
+      "title": "Infiltration",
+      "description": "A foothold inside the network followed by internal activity.",
+      "scenario": "infiltration",
+      "target_labels": [
+        "Infilteration"
+      ],
+      "file": "demo-infilteration-0301.csv",
+      "format": "csv",
+      "size_bytes": 1646247,
+      "size_mb": 1.6,
+      "sha256": "85670aa3976786832f72932a0c265c19ddceb7dac5ac76eaf2ea03dbd3052cf5",
+      "n_rows": 5000,
+      "label_mix": {
+        "Infilteration": 5000
+      },
+      "structure": {
+        "flows": 5000,
+        "windows": 32,
+        "hosts": 1,
+        "max_windows_per_host": 32,
+        "hosts_with_full_sequence": 1
+      },
+      "family_in_scored_windows": {
+        "host": "NETWORK-2018-03-01",
+        "share": 1.0,
+        "labels": {
+          "Infilteration": 3360
+        }
+      },
+      "search": {
+        "day": "03-01",
+        "labels": [
+          "Infilteration"
+        ],
+        "slices_tried": 49,
+        "slices_scored": 33,
+        "best_search_peak": 0.9207,
+        "best_slice": [
+          259655,
+          264655
+        ]
+      },
+      "source": {
+        "dataset": "CSE-CIC-IDS2018",
+        "day": "1 Mar 2018",
+        "day_mmdd": "03-01",
+        "file": "Thursday-01-03-2018_TrafficForML_CICFlowMeter.csv",
+        "row_start": 259655,
+        "row_end": 264655,
+        "rule": "rows 259655..264654: the slice with the strongest alert for this family in the search grid (scripts/search_demo_slices.py)",
+        "citation": "CSE-CIC-IDS2018 (Canadian Institute for Cybersecurity / Communications Security Establishment), https://www.unb.ca/cic/datasets/ids-2018.html. Redistribution is allowed with citation: I. Sharafaldin, A. Habibi Lashkari, A. A. Ghorbani, 'Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization', ICISSP 2018."
+      },
+      "split": "test",
+      "split_tag": "HELD-OUT TEST DAY",
+      "measured": {
+        "status": "success",
+        "flows": 5000,
+        "windows": 32,
+        "hosts_scored": 1,
+        "high_risk_hosts": 1,
+        "peak_prob": 0.9207,
+        "top_host": "NETWORK-2018-03-01",
+        "top_host_severity": "critical",
+        "top_host_predicted_stage": "Lateral Movement",
+        "top_host_observed_runs": [
+          {
+            "stage": "Lateral Movement",
+            "observed": true,
+            "n_windows": 12,
+            "flow_count": 3360,
+            "from": "2018-03-01T10:13:10",
+            "to": "2018-03-01T10:15:10",
+            "may_be_heuristic": false
+          }
+        ],
+        "catch": {
+          "host": "NETWORK-2018-03-01",
+          "peak_prob": 0.9207,
+          "observed_runs": [
+            {
+              "stage": "Lateral Movement",
+              "observed": true,
+              "n_windows": 12,
+              "flow_count": 3360,
+              "from": "2018-03-01T10:13:10",
+              "to": "2018-03-01T10:15:10",
+              "may_be_heuristic": false
+            }
+          ]
+        },
+        "alert_threshold": 0.4
+      },
+      "expected_behaviour": {
+        "verdict": "flagged",
+        "text": "Alerts: peak 0.92 on the alerting host. Scored windows: Lateral Movement x12. Held-out test day."
+      }
+    },
+    {
+      "id": "benign",
+      "title": "Benign baseline",
+      "description": "Ordinary office traffic with no attack labels. A false-alarm check.",
+      "scenario": "benign",
+      "target_labels": [],
+      "file": "demo-benign.csv",
+      "format": "csv",
+      "size_bytes": 14290904,
+      "size_mb": 13.6,
+      "sha256": "5c10b210d218b237107ea2d77886adac59c94f9f4f15091df4055088924e9d7a",
+      "n_rows": 35000,
+      "label_mix": {
+        "Benign": 35000
+      },
+      "structure": {
+        "flows": 35000,
+        "windows": 3053,
+        "hosts": 1,
+        "max_windows_per_host": 3053,
+        "hosts_with_full_sequence": 1
+      },
+      "family_in_scored_windows": null,
+      "search": null,
+      "source": {
+        "dataset": "CSE-CIC-IDS2018",
+        "day": "23 Feb 2018",
+        "day_mmdd": "02-23",
+        "file": "Friday-23-02-2018_TrafficForML_CICFlowMeter.csv",
+        "row_start": 2402,
+        "row_end": 37402,
+        "rule": "rows 2402..37401: the first 35000 rows after the last non-benign row of the day",
+        "citation": "CSE-CIC-IDS2018 (Canadian Institute for Cybersecurity / Communications Security Establishment), https://www.unb.ca/cic/datasets/ids-2018.html. Redistribution is allowed with citation: I. Sharafaldin, A. Habibi Lashkari, A. A. Ghorbani, 'Toward Generating a New Intrusion Detection Dataset and Intrusion Traffic Characterization', ICISSP 2018."
+      },
+      "split": "test",
+      "split_tag": "HELD-OUT TEST DAY",
+      "measured": {
+        "status": "success",
+        "flows": 35000,
+        "windows": 3053,
+        "hosts_scored": 1,
+        "high_risk_hosts": 0,
+        "peak_prob": 0.0093,
+        "top_host": "NETWORK-2018-02-23",
+        "top_host_severity": "good",
+        "top_host_predicted_stage": "Benign",
+        "top_host_observed_runs": [
+          {
+            "stage": "Benign",
+            "observed": true,
+            "n_windows": 12,
+            "flow_count": 26,
+            "from": "2018-02-23T12:57:50",
+            "to": "2018-02-23T13:00:00",
+            "may_be_heuristic": false
+          }
+        ],
+        "catch": null,
+        "alert_threshold": 0.4
+      },
+      "expected_behaviour": {
+        "verdict": "correct_quiet",
+        "text": "Stays quiet: peak 0.01, below the 0.40 alert threshold. A false-alarm check. Held-out test day."
+      }
+    }
+  ],
+  "documented_only": [
+    {
+      "id": "ssh-bruteforce-0214",
+      "day": "02-14",
+      "labels": [
+        "SSH-Bruteforce"
+      ],
+      "slices_tried": 49,
+      "slices_scored": 35,
+      "slices_skipped": {
+        "N MB over cap": 14
+      },
+      "best_attack_in_view_peak": 0.0071,
+      "best_attack_in_view_slice": [
+        215182,
+        220182
+      ],
+      "highest_peak_any_window": 0.1585,
+      "on_dashboard": false,
+      "reason": "no scored slice reached the 0.40 alert threshold with the attack in view"
+    },
+    {
+      "id": "dos-attacks-goldeneye-0215",
+      "day": "02-15",
+      "labels": [
+        "DoS attacks-GoldenEye"
+      ],
+      "slices_tried": 34,
+      "slices_scored": 28,
+      "slices_skipped": {
+        "N MB over cap": 6
+      },
+      "best_attack_in_view_peak": 0.0725,
+      "best_attack_in_view_slice": [
+        27670,
+        32670
+      ],
+      "highest_peak_any_window": 0.1967,
+      "on_dashboard": false,
+      "reason": "no scored slice reached the 0.40 alert threshold with the attack in view"
+    },
+    {
+      "id": "dos-attacks-slowloris-0215",
+      "day": "02-15",
+      "labels": [
+        "DoS attacks-Slowloris"
+      ],
+      "slices_tried": 43,
+      "slices_scored": 32,
+      "slices_skipped": {
+        "N MB over cap": 11
+      },
+      "best_attack_in_view_peak": 0.3975,
+      "best_attack_in_view_slice": [
+        27925,
+        32925
+      ],
+      "highest_peak_any_window": 0.3975,
+      "on_dashboard": false,
+      "reason": "no scored slice reached the 0.40 alert threshold with the attack in view"
+    },
+    {
+      "id": "dos-attacks-hulk-0216",
+      "day": "02-16",
+      "labels": [
+        "DoS attacks-Hulk"
+      ],
+      "slices_tried": 49,
+      "slices_scored": 1,
+      "slices_skipped": {
+        "no host with N windows": 48
+      },
+      "best_attack_in_view_peak": null,
+      "best_attack_in_view_slice": null,
+      "highest_peak_any_window": 0.0856,
+      "on_dashboard": false,
+      "reason": "no scored slice reached the 0.40 alert threshold with the attack in view"
+    },
+    {
+      "id": "ddos-attack-hoic-0221",
+      "day": "02-21",
+      "labels": [
+        "DDOS attack-HOIC"
+      ],
+      "slices_tried": 49,
+      "slices_scored": 1,
+      "slices_skipped": {
+        "no host with N windows": 48
+      },
+      "best_attack_in_view_peak": 0.7413,
+      "best_attack_in_view_slice": [
+        1930,
+        41930
+      ],
+      "highest_peak_any_window": 0.7413,
+      "on_dashboard": false,
+      "reason": "excluded: the scored windows do not contain this family's own flows"
+    },
+    {
+      "id": "web-attacks-0222",
+      "day": "02-22",
+      "labels": [
+        "Brute Force -Web",
+        "Brute Force -XSS",
+        "SQL Injection"
+      ],
+      "slices_tried": 3,
+      "slices_scored": 3,
+      "slices_skipped": {},
+      "best_attack_in_view_peak": null,
+      "best_attack_in_view_slice": null,
+      "highest_peak_any_window": 0.1681,
+      "on_dashboard": false,
+      "reason": "no scored slice reached the 0.40 alert threshold with the attack in view"
+    },
+    {
+      "id": "web-attacks-0223",
+      "day": "02-23",
+      "labels": [
+        "Brute Force -Web",
+        "Brute Force -XSS",
+        "SQL Injection"
+      ],
+      "slices_tried": 3,
+      "slices_scored": 2,
+      "slices_skipped": {
+        "N MB over cap": 1
+      },
+      "best_attack_in_view_peak": null,
+      "best_attack_in_view_slice": null,
+      "highest_peak_any_window": 0.0393,
+      "on_dashboard": false,
+      "reason": "no scored slice reached the 0.40 alert threshold with the attack in view"
+    },
+    {
+      "id": "infilteration-0228",
+      "day": "02-28",
+      "labels": [
+        "Infilteration"
+      ],
+      "slices_tried": 49,
+      "slices_scored": 49,
+      "slices_skipped": {},
+      "best_attack_in_view_peak": null,
+      "best_attack_in_view_slice": null,
+      "highest_peak_any_window": 0.0884,
+      "on_dashboard": false,
+      "reason": "no scored slice reached the 0.40 alert threshold with the attack in view"
+    },
+    {
+      "id": "bot-0302",
+      "day": "03-02",
+      "labels": [
+        "Bot"
+      ],
+      "slices_tried": 48,
+      "slices_scored": 47,
+      "slices_skipped": {
+        "only N attack rows": 1
+      },
+      "best_attack_in_view_peak": 0.0395,
+      "best_attack_in_view_slice": [
+        258056,
+        298056
+      ],
+      "highest_peak_any_window": 0.0395,
+      "on_dashboard": false,
+      "reason": "no scored slice reached the 0.40 alert threshold with the attack in view"
+    }
+  ],
+  "search": {
+    "ftp-bruteforce-0214": {
+      "id": "ftp-bruteforce-0214",
+      "day": "02-14",
+      "labels": [
+        "FTP-BruteForce"
+      ],
+      "slices_tried": 48,
+      "slices_scored": 26,
+      "slices_skipped": {
+        "only N attack rows": 22
+      },
+      "best_attack_in_view_peak": 0.7044,
+      "best_attack_in_view_slice": [
+        58942,
+        63942
+      ],
+      "highest_peak_any_window": 0.7044,
+      "on_dashboard": true
+    },
+    "ssh-bruteforce-0214": {
+      "id": "ssh-bruteforce-0214",
+      "day": "02-14",
+      "labels": [
+        "SSH-Bruteforce"
+      ],
+      "slices_tried": 49,
+      "slices_scored": 35,
+      "slices_skipped": {
+        "N MB over cap": 14
+      },
+      "best_attack_in_view_peak": 0.0071,
+      "best_attack_in_view_slice": [
+        215182,
+        220182
+      ],
+      "highest_peak_any_window": 0.1585,
+      "on_dashboard": false
+    },
+    "dos-attacks-goldeneye-0215": {
+      "id": "dos-attacks-goldeneye-0215",
+      "day": "02-15",
+      "labels": [
+        "DoS attacks-GoldenEye"
+      ],
+      "slices_tried": 34,
+      "slices_scored": 28,
+      "slices_skipped": {
+        "N MB over cap": 6
+      },
+      "best_attack_in_view_peak": 0.0725,
+      "best_attack_in_view_slice": [
+        27670,
+        32670
+      ],
+      "highest_peak_any_window": 0.1967,
+      "on_dashboard": false
+    },
+    "dos-attacks-slowloris-0215": {
+      "id": "dos-attacks-slowloris-0215",
+      "day": "02-15",
+      "labels": [
+        "DoS attacks-Slowloris"
+      ],
+      "slices_tried": 43,
+      "slices_scored": 32,
+      "slices_skipped": {
+        "N MB over cap": 11
+      },
+      "best_attack_in_view_peak": 0.3975,
+      "best_attack_in_view_slice": [
+        27925,
+        32925
+      ],
+      "highest_peak_any_window": 0.3975,
+      "on_dashboard": false
+    },
+    "dos-attacks-hulk-0216": {
+      "id": "dos-attacks-hulk-0216",
+      "day": "02-16",
+      "labels": [
+        "DoS attacks-Hulk"
+      ],
+      "slices_tried": 49,
+      "slices_scored": 1,
+      "slices_skipped": {
+        "no host with N windows": 48
+      },
+      "best_attack_in_view_peak": null,
+      "best_attack_in_view_slice": null,
+      "highest_peak_any_window": 0.0856,
+      "on_dashboard": false
+    },
+    "dos-attacks-slowhttptest-0216": {
+      "id": "dos-attacks-slowhttptest-0216",
+      "day": "02-16",
+      "labels": [
+        "DoS attacks-SlowHTTPTest"
+      ],
+      "slices_tried": 49,
+      "slices_scored": 7,
+      "slices_skipped": {
+        "only N attack rows": 42
+      },
+      "best_attack_in_view_peak": 0.6245,
+      "best_attack_in_view_slice": [
+        82470,
+        87470
+      ],
+      "highest_peak_any_window": 0.6245,
+      "on_dashboard": true
+    },
+    "ddos-attacks-loic-http-0220": {
+      "id": "ddos-attacks-loic-http-0220",
+      "day": "02-20",
+      "labels": [
+        "DDoS attacks-LOIC-HTTP"
+      ],
+      "slices_tried": 49,
+      "slices_scored": 21,
+      "slices_skipped": {
+        "no host with N windows": 11,
+        "N MB over cap": 17
+      },
+      "best_attack_in_view_peak": 0.9902,
+      "best_attack_in_view_slice": [
+        413355,
+        433355
+      ],
+      "highest_peak_any_window": 0.9902,
+      "on_dashboard": true
+    },
+    "ddos-attack-loic-udp-0221": {
+      "id": "ddos-attack-loic-udp-0221",
+      "day": "02-21",
+      "labels": [
+        "DDOS attack-LOIC-UDP"
+      ],
+      "slices_tried": 3,
+      "slices_scored": 3,
+      "slices_skipped": {},
+      "best_attack_in_view_peak": 0.7413,
+      "best_attack_in_view_slice": [
+        0,
+        5000
+      ],
+      "highest_peak_any_window": 0.7413,
+      "on_dashboard": true
+    },
+    "ddos-attack-hoic-0221": {
+      "id": "ddos-attack-hoic-0221",
+      "day": "02-21",
+      "labels": [
+        "DDOS attack-HOIC"
+      ],
+      "slices_tried": 49,
+      "slices_scored": 1,
+      "slices_skipped": {
+        "no host with N windows": 48
+      },
+      "best_attack_in_view_peak": 0.7413,
+      "best_attack_in_view_slice": [
+        1930,
+        41930
+      ],
+      "highest_peak_any_window": 0.7413,
+      "on_dashboard": false
+    },
+    "web-attacks-0222": {
+      "id": "web-attacks-0222",
+      "day": "02-22",
+      "labels": [
+        "Brute Force -Web",
+        "Brute Force -XSS",
+        "SQL Injection"
+      ],
+      "slices_tried": 3,
+      "slices_scored": 3,
+      "slices_skipped": {},
+      "best_attack_in_view_peak": null,
+      "best_attack_in_view_slice": null,
+      "highest_peak_any_window": 0.1681,
+      "on_dashboard": false
+    },
+    "web-attacks-0223": {
+      "id": "web-attacks-0223",
+      "day": "02-23",
+      "labels": [
+        "Brute Force -Web",
+        "Brute Force -XSS",
+        "SQL Injection"
+      ],
+      "slices_tried": 3,
+      "slices_scored": 2,
+      "slices_skipped": {
+        "N MB over cap": 1
+      },
+      "best_attack_in_view_peak": null,
+      "best_attack_in_view_slice": null,
+      "highest_peak_any_window": 0.0393,
+      "on_dashboard": false
+    },
+    "infilteration-0228": {
+      "id": "infilteration-0228",
+      "day": "02-28",
+      "labels": [
+        "Infilteration"
+      ],
+      "slices_tried": 49,
+      "slices_scored": 49,
+      "slices_skipped": {},
+      "best_attack_in_view_peak": null,
+      "best_attack_in_view_slice": null,
+      "highest_peak_any_window": 0.0884,
+      "on_dashboard": false
+    },
+    "infilteration-0301": {
+      "id": "infilteration-0301",
+      "day": "03-01",
+      "labels": [
+        "Infilteration"
+      ],
+      "slices_tried": 49,
+      "slices_scored": 33,
+      "slices_skipped": {
+        "only N attack rows": 16
+      },
+      "best_attack_in_view_peak": 0.9207,
+      "best_attack_in_view_slice": [
+        259655,
+        264655
+      ],
+      "highest_peak_any_window": 0.9207,
+      "on_dashboard": true
+    },
+    "bot-0302": {
+      "id": "bot-0302",
+      "day": "03-02",
+      "labels": [
+        "Bot"
+      ],
+      "slices_tried": 48,
+      "slices_scored": 47,
+      "slices_skipped": {
+        "only N attack rows": 1
+      },
+      "best_attack_in_view_peak": 0.0395,
+      "best_attack_in_view_slice": [
+        258056,
+        298056
+      ],
+      "highest_peak_any_window": 0.0395,
+      "on_dashboard": false
+    }
+  }
+}

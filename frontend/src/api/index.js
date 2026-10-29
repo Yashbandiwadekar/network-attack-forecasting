@@ -71,3 +71,13 @@ export const reportApi = {
 export const evalApi = {
   getMetrics: () => apiFetch('/api/v1/eval/metrics'),
 };
+
+export const demoApi = {
+  // Server-side demo captures listed in demo/demo_manifest.json (docs/22). The client names a
+  // scenario by id only; the server resolves the file and verifies its checksum.
+  listScenarios: () => apiFetch('/api/v1/demo/scenarios'),
+  loadScenario: (id) => apiFetch('/api/v1/demo/load', {
+    method: 'POST',
+    body: JSON.stringify({ id }),
+  }),
+};

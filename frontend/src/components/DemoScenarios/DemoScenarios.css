@@ -1,0 +1,30 @@
+.demo-scenarios { margin-top: 1.4rem; }
+.demo-scenarios-title {
+  font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600; color: var(--text-3);
+  letter-spacing: 0.08em; border-bottom: 1px solid var(--line-08); padding-bottom: 0.5rem; margin-bottom: 0.9rem;
+}
+.demo-empty { color: var(--text-3); font-size: 0.82rem; font-family: var(--font-mono); }
+.demo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.9rem; }
+.demo-card {
+  background: var(--bg-input); border: 1px solid var(--line-10); border-radius: 6px; padding: 0.9rem;
+  display: flex; flex-direction: column; gap: 0.45rem;
+}
+.demo-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; }
+.demo-card-title { font-family: var(--font-mono); font-size: 0.85rem; font-weight: 600; color: var(--text-1); }
+.demo-tag {
+  font-family: var(--font-mono); font-size: 0.62rem; color: var(--text-2); background: var(--ov-08);
+  padding: 0.15rem 0.4rem; border-radius: 3px; white-space: nowrap;
+}
+.demo-desc { margin: 0; font-size: 0.8rem; color: var(--text-2); }
+.demo-source { margin: 0; font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-3); }
+.demo-expect { margin: 0; font-size: 0.76rem; color: var(--text-2); border-left: 2px solid var(--line-12); padding-left: 0.5rem; }
+.demo-expect.flagged { border-left-color: var(--c-orange); }
+.demo-expect.missed, .demo-expect.out_of_view, .demo-expect.alert_on_benign_windows, .demo-expect.false_alarm { border-left-color: var(--c-amber-2); }
+.demo-load-btn {
+  margin-top: auto; align-self: flex-start; display: inline-flex; align-items: center; gap: 0.4rem;
+  font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-1); background: transparent;
+  border: 1px solid var(--c-orange); border-radius: 4px; padding: 0.35rem 0.8rem; cursor: pointer;
+}
+.demo-load-btn:disabled { opacity: 0.5; cursor: not-allowed; border-color: var(--line-12); }
+.demo-spin { animation: demo-spin 1s linear infinite; }
+@keyframes demo-spin { to { transform: rotate(360deg); } }

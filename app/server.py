@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import numpy as np
+import pandas as pd
 from fastapi import Depends, FastAPI, File, HTTPException, Request, Security, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, Response
@@ -344,6 +345,67 @@ def _display_observed(observed: str | None) -> str:
     """Observed stage for display. With no ground truth we say so; we never substitute the
     forecast's first step (that is t+1, a prediction, not an observation)."""
     return _display(observed) if observed is not None else UNLABELLED
+
+
+def _observed_history(host_ip: str, config: dict[str, Any]) -> dict[str, Any]:
+    """The host's input windows -- the `sequence_length` windows the forecast is based on (the same
+    rows `latest_sequence` feeds the model) -- with the stage OBSERVED in each, and consecutive
+    identical stages collapsed into runs for display.
+
+    Same no-fabrication rule as `_observed_stage`: windows from an unlabelled capture (no Label
+    column, PCAP, live) carry `stage_observed == False`, and their stage is reported as
+    "Unlabelled", never as Benign. The stage values are only ever the ones in `windows["stage"]`
+    (project stages); nothing is inferred or invented here.
+
+    `may_be_heuristic` marks a window whose "Reconnaissance" was written by `apply_reconnaissance_heuristic`
+    (a port-scan-signature rule) rather than read from a label. CIC-IDS-2018 has no Reconnaissance
+    labels, so on a labelled CIC capture every such window is the heuristic; it is flagged in the
+    window and the run so the UI can say so.
+    """
+    seq_len = int(config["windowing"]["sequence_length"])
+    window_seconds = int(config["windowing"]["window_seconds"])
+    empty = {"observed": False, "window_seconds": window_seconds, "windows": [], "runs": []}
+    if STATE.windows is None or "src_ip" not in STATE.windows.columns:
+        return empty
+    group = STATE.windows[STATE.windows["src_ip"] == host_ip].sort_values("window_start")
+    group = group.iloc[-seq_len:]
+    if group.empty:
+        return empty
+    has_stage = "stage" in group.columns
+    stage_observed = (group["stage_observed"].astype(bool).to_numpy()
+                      if "stage_observed" in group.columns else np.full(len(group), has_stage))
+    starts = group["window_start"].to_numpy()
+    flow_counts = (group["flow_count"].to_numpy() if "flow_count" in group.columns
+                   else np.zeros(len(group)))
+    stage_ids = group["stage"].astype(str).to_numpy() if has_stage else np.array([""] * len(group))
+    recon_h = [bool(sid == "reconnaissance") and bool(obs) for sid, obs in zip(stage_ids, stage_observed)]
+
+    windows = []
+    for i in range(len(group)):
+        obs = bool(stage_observed[i]) and has_stage
+        windows.append({
+            "window_start": pd.Timestamp(starts[i]).isoformat(),
+            "window_end": (pd.Timestamp(starts[i]) + pd.Timedelta(seconds=window_seconds)).isoformat(),
+            "stage": _display(stage_ids[i]) if obs else UNLABELLED,
+            "stage_id": stage_ids[i] if obs else None,
+            "stage_observed": obs,
+            "flow_count": int(flow_counts[i]),
+            "may_be_heuristic": bool(obs and recon_h[i]),
+        })
+
+    runs: list[dict[str, Any]] = []
+    for w in windows:
+        last = runs[-1] if runs else None
+        if last and last["stage_id"] == w["stage_id"] and last["may_be_heuristic"] == w["may_be_heuristic"]:
+            last["to"] = w["window_end"]
+            last["n_windows"] += 1
+            last["flow_count"] += w["flow_count"]
+        else:
+            runs.append({"stage": w["stage"], "stage_id": w["stage_id"], "observed": w["stage_observed"],
+                         "may_be_heuristic": w["may_be_heuristic"], "from": w["window_start"], "to": w["window_end"],
+                         "n_windows": 1, "flow_count": w["flow_count"]})
+    return {"observed": any(w["stage_observed"] for w in windows),
+            "window_seconds": window_seconds, "windows": windows, "runs": runs}
 
 
 def _host_row(idx: int) -> dict[str, Any]:
@@ -765,6 +827,9 @@ def predict_forecast(req: PredictRequest):
         # Command & Control.
         "current_stage": _display_observed(_observed_stage(req.host_ip)),
         "current_stage_observed": _observed_stage(req.host_ip) is not None,
+        # The 12 windows this forecast is based on, with the observed stage of each and runs of
+        # equal stages collapsed (additive; feeds the dashboard's OBSERVED TRAFFIC STATES column).
+        "observed_history": _observed_history(req.host_ip, config),
         # QC-1: False means the host's latest L windows span wall-clock gaps (windows exist only
         # for slots with flows), so lead-time claims for this host should be qualified.
         "input_contiguous": latest_sequence_is_contiguous(
@@ -973,18 +1038,27 @@ def upload_file(file: UploadFile = File(...)):
     tmp_path.write_bytes(contents)
 
     try:
-        if ext == ".csv":
-            flow_df, windows = service.process_uploads(tmp_path, None, config)
-        else:
-            flow_df, windows = service.process_uploads(None, tmp_path, config)
-    except Exception as exc:
-        raise HTTPException(status_code=422, detail=f"Could not parse {filename}: {exc}") from exc
+        return _ingest_capture(tmp_path, ext, filename, size_mb, config, model, scaler)
     finally:
         try:
             tmp_path.unlink()
             tmp_dir.rmdir()
         except OSError:
             pass
+
+
+def _ingest_capture(path: Path, ext: str, filename: str, size_mb: float,
+                    config: dict[str, Any], model, scaler) -> dict[str, Any]:
+    """Parse -> window -> score -> publish into STATE -> upload-shaped response. Shared by
+    /analysis/upload (a temp copy of the client's bytes) and /demo/load (a server-side demo file,
+    read in place and never modified), so a demo behaves exactly like the same file uploaded."""
+    try:
+        if ext == ".csv":
+            flow_df, windows = service.process_uploads(path, None, config)
+        else:
+            flow_df, windows = service.process_uploads(None, path, config)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Could not parse {filename}: {exc}") from exc
 
     engine = ForecastEngine(model, scaler, config)
     feature_cols = service.feature_cols_for(config)
@@ -1030,6 +1104,87 @@ def upload_file(file: UploadFile = File(...)):
             f"{len(windows):,} windows, {len(rows)} hosts scored."
         ),
     }
+
+
+# ---------------------------------------------------------------- demo scenarios (docs/22)
+# Server-side demo captures (scripts/build_demo_files.py). The client names a scenario by id only;
+# the file is whatever the manifest says it is, looked up under DEMO_DIR, and must match the
+# manifest's sha256. Module-level so tests can point them at a tmp fixture.
+DEMO_DIR = PROJECT_ROOT / "demo"
+DEMO_MANIFEST = DEMO_DIR / "demo_manifest.json"
+_PUBLIC_SCENARIO_KEYS = ("id", "title", "description", "scenario", "source", "split_tag", "label_mix",
+                         "size_mb", "format", "expected_behaviour", "measured")
+
+
+def _load_demo_manifest() -> list[dict[str, Any]]:
+    try:
+        data = json.loads(DEMO_MANIFEST.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    items = data.get("scenarios") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        return []
+    return [i for i in items if isinstance(i, dict) and isinstance(i.get("id"), str)]
+
+
+def _demo_file(entry: dict[str, Any]) -> Path | None:
+    """The demo file for a manifest entry, or None if the name is not a bare file name that
+    resolves inside DEMO_DIR (the manifest is trusted, but this keeps traversal impossible anyway)."""
+    name = entry.get("file")
+    if not isinstance(name, str) or not name or Path(name).name != name or name in (".", ".."):
+        return None
+    root = DEMO_DIR.resolve()
+    p = (root / name).resolve()
+    return p if p.parent == root else None
+
+
+def _sha256_file(path: Path) -> str:
+    import hashlib
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+class DemoLoadRequest(BaseModel):
+    id: str
+
+
+@app.get("/api/v1/demo/scenarios", dependencies=[Depends(_require_token)])
+def demo_scenarios():
+    """The manifest without file names or paths, plus `available` (file present with the manifest's
+    byte size -- cheap; the sha256 is checked at load time)."""
+    out = []
+    for entry in _load_demo_manifest():
+        f = _demo_file(entry)
+        available = bool(f and f.is_file() and f.stat().st_size == entry.get("size_bytes"))
+        out.append({**{k: entry[k] for k in _PUBLIC_SCENARIO_KEYS if k in entry}, "available": available})
+    return {"scenarios": out,
+            "message": None if out else "No demo scenarios are installed on this server."}
+
+
+@app.post("/api/v1/demo/load", dependencies=[Depends(_require_token)])
+def demo_load(req: DemoLoadRequest):
+    """Run a manifest-listed demo capture through the same ingest path as an upload. Like an upload
+    it replaces the dashboard's in-memory state, and is refused (409) while live/replay is active."""
+    _refuse_while_live("demo load")
+    entry = next((e for e in _load_demo_manifest() if e["id"] == req.id), None)
+    if entry is None:
+        raise HTTPException(status_code=404, detail="Unknown demo scenario.")
+    path = _demo_file(entry)
+    if path is None or not path.is_file():
+        raise HTTPException(status_code=404, detail="This demo scenario's file is not installed on the server.")
+    expected = str(entry.get("sha256", "")).lower()
+    if not expected or _sha256_file(path) != expected:
+        raise HTTPException(status_code=422, detail="Demo file does not match its manifest checksum; "
+                            "refusing to load it. Re-copy the demo files (docs/22).")
+    ext = path.suffix.lower()
+    if ext not in (".pcap", ".pcapng", ".csv"):
+        raise HTTPException(status_code=422, detail=f"Unsupported demo format '{ext}'.")
+    config, model, scaler, _ = _backend()
+    res = _ingest_capture(path, ext, path.name, path.stat().st_size / (1024 * 1024), config, model, scaler)
+    return {**res, "scenario_id": entry["id"]}
 
 
 # ---------------------------------------------------------------- live / replay (docs/11)

@@ -16,6 +16,7 @@ vi.mock('../api', () => ({
   },
   forecastApi: { getHosts: vi.fn().mockResolvedValue({ hosts: [] }), predict: vi.fn() },
   explainApi: { getAttribution: vi.fn(), getNarrative: vi.fn(), getMitre: vi.fn() },
+  demoApi: { listScenarios: vi.fn().mockResolvedValue({ scenarios: [] }), loadScenario: vi.fn() },
   analysisApi: { uploadFile: vi.fn() },
   reportApi: { generateReport: vi.fn() },
   evalApi: { getMetrics: vi.fn() },
