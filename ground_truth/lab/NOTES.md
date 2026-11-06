@@ -50,3 +50,4 @@ Attack families and MITRE tactics/techniques are looked up using `pipeline.label
 
 * **Synthetic Dynamics**: Packet timings and payload volumes are algorithmically generated; they do not exhibit real-world network jitter or complex routing artefacts.
 * **Scope**: Strictly intended for measuring forecasting horizon early-warning rates ($K=6$ windows) on reproducible multi-stage attack transitions without needing live infrastructure attacks.
+

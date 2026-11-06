@@ -30,24 +30,26 @@ def test_cic2018_events_csv_structure():
         assert ftp_row["attacker_ip"] == "18.221.219.4"
         assert ftp_row["victim_ip"] == "172.31.69.25"
         assert ftp_row["dst_port"] == "21"
-        assert ftp_row["start_ts"] == "2018-02-14T10:30:00Z"
-        assert ftp_row["end_ts"] == "2018-02-14T11:30:00Z"
+        assert ftp_row["start_ts"] == "2018-02-14T14:32:00Z"
+        assert ftp_row["end_ts"] == "2018-02-14T16:09:00Z"
         assert ftp_row["attack_family"] == "bruteforce"
         assert ftp_row["mitre_tactic"] == "TA0006"
         assert ftp_row["mitre_technique"] == "T1110"
+        assert ftp_row["label_source"] == "ground_truth_schedule"
         assert ftp_row["original_label"] == "FTP-BruteForce"
         assert "ids-2018.html" in ftp_row["citation"]
 
         # SSH brute force assertions
         assert ssh_row["campaign_id"] == "cic2018_wed_bruteforce_02"
-        assert ssh_row["attacker_ip"] == "18.221.219.4"
+        assert ssh_row["attacker_ip"] == "13.58.98.64"
         assert ssh_row["victim_ip"] == "172.31.69.25"
         assert ssh_row["dst_port"] == "22"
-        assert ssh_row["start_ts"] == "2018-02-14T14:00:00Z"
-        assert ssh_row["end_ts"] == "2018-02-14T15:00:00Z"
+        assert ssh_row["start_ts"] == "2018-02-14T18:01:00Z"
+        assert ssh_row["end_ts"] == "2018-02-14T19:31:00Z"
         assert ssh_row["attack_family"] == "bruteforce"
         assert ssh_row["mitre_tactic"] == "TA0006"
         assert ssh_row["mitre_technique"] == "T1110"
+        assert ssh_row["label_source"] == "ground_truth_schedule"
         assert ssh_row["original_label"] == "SSH-Bruteforce"
 
 
@@ -59,3 +61,4 @@ def test_cic2018_notes_documentation():
     assert "Timezone Offset" in content or "Time Zone" in content
     assert "172.31.69.25" in content
     assert "Friday 23-02-2018" in content  # Held-out protection documented
+

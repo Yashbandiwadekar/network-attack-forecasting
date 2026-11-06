@@ -38,19 +38,19 @@
 
 ## 4. Label Counts and Statistics
 
-* **Canonical Event Count**: **18 events** in `ground_truth/cic2017/events.csv`.
+* **Canonical Event Count**: **50 events** in `ground_truth/cic2017/events.csv`.
 * **Events per Attack Family**:
   * `bruteforce`: 3 events (FTP-Patator, SSH-Patator, Web Attack – Brute Force)
   * `dos`: 4 events (Slowloris, Slowhttptest, Hulk, GoldenEye)
   * `web_exploit`: 3 events (Heartbleed, XSS, SQL Injection)
-  * `infiltration`: 1 event (Infiltration via host 192.168.10.8)
-  * `botnet_c2`: 5 events (ARES C2 across 5 infected bots)
-  * `portscan`: 1 event (PortScan sweep against 192.168.10.50)
-  * `ddos`: 1 event (LOIC HTTP flood)
+  * `infiltration`: 4 events (external infiltration stages toward 192.168.10.8 and 192.168.10.25)
+  * `botnet_c2`: 5 events (ARES C2 across 5 infected bots, 10:02–11:02)
+  * `portscan`: 28 events (1 internal reconnaissance sweep from Vista host on Thursday; 27 discrete PortScan probe windows on Friday)
+  * `ddos`: 3 events (LOIC HTTP flood from the three Win 8.1 attackers 205.174.165.69, .70, .71)
 * **Events per Campaign**:
   * `cic2017_tue_bruteforce_01`, `cic2017_tue_bruteforce_02`, `cic2017_wed_dos_01`, `cic2017_wed_dos_02`, `cic2017_wed_web_01`, `cic2017_thu_web_01`, `cic2017_thu_infiltration_01`, `cic2017_fri_bot_01`, `cic2017_fri_portscan_01`, `cic2017_fri_ddos_01`.
 * **Flow Counts (Official Flow CSVs)**: 2,830,743 flows total; 557,646 attack flows (PortScan 158,930, DDoS 128,024, DoS Hulk 231,073, GoldenEye 10,293, Slowloris 5,796, Slowhttptest 5,499, Patator 13,835, Web Attacks 2,180, Bot 1,966, Infiltration 36, Heartbleed 11).
-* **Unknown Label Rate in Events**: 0% (all 18 events map to standard families). Unmatched background flows outside attack windows are treated as `unknown`.
+* **Unknown Label Rate in Events**: 0% (all 50 events map to standard families). Unmatched background flows outside attack windows are treated as `unknown`.
 
 ---
 
@@ -67,3 +67,4 @@
 
 1. **UTC Offset Confirmation**: Awaiting `check.csv` from Yash after running `scripts/check_events_in_pcap.py` against Monday–Friday PCAPs.
 2. **NAT Gateway Scope**: Final confirmation whether any capture files were taken outside the NAT firewall where `205.174.165.73` appears directly as `ip.src`.
+

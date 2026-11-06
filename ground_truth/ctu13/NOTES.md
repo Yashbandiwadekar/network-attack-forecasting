@@ -13,7 +13,7 @@
 | Scenario | Bot Name | Infected Host IPs | Normal Verified Hosts | Primary Attack Behaviours | Input BINETFLOW |
 |---|---|---|---|---|---|
 | **1** | Neris | `147.32.84.165` | `147.32.84.170`, `147.32.84.134`, `147.32.84.164` | IRC bot, SPAM, HTTP C&C | `capture20110810.binetflow` |
-| **2** | Neris | `147.32.84.165` | `147.32.84.170`, `147.32.84.134`, `147.32.84.164` | IRC bot, SPAM, HTTP C&C | `capture20110811.binetflow` |
+| **2** | Neris | `147.32.84.165` | `147.32.84.170`, `147.32.84.164` | IRC bot, SPAM, HTTP C&C | `capture20110811.binetflow` |
 | **3** | Rbot | `147.32.84.165` | `147.32.84.170`, `147.32.84.134`, `147.32.84.164` | IRC botnet, portscan, USer-to-User | `capture20110812.binetflow` |
 | **4** | Rbot | `147.32.84.165` | `147.32.84.170`, `147.32.84.134`, `147.32.84.164` | IRC botnet, ICMP DDoS, TCP SYN flood | `capture20110815.binetflow` |
 | **5** | Virut | `147.32.84.165` | `147.32.84.170`, `147.32.84.134`, `147.32.84.164` | HTTP C&C, SPAM, scanning | `capture20110815-2.binetflow` |
@@ -63,3 +63,4 @@ Events are generated per `(infected_host, behaviour)` tuple:
 
 1. **Full BINETFLOW Run**: Yash will execute `scripts/build_events.py --dataset ctu13` across all 13 scenarios located at `V:\Datasets\CTU-13\`.
 2. **PCAP Scenario 6 Cross-Check**: Yash will run `scripts/check_events_in_pcap.py` against `V:\Datasets\CTU-13-pcaps\6\botnet-capture-20110816-menti.pcap` to confirm exact packet alignment for Menti C2 flows.
+

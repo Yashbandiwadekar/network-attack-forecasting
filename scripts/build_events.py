@@ -51,7 +51,7 @@ CTU13_SCENARIOS: Dict[int, Dict[str, Any]] = {
     2: {
         "bot_name": "Neris",
         "infected_hosts": ["147.32.84.165"],
-        "normal_hosts": ["147.32.84.170", "147.32.84.134", "147.32.84.164"],
+        "normal_hosts": ["147.32.84.170", "147.32.84.164"],
         "description": "IRC bot, spam, HTTP C&C",
     },
     3: {

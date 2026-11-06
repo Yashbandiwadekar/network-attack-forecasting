@@ -1,82 +1,67 @@
 # CIC-IDS-2017 Ground-Truth Events Documentation and Notes
 
 **File**: `ground_truth/cic2017/events.csv`  
-**Created**: Week 2 (2026-11-06)  
-**Author**: Mohammed Amin Kaifi  
-**Source**: Official UNB CIC-IDS-2017 attack schedule (https://www.unb.ca/cic/datasets/ids-2017.html, Table 4) and project documentation (`docs/14-stage-forecasting.md`, `docs/15-retrain-joint-cic1718.md`).
+**Dataset**: CIC-IDS-2017 (Canadian Institute for Cybersecurity)  
+**Official Reference**: https://www.unb.ca/cic/datasets/ids-2017.html  
+**Updated**: Week 3/4 Revision per Project Lead Review
 
 ---
 
-## 1. Ground Truth Source & Event Construction
-
-Events were manually constructed following the official UNB schedule and network diagram:
-* **Tuesday (04/07/2017)**:
-  * Morning: FTP-Patator (`cic2017_tue_bruteforce_01`), scheduled 09:20–10:20 (observed in flow CSVs: ~09:17–10:20). Target: Web Server (192.168.10.50), port 21.
-  * Afternoon: SSH-Patator (`cic2017_tue_bruteforce_02`), scheduled 14:00–15:00 (observed in flow CSVs: ~14:09–15:11). Target: Web Server (192.168.10.50), port 22.
-* **Wednesday (05/07/2017)**:
-  * Morning DoS:
-    * DoS slowloris (`cic2017_wed_dos_01`), scheduled 09:47–10:10. Target: 192.168.10.50, port 80.
-    * DoS Slowhttptest (`cic2017_wed_dos_01`), scheduled 10:14–10:35. Target: 192.168.10.50, port 80.
-    * DoS Hulk (`cic2017_wed_dos_02`), scheduled 10:43–11:00. Target: 192.168.10.50, port 80.
-    * DoS GoldenEye (`cic2017_wed_dos_02`), scheduled 11:10–11:23. Target: 192.168.10.50, port 80.
-  * Afternoon Web Exploit:
-    * Heartbleed (`cic2017_wed_web_01`), scheduled 15:12–15:32. Target: Ubuntu server (192.168.10.51), port 444.
-* **Thursday (06/07/2017)**:
-  * Morning Web Attacks:
-    * Web Attack – Brute Force (`cic2017_thu_web_01`), scheduled 09:20–10:00 (09:15–10:00). Target: 192.168.10.50, port 80.
-    * Web Attack – XSS (`cic2017_thu_web_01`), scheduled 10:15–10:35. Target: 192.168.10.50, port 80.
-    * Web Attack – Sql Injection (`cic2017_thu_web_01`), scheduled 10:40–10:42. Target: 192.168.10.50, port 80.
-  * Afternoon Infiltration:
-    * Infiltration (`cic2017_thu_infiltration_01`), scheduled 14:19–15:45. Internal victim machine `192.168.10.8` compromised via malicious file, scanning and attacking internal server `192.168.10.25`.
-* **Friday (07/07/2017)**:
-  * Morning Botnet (ARES):
-    * 5 distinct infected internal machines (`192.168.10.5`, `192.168.10.8`, `192.168.10.9`, `192.168.10.14`, `192.168.10.15`), communicating with C2 server (`205.174.165.73`), scheduled 10:02–11:02 and 11:10–12:59. Stored as 5 distinct victim rows under `cic2017_fri_bot_01`.
-  * Afternoon Reconnaissance:
-    * PortScan (`cic2017_fri_portscan_01`), scheduled 13:00–15:23 (raw scans at 13:05, 13:52, 14:14, 14:51, 15:03, 15:21). Target: 192.168.10.50, broad port sweep.
-  * Afternoon DDoS:
-    * DDoS LOIC HTTP (`cic2017_fri_ddos_01`), scheduled 15:56–16:16. Target: 192.168.10.50, port 80.
+> [!IMPORTANT]
+> **LOCAL TIME NOTICE (CRITICAL)**:  
+> All timestamps in `ground_truth/cic2017/events.csv` currently reflect the **published local Canadian times** (with a `Z` suffix), exactly as given in the official UNB attack schedule. Do **NOT** apply an assumed timezone offset. Yash will run `scripts/check_events_in_pcap.py` on the raw daily PCAPs and produce `check.csv` with the measured offset before final UTC conversion.
 
 ---
 
-## 2. Time Zone Considerations (Action Required by Yash via PCAP Script)
+## 1. Schedule Mapping & Structure (50 Events Total)
 
-* **Published Times**: The times in the official UNB table are local Canadian Atlantic time (ADT / AST, UTC-3 or UTC-4).
-* **Current Event Timestamps**: The initial timestamps in `events.csv` are recorded verbatim from the published schedule with a `Z` suffix pending PCAP verification.
-* **Offset Resolution Procedure**:
-  * Yash will run `scripts/check_events_in_pcap.py` against the actual daily PCAPs.
-  * `check_events_in_pcap.py` searches within a +/- 6-hour window around the nominal start time and extracts the epoch of the first and last packets matching the attacker and victim IP addresses.
-  * When Yash runs the script and provides `check.csv`, the measured time offset will be reviewed, recorded here, and used to adjust the UTC timestamps in `events.csv` if an offset exists in the packet epochs.
+The event table is structured directly from the published daily schedules:
+
+### Tuesday (July 4, 2017)
+* **09:20–10:20**: FTP-Patator (`cic2017_tue_bruteforce_01`), Attacker `205.174.165.73` $\rightarrow$ Web Server `192.168.10.50:21`.
+* **14:00–15:00**: SSH-Patator (`cic2017_tue_bruteforce_02`), Attacker `205.174.165.73` $\rightarrow$ Web Server `192.168.10.50:22`.
+
+### Wednesday (July 5, 2017)
+* **09:47–10:10**: DoS slowloris (`cic2017_wed_dos_01`), Attacker `205.174.165.73` $\rightarrow$ `192.168.10.50:80`.
+* **10:14–10:35**: DoS Slowhttptest (`cic2017_wed_dos_01`), Attacker `205.174.165.73` $\rightarrow$ `192.168.10.50:80`.
+* **10:43–11:00**: DoS Hulk (`cic2017_wed_dos_02`), Attacker `205.174.165.73` $\rightarrow$ `192.168.10.50:80`.
+* **11:10–11:23**: DoS GoldenEye (`cic2017_wed_dos_02`), Attacker `205.174.165.73` $\rightarrow$ `192.168.10.50:80`.
+* **15:12–15:32**: Heartbleed (`cic2017_wed_web_01`), Attacker `205.174.165.73` $\rightarrow$ Ubuntu Server `192.168.10.51:444`.
+
+### Thursday (July 6, 2017)
+* **Web Attacks** (`cic2017_thu_web_01`):
+  * **09:20–10:00**: Web Attack – Brute Force (`205.174.165.73` $\rightarrow$ `192.168.10.50:80`)
+  * **10:15–10:35**: Web Attack – XSS (`205.174.165.73` $\rightarrow$ `192.168.10.50:80`)
+  * **10:40–10:42**: Web Attack – Sql Injection (`205.174.165.73` $\rightarrow$ `192.168.10.50:80`)
+* **Infiltration** (`cic2017_thu_infiltration_01`, 5 discrete steps):
+  * **14:19–14:21**: Attacker `205.174.165.73` $\rightarrow$ Vista host `192.168.10.8` (coolstuff preparation)
+  * **14:33–14:35**: Attacker `205.174.165.73` $\rightarrow$ Vista host `192.168.10.8`
+  * **14:53–15:00**: Attacker `205.174.165.73` $\rightarrow$ MAC server `192.168.10.25` (variant: `cool_disk`)
+  * **15:04–15:45**: Attacker `205.174.165.73` $\rightarrow$ Vista host `192.168.10.8` (variant: `dropbox_download`)
+  * **15:04–15:45**: Compromised host `192.168.10.8` sweeps internal network (blank victim IP). Family `portscan`, MITRE `TA0043`/`T1595`, original_label `Infiltration`.
+
+### Friday (July 7, 2017)
+* **Botnet ARES** (`cic2017_fri_bot_01`):
+  * Official schedule: **10:02–11:02** across 5 infected internal victims (`192.168.10.5`, `.8`, `.9`, `.14`, `.15`).
+  * Discrepancy Note: The released flow CSVs labelled flows as Bot up to 12:59, but the official ground-truth schedule explicitly specifies 10:02–11:02. The event table strictly adheres to the published schedule (10:02–11:02).
+* **PortScan** (`cic2017_fri_portscan_01`, 27 discrete windows):
+  * Firewall ON (12 windows): 13:55–13:57, 13:58–14:00, 14:01–14:04, 14:05–14:07, 14:08–14:10, 14:11–14:13, 14:14–14:16, 14:17–14:19, 14:20–14:21, 14:22–14:24, 14:33–14:33:59, 14:35–14:35:59.
+  * Firewall OFF (15 windows with specific nmap probe flags): `nmap_sS` (14:51–14:53), `nmap_sT` (14:54–14:56), `nmap_sF` (14:57–14:59), `nmap_sX` (15:00–15:02), `nmap_sN` (15:03–15:05), `nmap_sP` (15:06–15:07), `nmap_sV` (15:08–15:10), `nmap_sU` (15:11–15:12), `nmap_sO` (15:13–15:15), `nmap_sA` (15:16–15:18), `nmap_sW` (15:19–15:21), `nmap_sR` (15:22–15:24), `nmap_sL` (15:25–15:25:59), `nmap_sI` (15:26–15:27), `nmap_b` (15:28–15:29).
+  * 1-minute single-minute windows (14:33, 14:35, 15:25) have `end_ts = start_ts + 59s`.
+* **DDoS LOIC HTTP** (`cic2017_fri_ddos_01`):
+  * Schedule: **15:56–16:16**
+  * Attackers: The three Windows 8.1 machines (`205.174.165.69`, `205.174.165.70`, `205.174.165.71`) targeting Web Server `192.168.10.50:80` (one row per attacker).
 
 ---
 
-## 3. NAT IP Address Handling
+## 2. Encoding & NAT Handling
 
-* **Official Network Diagram IP**: `205.174.165.73` (Attacker outside firewall).
-* **Observed Internal NAT IP**: `172.16.0.1`. In internal packet captures behind the gateway, traffic originating from the external attacker is translated to `172.16.0.1`.
-* **Rule Applied**: In `events.csv`, the published attacker IP `205.174.165.73` is preserved. `scripts/check_events_in_pcap.py` checks both `205.174.165.73` and `172.16.0.1` (and reverse directions) so that whether the capture was taken outside the firewall or inside the NAT boundary, matching packets will be detected.
+* **Windows-1252 Dash (0x96)**: Web attack labels in the official CSV use byte `0x96`, which becomes mojibake if read as raw UTF-8 without decoding. In `events.csv`, all entries use valid UTF-8 en dash `–` (`\u2013`), e.g. `Web Attack – Brute Force`.
+* **NAT Address**: Inside internal PCAPs, traffic originating from external attackers `205.174.165.x` appears with firewall NAT address `172.16.0.1`. The events table preserves the published source IPs.
 
 ---
 
-## 4. Cross-Validation Against Flow CSV Labels
+## 3. Open Questions for Yash
 
-The 8 flow CSVs from the official `TrafficLabelling` release contain the following attack labels:
-1. `FTP-Patator` (Tuesday): Covered by `cic2017_tue_bruteforce_01`
-2. `SSH-Patator` (Tuesday): Covered by `cic2017_tue_bruteforce_02`
-3. `DoS slowloris` (Wednesday): Covered by `cic2017_wed_dos_01`
-4. `DoS Slowhttptest` (Wednesday): Covered by `cic2017_wed_dos_01`
-5. `DoS Hulk` (Wednesday): Covered by `cic2017_wed_dos_02`
-6. `DoS GoldenEye` (Wednesday): Covered by `cic2017_wed_dos_02`
-7. `Heartbleed` (Wednesday): Covered by `cic2017_wed_web_01`
-8. `Web Attack – Brute Force` (Thursday): Covered by `cic2017_thu_web_01`
-9. `Web Attack – XSS` (Thursday): Covered by `cic2017_thu_web_01`
-10. `Web Attack – Sql Injection` (Thursday): Covered by `cic2017_thu_web_01`
-11. `Infiltration` (Thursday): Covered by `cic2017_thu_infiltration_01`
-12. `Bot` (Friday): Covered by `cic2017_fri_bot_01` (5 victim rows)
-13. `PortScan` (Friday): Covered by `cic2017_fri_portscan_01`
-14. `DDoS` (Friday): Covered by `cic2017_fri_ddos_01`
-
-**Verification Status**:
-* Every attack label present in the flow CSVs maps to at least one ground-truth event.
-* No unsupported labels have been invented.
-* Status is **PENDING PCAP VALIDATION** by Yash using `scripts/check_events_in_pcap.py`.
-
+1. **PCAP Timestamp Offset**: Awaiting `check.csv` from Yash after running `scripts/check_events_in_pcap.py` on the raw Monday–Friday PCAPs.
+2. **NAT Gateway Scope**: Check whether external traffic PCAPs exist where `205.174.165.x` is seen directly without NAT.

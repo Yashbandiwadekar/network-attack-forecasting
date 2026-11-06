@@ -100,3 +100,4 @@ def test_build_lab_events_missing_label_column(tmp_path: Path):
 
     with pytest.raises(ValueError, match="missing 'label' column"):
         build_lab_events(bad_sidecar, out_file)
+

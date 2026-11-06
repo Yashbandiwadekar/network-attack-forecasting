@@ -167,3 +167,83 @@ def test_check_events_nat_resolution(tmp_path: Path):
     assert results[0]["observed_attacker_ip"] == "172.16.0.1"
     assert float(results[0]["offset_from_published_start"]) == 120.0
 
+
+def test_check_events_utf8_bom_and_unicode(tmp_path: Path):
+    """Test reading events file with UTF-8 BOM and unicode characters (such as en-dash)."""
+    events_file = tmp_path / "events_bom.csv"
+    pcap_file = tmp_path / "traffic.pcap"
+    out_file = tmp_path / "check.csv"
+
+    # Write file with explicit BOM via utf-8-sig
+    content = (
+        "campaign_id,attacker_ip,victim_ip,dst_port,start_ts,end_ts,"
+        "attack_family,attack_variant,mitre_tactic,mitre_technique,"
+        "label_source,label_confidence,original_label,citation\n"
+        "cic2017_thu_web_01,205.174.165.73,192.168.10.50,80,"
+        "2017-07-06T09:20:00Z,2017-07-06T10:00:00Z,web_exploit,brute_force,"
+        "TA0001,T1190,schedule,exact,Web Attack \u2013 Brute Force,https://example.com\n"
+    )
+    events_file.write_text(content, encoding="utf-8-sig")
+
+    base_time = datetime(2017, 7, 6, 9, 25, 0, tzinfo=timezone.utc)
+    pkt = Ether() / IP(src="205.174.165.73", dst="192.168.10.50") / TCP(sport=50000, dport=80)
+    pkt.time = base_time.timestamp()
+    wrpcap(str(pcap_file), [pkt])
+
+    results = check_events_in_pcap(
+        events_csv_path=events_file,
+        pcap_path=pcap_file,
+        out_csv_path=out_file,
+        window_hours=1.0,
+        prefer_scapy=True,
+    )
+
+    assert len(results) == 1
+    assert results[0]["campaign_id"] == "cic2017_thu_web_01"
+    assert results[0]["found"] == "yes"
+
+
+def test_tshark_truncated_capture_exit_14(monkeypatch, tmp_path: Path):
+    """Test that tshark returning exit code 14 (truncated capture) still parses stdout and notes error."""
+    import subprocess
+    from scripts.check_events_in_pcap import scan_pcap_with_tshark
+
+    pcap_file = tmp_path / "truncated.pcap"
+    pcap_file.write_bytes(b"dummy pcap header and truncated frame")
+
+    mock_stdout = "1518618720.0 18.221.219.4 172.31.69.25\n1518624540.0 172.31.69.25 18.221.219.4\n"
+    mock_stderr = "tshark: The capture file appears to have been cut short in the middle of a packet."
+
+    class MockCompletedProcess:
+        returncode = 14
+        stdout = mock_stdout
+        stderr = mock_stderr
+
+    def mock_run(*args, **kwargs):
+        return MockCompletedProcess()
+
+    monkeypatch.setattr(subprocess, "run", mock_run)
+
+    start_dt = datetime(2018, 2, 14, 14, 32, 0, tzinfo=timezone.utc)
+    end_dt = datetime(2018, 2, 14, 16, 9, 0, tzinfo=timezone.utc)
+
+    found, f_epoch, l_epoch, o_att, o_vic, note = scan_pcap_with_tshark(
+        pcap_files=[pcap_file],
+        candidate_attackers={"18.221.219.4"},
+        candidate_victims={"172.31.69.25"},
+        dst_port=21,
+        start_dt=start_dt,
+        end_dt=end_dt,
+        window_seconds=3600.0,
+        tshark_exe="mock_tshark",
+    )
+
+    assert found is True
+    assert f_epoch == 1518618720.0
+    assert l_epoch == 1518624540.0
+    assert o_att == "18.221.219.4"
+    assert o_vic == "172.31.69.25"
+    assert "tshark returned code 14" in note
+    assert "cut short" in note
+
+

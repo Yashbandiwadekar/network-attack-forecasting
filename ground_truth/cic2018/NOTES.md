@@ -8,63 +8,60 @@
 
 ---
 
-## 1. Attack Schedule & Scope (Wednesday 14-02-2018)
+## 1. Attack Schedule & Direct PCAP Measurements (Wednesday 14-02-2018)
 
-According to the official UNB CSE-CIC-IDS2018 dataset schedule:
-* **Morning Attack**:
-  * **Attack**: FTP-BruteForce
-  * **Nominal Published Time**: 10:30 – 11:30 local Canadian time
-  * **Attacker IP**: `18.221.219.4` (External Kali attacker machine on AWS)
-  * **Victim IP**: `172.31.69.25` (Ubuntu 16.04 server hosting FTP service)
-  * **Destination Port**: `21`
-  * **Campaign ID**: `cic2018_wed_bruteforce_01`
-  * **Standard Mapping**: Family `bruteforce`, MITRE Tactic `TA0006` (Credential Access), Technique `T1110` (Brute Force), Stage `initial_access`.
-* **Afternoon Attack**:
-  * **Attack**: SSH-Bruteforce
-  * **Nominal Published Time**: 14:00 – 15:00 local Canadian time
-  * **Attacker IP**: `18.221.219.4`
-  * **Victim IP**: `172.31.69.25`
-  * **Destination Port**: `22`
-  * **Campaign ID**: `cic2018_wed_bruteforce_02`
-  * **Standard Mapping**: Family `bruteforce`, MITRE Tactic `TA0006`, Technique `T1110`, Stage `initial_access`.
+Measurements performed directly on drive `V:` via `tshark` on the victim capture file `UCAP172.31.69.25`:
 
----
+* **Timezone Offset**:
+  Published CSE-CIC-IDS2018 times are in Canadian Atlantic Standard Time (**AST = UTC-4**).
+  The measured PCAP timestamps demonstrate an exact **+4 hour offset** from published schedule times to UTC.
+  *(Important: Do NOT apply this offset to CIC-IDS-2017; CIC-2017 was recorded in July under Daylight Saving Time and has its own distinct offset).*
 
-## 2. Victim-Specific PCAP File Structure
+* **IP Addressing (Public vs Internal)**:
+  Inside the raw PCAP capture, the external attackers carry their **PUBLIC IP addresses**, while the victim carries its **INTERNAL IP address** (`172.31.69.25`).
 
-Unlike datasets that package traffic into a single monolithic capture per day, the CSE-CIC-IDS2018 PCAP release for Wednesday 14-02-2018 consists of **449 individual PCAP files** (~45 GB), organised per captured endpoint/victim machine.
-* File naming pattern: `cap<HOSTNAME>-<IP>`, e.g., `capDESKTOP-AN3U28N-172.31.64.111`.
-* The brute-force attacks on 14-02 targeted the internal server at `172.31.69.25`.
-* **Action for Yash**: Run `scripts/check_events_in_pcap.py` targeting the PCAP files corresponding to victim IP `172.31.69.25`:
-  ```bash
-  python -m scripts.check_events_in_pcap --events ground_truth/cic2018/events.csv --pcap "V:\Datasets\CSE-CIC-IDS2018\Wednesday-14-02-2018" --out check_cic2018.csv
-  ```
+### 1.1 FTP Brute Force (`cic2018_wed_bruteforce_01`)
+* **Published Schedule Time**: 10:32 – 12:09 (nominal local AST)
+* **Direct PCAP Measurement (tshark)**:
+  * Traffic: `18.221.219.4` $\rightarrow$ `172.31.69.25:21`
+  * First Packet Observed: `14:33:27Z`
+  * Last Packet Observed: `16:10:32Z`
+* **Canonical Event Window**: `2018-02-14T14:32:00Z` to `2018-02-14T16:09:00Z` (+4 hours offset).
+* **Attacker IP**: `18.221.219.4` (Public IP)
+* **Victim IP**: `172.31.69.25` (Internal IP)
+* **Port**: `21`
+* **Classification**: Family `bruteforce`, MITRE Tactic `TA0006`, Technique `T1110`, Stage `initial_access`.
 
----
-
-## 3. Time Zone & NAT Considerations
-
-* **Timezone Offset**: Published times reflect local Canadian time (UTC-4 / AST or UTC-5 / EST depending on AWS region configuration). Event timestamps in `events.csv` reflect nominal published times with a `Z` suffix. Final UTC offset resolution is pending Yash's `check_events_in_pcap.py` output.
-* **NAT Differences**: In AWS VPC network captures, external traffic originating from `18.221.219.4` may appear with private gateway/NAT interfaces or direct public IP headers depending on whether the capture was positioned at the host interface or internet gateway. `scripts/check_events_in_pcap.py` supports endpoint pair searches in both directions.
+### 1.2 SSH Brute Force (`cic2018_wed_bruteforce_02`)
+* **Published Schedule Time**: 14:01 – 15:31 (nominal local AST)
+* **Direct PCAP Measurement (tshark)**:
+  * Traffic: `13.58.98.64` $\rightarrow$ `172.31.69.25:22`
+  * First Packet Observed: `18:01:50Z`
+  * Last Packet Observed: `19:32:31Z`
+* **Canonical Event Window**: `2018-02-14T18:01:00Z` to `2018-02-14T19:31:00Z` (+4 hours offset).
+* **Attacker IP**: `13.58.98.64` (Public IP — Note: this is a distinct attacker machine from FTP's `18.221.219.4`).
+* **Victim IP**: `172.31.69.25` (Internal IP)
+* **Port**: `22`
+* **Classification**: Family `bruteforce`, MITRE Tactic `TA0006`, Technique `T1110`, Stage `initial_access`.
 
 ---
 
-## 4. Flow CSV Limitations
+## 2. Victim-Specific PCAP Layout
 
-* **Missing IP Addresses**: 9 of the 10 daily CSV releases in CSE-CIC-IDS2018 do not contain `Source IP` or `Destination IP` columns. Therefore, flow CSVs cannot be windowed by host or joined by IP.
-* **Excel Row Cap**: 7 of the 10 flow CSVs were truncated at 1,048,575 rows due to an Excel export bug by the dataset authors (flagged as `excel_row_cap` by `scripts/inventory_raw.py`).
-* **Conclusion**: Ground-truth event matching and standardisation for CIC-IDS-2018 relies strictly on the official PCAP captures where real IPs and timestamps are preserved.
-
----
-
-## 5. Held-Out Test Day Protection (Friday 23-02-2018)
-
-* Friday 23-02-2018 is a spent test day reserved strictly for evaluation.
-* **Enforcement**: Friday 23-02 is excluded from training ground-truth generation and will never be processed into training events.
+* The PCAP capture for Wednesday 14-02 consists of 449 per-endpoint capture files.
+* The victim capture containing both brute-force attacks is `UCAP172.31.69.25`.
+* Captures are cut short at the end (tshark exit code 14), handled gracefully by `scripts/check_events_in_pcap.py`.
 
 ---
 
-## 6. Open Questions & Coordination Items
+## 3. Flow CSV Limitations
 
-1. **Measured UTC Offset**: Awaiting `check_cic2018.csv` from Yash after executing the PCAP validation tool.
-2. **Victim PCAP Confirmation**: Confirmation from Yash of the exact filename matching the `172.31.69.25` victim capture.
+* 9 of the 10 daily CSV releases in CSE-CIC-IDS2018 omit IP addresses entirely.
+* 7 of 10 flow CSVs suffer from the 1,048,575 Excel row cap.
+* Standardisation relies on PCAP ground truth where real IPs and timestamps are preserved.
+
+---
+
+## 4. Held-Out Test Day Protection (Friday 23-02-2018)
+
+* Friday 23-02-2018 is a held-out test day and is strictly excluded from training event generation.

@@ -22,8 +22,8 @@ The builder maps raw `NUSW-NB15_GT.csv` rows to the project's canonical 14-colum
 | `end_ts` | `Last time` (Unix epoch) | Converted to UTC ISO 8601 ending in `Z` |
 | `attack_family` | `Attack category` via `pipeline.label_standard` | Canonical attack family |
 | `attack_variant` | `Attack subcategory` (or `Attack Name`) | Tool or variant |
-| `mitre_tactic` | `Attack category` via `pipeline.label_standard` | ATT&CK Tactic ID (e.g. TA0043) |
-| `mitre_technique` | `Attack category` via `pipeline.label_standard` | ATT&CK Technique ID (e.g. T1595) |
+| `mitre_tactic` | `Attack category` via `pipeline.label_standard` | ATT&CK Tactic ID |
+| `mitre_technique` | `Attack category` via `pipeline.label_standard` | ATT&CK Technique ID |
 | `label_source` | Literal `dataset_flow_label` | Verified dataset flow label |
 | `label_confidence` | Literal `exact` | Per-event verified ground truth |
 | `original_label` | `Attack category` verbatim | Kept unchanged for auditability |
@@ -41,21 +41,20 @@ The builder maps raw `NUSW-NB15_GT.csv` rows to the project's canonical 14-colum
 ## 3. Attack Categories & Status in pipeline.label_standard
 
 ### Standard Mapped Categories:
-* `Reconnaissance` → `portscan` (TA0043 Reconnaissance / T1595 Active Scanning)
-* `Exploits` → `web_exploit` (TA0001 Initial Access / T1190 Exploit Public-Facing Application)
-* `DoS` → `dos` (TA0040 Impact / T1499 Endpoint Denial of Service)
+* `DoS` $\rightarrow$ `dos` (TA0040 Impact / T1499 Endpoint Denial of Service)
 
-### Unmapped Categories (Requires Yash's Review):
-The following 6 categories exist in `NUSW-NB15_GT.csv` but have no pre-approved entry in `pipeline.label_standard`:
-1. `Fuzzers` (Protocol fuzzing, mixed port/payload sweeps)
-2. `Generic` (Block-cipher complexity attacks)
-3. `Shellcode` (Payload code execution)
-4. `Worms` (Self-propagating lateral spread)
-5. `Backdoors` (C2 / persistence mechanisms)
-6. `Analysis` (Port scans, spam, HTML file penetration)
+### Unmapped Categories (8 Total, Awaiting Yash's Decision):
+Per project lead instruction, all UNSW-specific categories are withheld from hardcoded mappings until Yash decides the official taxonomy:
+1. `Reconnaissance` (Withheld from automatic portscan mapping pending project decision)
+2. `Exploits` (Contains diverse exploits beyond web, e.g. Solaris rwalld UDP exploit; withheld from web_exploit)
+3. `Fuzzers` (Protocol fuzzing, mixed port/payload sweeps)
+4. `Generic` (Block-cipher complexity attacks)
+5. `Shellcode` (Payload code execution)
+6. `Worms` (Self-propagating lateral spread)
+7. `Backdoors` (C2 / persistence mechanisms)
+8. `Analysis` (Port scans, spam, HTML file penetration)
 
 **Enforcement in `scripts/build_events.py`**:
-* By default, encountering any unmapped category halts generation with a clear diagnostic message and exit code.
-* No mappings have been guessed or fabricated independently (Rule 6).
-* Once Yash approves the official MITRE tactic/technique and family mappings for these 6 categories, they will be registered in `pipeline/label_standard.py`.
-
+* By default, encountering any of these 8 unmapped categories halts generation with a clear diagnostic message and exit code.
+* No mappings have been guessed or fabricated independently.
+* Once Yash approves the official MITRE tactic/technique and family mappings for these 8 categories, they will be registered in `pipeline/label_standard.py`.

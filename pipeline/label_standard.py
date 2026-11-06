@@ -1,11 +1,12 @@
 """Canonical Standard Family to MITRE ATT&CK Mapping (docs/23 section 2).
 
 Standard reference mapping table for dataset standardisation.
-Contains only the 8 pre-approved attack families defined by the project.
+Contains only the pre-approved attack families defined by the project.
 New mappings or category adjustments must not be added here independently.
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, Optional
 
 # Canonical 14-column schema for ground_truth/<dataset>/events.csv / events.parquet
@@ -87,13 +88,12 @@ STANDARD_FAMILY_TABLE: Dict[str, Dict[str, str]] = {
 
 # Mapping from common dataset raw category names to standard families
 # ONLY includes direct synonyms documented in docs/23 section 5.
-# Any category not listed here must be reported as unmapped.
+# Note: UNSW "reconnaissance" and "exploits" are deliberately omitted so Yash can decide them.
 RAW_CATEGORY_TO_FAMILY: Dict[str, str] = {
     "benign": "benign",
     "normal": "benign",
     "portscan": "portscan",
     "port scan": "portscan",
-    "reconnaissance": "portscan",
     "ftp-patator": "bruteforce",
     "ssh-patator": "bruteforce",
     "ftp-bruteforce": "bruteforce",
@@ -107,7 +107,6 @@ RAW_CATEGORY_TO_FAMILY: Dict[str, str] = {
     "web attack - sql injection": "web_exploit",
     "web attack – sql injection": "web_exploit",
     "heartbleed": "web_exploit",
-    "exploits": "web_exploit",
     "infiltration": "infiltration",
     "infilteration": "infiltration",
     "bot": "botnet_c2",
@@ -123,16 +122,26 @@ RAW_CATEGORY_TO_FAMILY: Dict[str, str] = {
 }
 
 
+def normalize_dashes(text: str) -> str:
+    """Normalize hyphens, en-dashes, em-dashes, and Windows-1252 0x96 bytes to standard hyphen."""
+    return text.replace("\x96", "-").replace("–", "-").replace("—", "-")
+
+
 def lookup_standard_mapping(category: str) -> Optional[Dict[str, str]]:
     """Look up MITRE tactic and technique for a raw category name.
     
     Returns standard mapping dict if known, or None if unmapped.
+    Normalises hyphens, en-dashes (U+2013), em-dashes, and 0x96 so either form matches.
     """
+    if category is None:
+        return None
     cleaned = category.strip().lower()
     family = RAW_CATEGORY_TO_FAMILY.get(cleaned)
+    if not family:
+        dash_norm = normalize_dashes(cleaned)
+        family = RAW_CATEGORY_TO_FAMILY.get(dash_norm)
     if not family:
         family = cleaned if cleaned in STANDARD_FAMILY_TABLE else None
     if family and family in STANDARD_FAMILY_TABLE:
         return STANDARD_FAMILY_TABLE[family]
     return None
-

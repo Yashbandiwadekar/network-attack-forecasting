@@ -103,6 +103,7 @@ def scan_pcap_with_scapy(
     obs_att: Optional[str] = None
     obs_vic: Optional[str] = None
     pkt_count = 0
+    scapy_notes: List[str] = []
 
     min_time = (start_dt.timestamp() - window_seconds) if start_dt else None
     max_time = (end_dt.timestamp() + window_seconds) if end_dt else None
@@ -155,13 +156,18 @@ def scan_pcap_with_scapy(
                         last_epoch = epoch
 
         except Exception as e:
-            pass
+            scapy_notes.append(f"scapy error reading {pcap_file.name}: {e}")
 
     if first_epoch is not None and last_epoch is not None:
         note = f"Matched {pkt_count} packets via streaming scan"
+        if scapy_notes:
+            note += f" ({'; '.join(scapy_notes)})"
         return True, first_epoch, last_epoch, obs_att, obs_vic, note
 
-    return False, None, None, None, None, "No matching packets found in window"
+    note = "No matching packets found in window"
+    if scapy_notes:
+        note += f" ({'; '.join(scapy_notes)})"
+    return False, None, None, None, None, note
 
 
 def scan_pcap_with_tshark(
@@ -180,6 +186,7 @@ def scan_pcap_with_tshark(
     obs_att: Optional[str] = None
     obs_vic: Optional[str] = None
     total_pkts = 0
+    tshark_notes: List[str] = []
 
     min_time = (start_dt.timestamp() - window_seconds) if start_dt else None
     max_time = (end_dt.timestamp() + window_seconds) if end_dt else None
@@ -211,7 +218,12 @@ def scan_pcap_with_tshark(
         try:
             res = subprocess.run(cmd, capture_output=True, text=True, check=False)
             if res.returncode != 0:
-                continue
+                err_msg = res.stderr.strip()[:100] if res.stderr else "unknown error"
+                tshark_notes.append(f"tshark returned code {res.returncode}: {err_msg}")
+                # Cut-short or truncated captures often return code 14 but still produce valid packets in stdout
+                if not res.stdout or not res.stdout.strip():
+                    continue
+
             for line in res.stdout.strip().splitlines():
                 parts = line.strip().split()
                 if len(parts) >= 3:
@@ -235,14 +247,20 @@ def scan_pcap_with_tshark(
                             last_epoch = ep
                     except ValueError:
                         continue
-        except Exception:
+        except Exception as exc:
+            tshark_notes.append(f"tshark error on {pcap.name}: {exc}")
             continue
 
     if first_epoch is not None and last_epoch is not None:
         note = f"Matched {total_pkts} packets via tshark"
+        if tshark_notes:
+            note += f" ({'; '.join(tshark_notes)})"
         return True, first_epoch, last_epoch, obs_att, obs_vic, note
 
-    return False, None, None, None, None, "No matching packets found in window"
+    note = "No matching packets found in window"
+    if tshark_notes:
+        note += f" ({'; '.join(tshark_notes)})"
+    return False, None, None, None, None, note
 
 
 def check_events_in_pcap(
@@ -266,7 +284,7 @@ def check_events_in_pcap(
     window_seconds = window_hours * 3600.0
     results: List[Dict[str, Any]] = []
 
-    with open(events_file, "r", encoding="utf-8") as f:
+    with open(events_file, "r", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         events = list(reader)
 

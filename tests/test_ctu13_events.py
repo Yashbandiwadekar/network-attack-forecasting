@@ -131,6 +131,45 @@ def test_ctu13_binetflow_parsing_and_events(tmp_path: Path):
     assert "flow=Normal-Unverified-Host" not in labels
 
 
+def test_ctu13_scenario_2_normal_hosts_excludes_134(tmp_path: Path):
+    """Test that CTU-13 Scenario 2 normal hosts excludes 147.32.84.134."""
+    binet_file = tmp_path / "scenario_02.binetflow"
+    out_file = tmp_path / "events_s2.parquet"
+
+    rows = [
+        # Normal flow from 147.32.84.170 (verified normal in S2) -> produces benign
+        {
+            "StartTime": "2011/08/11 10:00:00.000000", "Dur": "1.0", "Proto": "tcp",
+            "SrcAddr": "147.32.84.170", "Sport": "1111", "Dir": "->",
+            "DstAddr": "147.32.80.1", "Dport": "80", "State": "PA_PA",
+            "sTos": "0", "dTos": "0", "TotPkts": "5", "TotBytes": "500", "SrcBytes": "250",
+            "Label": "flow=Normal-Host-170",
+        },
+        # Normal flow from 147.32.84.164 (verified normal in S2) -> produces benign
+        {
+            "StartTime": "2011/08/11 10:05:00.000000", "Dur": "1.0", "Proto": "tcp",
+            "SrcAddr": "147.32.84.164", "Sport": "2222", "Dir": "->",
+            "DstAddr": "147.32.80.1", "Dport": "80", "State": "PA_PA",
+            "sTos": "0", "dTos": "0", "TotPkts": "5", "TotBytes": "500", "SrcBytes": "250",
+            "Label": "flow=Normal-Host-164",
+        },
+        # Normal flow from 147.32.84.134 (NOT verified normal in S2, must be excluded)
+        {
+            "StartTime": "2011/08/11 10:10:00.000000", "Dur": "1.0", "Proto": "tcp",
+            "SrcAddr": "147.32.84.134", "Sport": "3333", "Dir": "->",
+            "DstAddr": "147.32.80.1", "Dport": "80", "State": "PA_PA",
+            "sTos": "0", "dTos": "0", "TotPkts": "5", "TotBytes": "500", "SrcBytes": "250",
+            "Label": "flow=Normal-Host-134",
+        },
+    ]
+    _create_binetflow_fixture(binet_file, rows)
+
+    df_out = build_ctu13_events(binet_file, out_file, scenario_id=2)
+    assert len(df_out) == 2
+    assert set(df_out["attacker_ip"].unique()) == {"147.32.84.170", "147.32.84.164"}
+    assert "147.32.84.134" not in df_out["attacker_ip"].values
+
+
 def test_ctu13_malformed_input(tmp_path: Path):
     """Test error handling on missing required columns."""
     bad_file = tmp_path / "bad.binetflow"
@@ -139,3 +178,4 @@ def test_ctu13_malformed_input(tmp_path: Path):
 
     with pytest.raises(ValueError, match="missing required"):
         build_ctu13_events(bad_file, out_file, scenario_id=1)
+

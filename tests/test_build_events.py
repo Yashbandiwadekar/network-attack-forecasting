@@ -41,49 +41,49 @@ def test_build_events_unsw_standard_mapping(tmp_path: Path):
     #             1421927300 = 2015-01-22T11:48:20Z
     #             1424160000 = 2015-02-17T08:00:00Z
     rows = [
-        # Row 1: Reconnaissance (maps to portscan / TA0043 / T1595)
+        # Row 1: DoS (standard mapped family: dos / TA0040 / T1499)
         {
             "Start time": "1421927000",
             "Last time": "1421927300",
-            "Attack category": "Reconnaissance",
-            "Attack subcategory": "Port Scan",
+            "Attack category": "DoS",
+            "Attack subcategory": "Hulk",
             "Protocol": "tcp",
             "Source IP": "175.45.176.0",
             "Source Port": "12345",
             "Destination IP": "149.171.126.100",
             "Destination Port": "80",
-            "Attack Name": "Nmap Port Scan",
+            "Attack Name": "Hulk flood",
             "Attack Reference": "CVE-2015-XXXX",
         },
         # Row 2: Exact duplicate of Row 1
         {
             "Start time": "1421927000",
             "Last time": "1421927300",
-            "Attack category": "Reconnaissance",
-            "Attack subcategory": "Port Scan",
+            "Attack category": "DoS",
+            "Attack subcategory": "Hulk",
             "Protocol": "tcp",
             "Source IP": "175.45.176.0",
             "Source Port": "12345",
             "Destination IP": "149.171.126.100",
             "Destination Port": "80",
-            "Attack Name": "Nmap Port Scan",
+            "Attack Name": "Hulk flood",
             "Attack Reference": "CVE-2015-XXXX",
         },
-        # Row 3: Exploits (maps to web_exploit / TA0001 / T1190)
+        # Row 3: PortScan (standard mapped family: portscan / TA0043 / T1595)
         {
             "Start time": "1421928000",
             "Last time": "1421928500",
-            "Attack category": "Exploits",
-            "Attack subcategory": "SQL Injection",
+            "Attack category": "PortScan",
+            "Attack subcategory": "SYN Scan",
             "Protocol": "tcp",
             "Source IP": "175.45.176.1",
             "Source Port": "45678",
             "Destination IP": "149.171.126.101",
             "Destination Port": "80",
-            "Attack Name": "SQLi Probe",
+            "Attack Name": "Nmap Port Scan",
             "Attack Reference": "SecLists",
         },
-        # Row 4: DoS (maps to dos / TA0040 / T1499)
+        # Row 4: DoS (another instance on day 2)
         {
             "Start time": "1424160000",
             "Last time": "1424160300",
@@ -118,22 +118,22 @@ def test_build_events_unsw_standard_mapping(tmp_path: Path):
     assert df_out.iloc[2]["campaign_id"] == "unsw_20150217_175.45.176.2"
 
     # 5. Original label preservation
-    assert df_out.iloc[0]["original_label"] == "Reconnaissance"
-    assert df_out.iloc[1]["original_label"] == "Exploits"
+    assert df_out.iloc[0]["original_label"] == "DoS"
+    assert df_out.iloc[1]["original_label"] == "PortScan"
     assert df_out.iloc[2]["original_label"] == "DoS"
 
     # 6. Attack variant preservation
-    assert df_out.iloc[0]["attack_variant"] == "Port Scan"
-    assert df_out.iloc[1]["attack_variant"] == "SQL Injection"
+    assert df_out.iloc[0]["attack_variant"] == "Hulk"
+    assert df_out.iloc[1]["attack_variant"] == "SYN Scan"
 
     # 7. MITRE mapping lookup
-    assert df_out.iloc[0]["attack_family"] == "portscan"
-    assert df_out.iloc[0]["mitre_tactic"] == "TA0043"
-    assert df_out.iloc[0]["mitre_technique"] == "T1595"
+    assert df_out.iloc[0]["attack_family"] == "dos"
+    assert df_out.iloc[0]["mitre_tactic"] == "TA0040"
+    assert df_out.iloc[0]["mitre_technique"] == "T1499"
 
-    assert df_out.iloc[1]["attack_family"] == "web_exploit"
-    assert df_out.iloc[1]["mitre_tactic"] == "TA0001"
-    assert df_out.iloc[1]["mitre_technique"] == "T1190"
+    assert df_out.iloc[1]["attack_family"] == "portscan"
+    assert df_out.iloc[1]["mitre_tactic"] == "TA0043"
+    assert df_out.iloc[1]["mitre_technique"] == "T1595"
 
     assert df_out.iloc[2]["attack_family"] == "dos"
     assert df_out.iloc[2]["mitre_tactic"] == "TA0040"
@@ -154,7 +154,7 @@ def test_build_events_unsw_standard_mapping(tmp_path: Path):
 
 
 def test_build_events_unmapped_category_error(tmp_path: Path):
-    """Test that unmapped categories (Fuzzers, Generic, Shellcode, Worms, Backdoors, Analysis) stop execution."""
+    """Test that unmapped categories (including Reconnaissance and Exploits) stop execution."""
     gt_file = tmp_path / "NUSW-NB15_GT_unmapped.csv"
     out_file = tmp_path / "events.parquet"
 
@@ -162,27 +162,40 @@ def test_build_events_unmapped_category_error(tmp_path: Path):
         {
             "Start time": "1421927000",
             "Last time": "1421927300",
-            "Attack category": "Fuzzers",
-            "Attack subcategory": "FTP",
+            "Attack category": "Reconnaissance",
+            "Attack subcategory": "Port Scan",
             "Protocol": "tcp",
             "Source IP": "175.45.176.0",
             "Source Port": "1234",
             "Destination IP": "149.171.126.100",
-            "Destination Port": "21",
-            "Attack Name": "Fuzzing probe",
+            "Destination Port": "80",
+            "Attack Name": "Scanning probe",
             "Attack Reference": "",
         },
         {
             "Start time": "1421928000",
             "Last time": "1421928300",
-            "Attack category": "Backdoors",
-            "Attack subcategory": "HTTP",
-            "Protocol": "tcp",
+            "Attack category": "Exploits",
+            "Attack subcategory": "Solaris rwalld",
+            "Protocol": "udp",
             "Source IP": "175.45.176.1",
             "Source Port": "5678",
             "Destination IP": "149.171.126.101",
-            "Destination Port": "80",
-            "Attack Name": "Backdoor agent",
+            "Destination Port": "1024",
+            "Attack Name": "UDP Exploit",
+            "Attack Reference": "",
+        },
+        {
+            "Start time": "1421929000",
+            "Last time": "1421929300",
+            "Attack category": "Fuzzers",
+            "Attack subcategory": "FTP",
+            "Protocol": "tcp",
+            "Source IP": "175.45.176.2",
+            "Source Port": "1234",
+            "Destination IP": "149.171.126.102",
+            "Destination Port": "21",
+            "Attack Name": "Fuzzing probe",
             "Attack Reference": "",
         },
     ]
@@ -226,4 +239,3 @@ def test_build_events_allow_unmapped_flag(tmp_path: Path):
     assert df_out.iloc[0]["attack_family"] == ""
     assert df_out.iloc[0]["mitre_tactic"] == ""
     assert df_out.iloc[0]["mitre_technique"] == ""
-

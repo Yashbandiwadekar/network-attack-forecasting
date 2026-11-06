@@ -52,12 +52,13 @@
 ## 5. Known Issues
 
 1. **Missing Capture Files**: PCAPs 18 through 26 for 17 February 2015 are absent from the primary dataset download mirror.
-2. **Unmapped Attack Categories**: 6 of the 9 UNSW attack categories (`Fuzzers`, `Generic`, `Shellcode`, `Worms`, `Backdoors`, `Analysis`) do not cleanly map to single MITRE stages.
+2. **Unmapped Attack Categories**: 8 of the 9 UNSW attack categories (`Reconnaissance`, `Exploits`, `Fuzzers`, `Generic`, `Shellcode`, `Worms`, `Backdoors`, `Analysis`) are currently unmapped pending project lead taxonomy decisions.
 3. **Argus Protocol Handling**: ~130 protocols reported by Argus; non-TCP/UDP/ICMP flows are normalized onto protocol 255 to prevent silent row dropping.
 
 ---
 
 ## 6. Open Questions
 
-1. **Category Mapping Approval**: Yash to review and confirm standard family and MITRE mappings for the 6 unmapped categories.
+1. **Category Mapping Approval**: Yash to review and confirm standard family and MITRE mappings for the 8 unmapped categories (including Reconnaissance and Exploits).
 2. **Missing PCAP Recovery**: Confirmation whether UNSW PCAPs 18–26 for 17-02-2015 can be retrieved from alternative UNSW archives.
+

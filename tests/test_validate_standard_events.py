@@ -92,3 +92,4 @@ def test_validator_detects_held_out_friday_contamination():
     df = pd.DataFrame([row], columns=CANONICAL_EVENT_COLUMNS)
     errors = validate_events_df(df)
     assert any("Held-out test day Friday 23-02-2018 detected" in e for e in errors)
+
