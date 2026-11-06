@@ -77,12 +77,20 @@ STANDARD_FAMILY_TABLE: Dict[str, Dict[str, str]] = {
         "mitre_technique": "T1498",     # Network Denial of Service
         "kill_chain_stage": "impact",
     },
+    "benign": {
+        "attack_family": "benign",
+        "mitre_tactic": "",
+        "mitre_technique": "",
+        "kill_chain_stage": "benign",
+    },
 }
 
 # Mapping from common dataset raw category names to standard families
 # ONLY includes direct synonyms documented in docs/23 section 5.
 # Any category not listed here must be reported as unmapped.
 RAW_CATEGORY_TO_FAMILY: Dict[str, str] = {
+    "benign": "benign",
+    "normal": "benign",
     "portscan": "portscan",
     "port scan": "portscan",
     "reconnaissance": "portscan",
@@ -127,3 +135,4 @@ def lookup_standard_mapping(category: str) -> Optional[Dict[str, str]]:
     if family and family in STANDARD_FAMILY_TABLE:
         return STANDARD_FAMILY_TABLE[family]
     return None
+
