@@ -101,3 +101,46 @@ def test_build_lab_events_missing_label_column(tmp_path: Path):
     with pytest.raises(ValueError, match="missing 'label' column"):
         build_lab_events(bad_sidecar, out_file)
 
+
+def test_build_lab_events_unmapped_labels_raise_error(tmp_path: Path):
+    """Test that unmapped labels raise ValueError and list all unmapped labels (P-01)."""
+    sidecar_file = tmp_path / "unmapped_labels.csv"
+    out_file = tmp_path / "events.parquet"
+
+    rows = [
+        {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "start": "2026-10-10 12:00:00", "end": "2026-10-10 12:05:00", "label": "custom_initial_access", "dst_port": "80"},
+        {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "start": "2026-10-10 12:10:00", "end": "2026-10-10 12:15:00", "label": "unknown_impact_label", "dst_port": "80"},
+        {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "start": "2026-10-10 12:20:00", "end": "2026-10-10 12:25:00", "label": "SSH-Bruteforce", "dst_port": "22"},
+    ]
+    _create_lab_sidecar_fixture(sidecar_file, rows)
+
+    with pytest.raises(ValueError) as excinfo:
+        build_lab_events(sidecar_file, out_file)
+
+    err_msg = str(excinfo.value)
+    assert "Unmapped lab attack labels" in err_msg
+    assert "custom_initial_access" in err_msg
+    assert "unknown_impact_label" in err_msg
+    assert "project-approved standard mapping" in err_msg
+
+
+def test_build_lab_events_all_approved_families(tmp_path: Path):
+    """Test positive mapping across standard approved lab labels."""
+    sidecar_file = tmp_path / "all_families.csv"
+    out_file = tmp_path / "events.parquet"
+
+    rows = [
+        {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "start": "2026-10-10 10:00:00", "end": "2026-10-10 10:05:00", "label": "DoS attacks-Hulk", "dst_port": "80"},
+        {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "start": "2026-10-10 10:10:00", "end": "2026-10-10 10:15:00", "label": "Brute Force -Web", "dst_port": "80"},
+        {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "start": "2026-10-10 10:20:00", "end": "2026-10-10 10:25:00", "label": "SQL Injection", "dst_port": "80"},
+        {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "start": "2026-10-10 10:30:00", "end": "2026-10-10 10:35:00", "label": "SYNTH-Exfiltration", "dst_port": "443"},
+        {"src_ip": "10.0.0.1", "dst_ip": "10.0.0.2", "start": "2026-10-10 10:40:00", "end": "2026-10-10 10:45:00", "label": "DDoS attacks-LOIC-HTTP", "dst_port": "80"},
+    ]
+    _create_lab_sidecar_fixture(sidecar_file, rows)
+
+    df = build_lab_events(sidecar_file, out_file)
+    assert len(df) == 5
+    families = df["attack_family"].tolist()
+    assert families == ["dos", "bruteforce", "web_exploit", "exfiltration", "ddos"]
+
+

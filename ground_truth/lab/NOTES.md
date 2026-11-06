@@ -38,11 +38,19 @@ The sidecar `labels.csv` conforms to `pipeline/adapters/sidecar.py`:
 * `citation`: `scripts/record_lab_campaigns.py: synthetic lab recording (controlled local research)`
 * `campaign_id`: `lab_<YYYYMMDD>_<src_ip>_<label>_<index>`
 
-Attack families and MITRE tactics/techniques are looked up using `pipeline.label_standard.lookup_standard_mapping()` and `pipeline.mitre_mapping.label_to_stage()`:
-* `PortScan` $\rightarrow$ `portscan` (TA0043, T1595)
-* `SSH-Bruteforce` / `FTP-BruteForce` $\rightarrow$ `bruteforce` (TA0006, T1110)
-* `Bot` $\rightarrow$ `botnet_c2` (TA0011, T1071)
-* `DoS` / `DDoS` $\rightarrow$ `dos` / `ddos` (TA0040, T1499 / T1498)
+Attack families and MITRE tactics/techniques are looked up strictly using `pipeline.label_standard.lookup_standard_mapping()` (P-01):
+* No heuristic fallback from stage or tactic to attack family is permitted.
+* Unmapped labels immediately raise an explicit `ValueError` listing all unmapped labels encountered.
+* Adding new lab labels requires project-approved entries in `pipeline.label_standard`.
+* Supported lab mappings include:
+  * `PortScan` $\rightarrow$ `portscan` (TA0043, T1595)
+  * `SSH-Bruteforce` / `FTP-BruteForce` / `SSH-Patator` / `FTP-Patator` / `Brute Force -Web` $\rightarrow$ `bruteforce` (TA0006, T1110)
+  * `SQL Injection` $\rightarrow$ `web_exploit` (TA0001, T1190)
+  * `Infiltration` $\rightarrow$ `infiltration` (TA0008, T1021)
+  * `Bot` $\rightarrow$ `botnet_c2` (TA0011, T1071)
+  * `SYNTH-Exfiltration` $\rightarrow$ `exfiltration` (TA0010, T1041)
+  * `DoS attacks-Hulk` / `DoS attacks-GoldenEye` / `DoS attacks-SlowHTTPTest` $\rightarrow$ `dos` (TA0040, T1499)
+  * `DDoS attacks-LOIC-HTTP` $\rightarrow$ `ddos` (TA0040, T1498)
 
 ---
 

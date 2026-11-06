@@ -635,6 +635,23 @@ def build_lab_events(
         if col not in df_raw.columns:
             df_raw[col] = ""
 
+    # Pre-validation: verify all labels exist in project-approved standard mapping (P-01)
+    unmapped_labels: List[str] = []
+    for idx, row in df_raw.iterrows():
+        raw_label = row["label"].strip()
+        mapping = lookup_standard_mapping(raw_label)
+        if not mapping:
+            if raw_label not in unmapped_labels:
+                unmapped_labels.append(raw_label)
+
+    if unmapped_labels:
+        msg = (
+            "Unmapped lab attack labels:\n"
+            + "\n".join(f"  - {l}" for l in unmapped_labels)
+            + "\nPlease add these labels to the project-approved standard mapping before event generation."
+        )
+        raise ValueError(msg)
+
     records: List[Dict[str, Any]] = []
     events_per_family: Dict[str, int] = {}
 
@@ -652,43 +669,12 @@ def build_lab_events(
         # Date for campaign ID
         date_str = start_ts[:10].replace("-", "") if start_ts else "20261010"
 
-        # Lookup standard mapping
+        # Lookup standard mapping (strict, no heuristic fallback)
         mapping = lookup_standard_mapping(raw_label)
-        if mapping:
-            family = mapping["attack_family"]
-            tactic = mapping["mitre_tactic"]
-            technique = mapping["mitre_technique"]
-        else:
-            # Fallback to mitre_mapping.label_to_stage
-            stg = label_to_stage(raw_label)
-            if stg == RECONNAISSANCE:
-                family = "portscan"
-                tactic = "TA0043"
-                technique = "T1595"
-            elif stg == INITIAL_ACCESS:
-                family = "bruteforce"
-                tactic = "TA0006"
-                technique = "T1110"
-            elif stg == LATERAL_MOVEMENT:
-                family = "infiltration"
-                tactic = "TA0008"
-                technique = "T1021"
-            elif stg == COMMAND_AND_CONTROL:
-                family = "botnet_c2"
-                tactic = "TA0011"
-                technique = "T1071"
-            elif stg == EXFILTRATION:
-                family = "exfiltration"
-                tactic = "TA0010"
-                technique = "T1041"
-            elif stg == IMPACT:
-                family = "dos"
-                tactic = "TA0040"
-                technique = "T1499"
-            else:
-                family = "benign"
-                tactic = ""
-                technique = ""
+        assert mapping is not None, f"Pre-validated label unexpectedly missing: {raw_label}"
+        family = mapping["attack_family"]
+        tactic = mapping["mitre_tactic"]
+        technique = mapping["mitre_technique"]
 
         dst_port = ""
         if dst_port_raw.isdigit():
