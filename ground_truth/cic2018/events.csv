@@ -1,0 +1,3 @@
+campaign_id,attacker_ip,victim_ip,dst_port,start_ts,end_ts,attack_family,attack_variant,mitre_tactic,mitre_technique,label_source,label_confidence,original_label,citation
+cic2018_wed_bruteforce_01,18.221.219.4,172.31.69.25,21,2018-02-14T10:30:00Z,2018-02-14T11:30:00Z,bruteforce,ftp_bruteforce,TA0006,T1110,ground_truth_schedule,window,FTP-BruteForce,https://www.unb.ca/cic/datasets/ids-2018.html (Wednesday-14-02-2018)
+cic2018_wed_bruteforce_02,18.221.219.4,172.31.69.25,22,2018-02-14T14:00:00Z,2018-02-14T15:00:00Z,bruteforce,ssh_bruteforce,TA0006,T1110,ground_truth_schedule,window,SSH-Bruteforce,https://www.unb.ca/cic/datasets/ids-2018.html (Wednesday-14-02-2018)
