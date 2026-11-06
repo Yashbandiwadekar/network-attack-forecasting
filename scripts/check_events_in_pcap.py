@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import argparse
 import csv
+import ipaddress
+import json
 import os
 import shutil
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 CHECK_CSV_COLUMNS = [
     "campaign_id",
@@ -28,11 +30,107 @@ CHECK_CSV_COLUMNS = [
     "notes",
 ]
 
-# Known NAT / gateway address mappings in datasets like CIC-IDS-2017
+DEFAULT_NAT_CONFIG_PATH = Path("config/nat_aliases.json")
+
+# Legacy reference mapping
 KNOWN_NAT_MAPPINGS: Dict[str, List[str]] = {
     "205.174.165.73": ["172.16.0.1"],
     "172.16.0.1": ["205.174.165.73"],
 }
+
+
+def load_nat_mapping(
+    nat_config_path: Optional[Path | str] = None,
+    use_default_if_none: bool = True,
+) -> Dict[str, List[str]]:
+    """Load and validate configurable NAT mappings from JSON file (P-02).
+
+    Expected JSON Schema:
+    {
+      "mappings": [
+        {
+          "published_ip": "205.174.165.73",
+          "observed_ip": "172.16.0.1",
+          "description": "optional"
+        }
+      ]
+    }
+
+    Returns bidirectional lookup dictionary mapping IP to list of alias IPs.
+    Rejects malformed addresses, missing fields, duplicates, and conflicting entries.
+    """
+    target_path: Optional[Path] = None
+    if nat_config_path is not None:
+        target_path = Path(nat_config_path).resolve()
+        if not target_path.is_file():
+            raise FileNotFoundError(f"NAT configuration file not found: {target_path}")
+    elif use_default_if_none:
+        candidate = DEFAULT_NAT_CONFIG_PATH.resolve()
+        if candidate.is_file():
+            target_path = candidate
+
+    if target_path is None:
+        return dict(KNOWN_NAT_MAPPINGS) if use_default_if_none else {}
+
+    try:
+        with open(target_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception as e:
+        raise ValueError(f"Invalid JSON in NAT configuration {target_path}: {e}")
+
+    if not isinstance(data, dict) or "mappings" not in data:
+        raise ValueError(f"NAT configuration {target_path} must be a JSON object with a 'mappings' list.")
+
+    mappings = data["mappings"]
+    if not isinstance(mappings, list):
+        raise ValueError(f"NAT configuration {target_path} 'mappings' key must be a list.")
+
+    lookup: Dict[str, List[str]] = {}
+    seen_pairs: Set[Tuple[str, str]] = set()
+
+    for i, item in enumerate(mappings):
+        if not isinstance(item, dict):
+            raise ValueError(f"NAT mapping entry #{i} in {target_path} must be a dictionary.")
+
+        pub_ip_raw = item.get("published_ip")
+        obs_ip_raw = item.get("observed_ip")
+
+        if not pub_ip_raw or not isinstance(pub_ip_raw, str) or not pub_ip_raw.strip():
+            raise ValueError(f"NAT mapping entry #{i} in {target_path} missing or empty 'published_ip'.")
+        if not obs_ip_raw or not isinstance(obs_ip_raw, str) or not obs_ip_raw.strip():
+            raise ValueError(f"NAT mapping entry #{i} in {target_path} missing or empty 'observed_ip'.")
+
+        pub_ip = pub_ip_raw.strip()
+        obs_ip = obs_ip_raw.strip()
+
+        # Validate IPs
+        try:
+            ipaddress.ip_address(pub_ip)
+        except ValueError as e:
+            raise ValueError(f"Invalid published IP '{pub_ip}' in {target_path} entry #{i}: {e}")
+
+        try:
+            ipaddress.ip_address(obs_ip)
+        except ValueError as e:
+            raise ValueError(f"Invalid observed IP '{obs_ip}' in {target_path} entry #{i}: {e}")
+
+        pair = (pub_ip, obs_ip)
+        if pair in seen_pairs:
+            raise ValueError(f"Duplicate NAT mapping for pair ({pub_ip} -> {obs_ip}) in {target_path} entry #{i}.")
+        seen_pairs.add(pair)
+
+        if pub_ip not in lookup:
+            lookup[pub_ip] = []
+        if obs_ip not in lookup[pub_ip]:
+            lookup[pub_ip].append(obs_ip)
+
+        # Allow reverse lookup so traffic in either direction resolves
+        if obs_ip not in lookup:
+            lookup[obs_ip] = []
+        if pub_ip not in lookup[obs_ip]:
+            lookup[obs_ip].append(pub_ip)
+
+    return lookup
 
 
 def parse_iso_utc(ts_str: str) -> Optional[datetime]:
@@ -269,6 +367,7 @@ def check_events_in_pcap(
     out_csv_path: Path | str,
     window_hours: float = 6.0,
     prefer_scapy: bool = False,
+    nat_map_path: Optional[Path | str] = None,
 ) -> List[Dict[str, Any]]:
     """Validate each event in events_csv against the specified PCAP file or directory."""
     events_file = Path(events_csv_path).resolve()
@@ -280,6 +379,7 @@ def check_events_in_pcap(
 
     pcap_files = collect_pcap_files(target_pcap)
     tshark_exe = None if prefer_scapy else find_tshark_path()
+    nat_map = load_nat_mapping(nat_map_path, use_default_if_none=True)
 
     window_seconds = window_hours * 3600.0
     results: List[Dict[str, Any]] = []
@@ -302,12 +402,12 @@ def check_events_in_pcap(
         dst_port = int(dst_port_str) if dst_port_str.isdigit() else None
 
         cand_att = {att_ip} if att_ip else set()
-        if att_ip in KNOWN_NAT_MAPPINGS:
-            cand_att.update(KNOWN_NAT_MAPPINGS[att_ip])
+        if att_ip in nat_map:
+            cand_att.update(nat_map[att_ip])
 
         cand_vic = {vic_ip} if vic_ip else set()
-        if vic_ip in KNOWN_NAT_MAPPINGS:
-            cand_vic.update(KNOWN_NAT_MAPPINGS[vic_ip])
+        if vic_ip in nat_map:
+            cand_vic.update(nat_map[vic_ip])
 
         if not pcap_files:
             results.append({
@@ -341,6 +441,16 @@ def check_events_in_pcap(
             if start_dt:
                 offset_sec = f"{(f_epoch - start_dt.timestamp()):.2f}"
 
+            nat_notes: List[str] = []
+            if o_att and o_att != att_ip and att_ip in nat_map and o_att in nat_map[att_ip]:
+                nat_notes.append(f"NAT mapping applied: published attacker {att_ip} -> observed {o_att}")
+            if o_vic and o_vic != vic_ip and vic_ip in nat_map and o_vic in nat_map[vic_ip]:
+                nat_notes.append(f"NAT mapping applied: published victim {vic_ip} -> observed {o_vic}")
+
+            full_notes = note
+            if nat_notes:
+                full_notes = f"{note} [{'; '.join(nat_notes)}]"
+
             results.append({
                 "campaign_id": campaign_id,
                 "found": "yes",
@@ -349,7 +459,7 @@ def check_events_in_pcap(
                 "offset_from_published_start": offset_sec,
                 "observed_attacker_ip": o_att or "",
                 "observed_victim_ip": o_vic or "",
-                "notes": note,
+                "notes": full_notes,
             })
         else:
             results.append({
@@ -383,6 +493,7 @@ def main() -> None:
     parser.add_argument("--out", required=True, help="Output check.csv path")
     parser.add_argument("--window-hours", type=float, default=6.0, help="Search window in hours around event time (default 6.0)")
     parser.add_argument("--scapy-only", action="store_true", help="Force pure Python Scapy scanner without tshark")
+    parser.add_argument("--nat-map", type=str, default=None, help="Path to JSON file specifying NAT IP aliases (default: config/nat_aliases.json if present)")
 
     args = parser.parse_args()
     check_events_in_pcap(
@@ -391,6 +502,7 @@ def main() -> None:
         out_csv_path=args.out,
         window_hours=args.window_hours,
         prefer_scapy=args.scapy_only,
+        nat_map_path=args.nat_map,
     )
 
 

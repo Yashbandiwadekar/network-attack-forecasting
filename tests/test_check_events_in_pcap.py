@@ -9,7 +9,7 @@ import pytest
 from scapy.all import Ether, IP, TCP, wrpcap
 
 from pipeline.label_standard import CANONICAL_EVENT_COLUMNS
-from scripts.check_events_in_pcap import check_events_in_pcap
+from scripts.check_events_in_pcap import check_events_in_pcap, load_nat_mapping
 
 
 def _write_sample_events(path: Path, rows: list[dict]) -> None:
@@ -245,5 +245,112 @@ def test_tshark_truncated_capture_exit_14(monkeypatch, tmp_path: Path):
     assert o_vic == "172.31.69.25"
     assert "tshark returned code 14" in note
     assert "cut short" in note
+
+
+def test_load_nat_mapping_valid(tmp_path: Path):
+    """Test loading valid NAT mapping configuration file."""
+    import json
+    cfg_file = tmp_path / "nat.json"
+    cfg_file.write_text(json.dumps({
+        "description": "Test NAT",
+        "mappings": [
+            {"published_ip": "198.51.100.1", "observed_ip": "10.0.0.1", "description": "Host 1"},
+            {"published_ip": "198.51.100.2", "observed_ip": "10.0.0.2"}
+        ]
+    }), encoding="utf-8")
+
+    mapping = load_nat_mapping(cfg_file)
+    assert "198.51.100.1" in mapping
+    assert "10.0.0.1" in mapping["198.51.100.1"]
+    assert "10.0.0.1" in mapping
+    assert "198.51.100.1" in mapping["10.0.0.1"]
+    assert "10.0.0.2" in mapping["198.51.100.2"]
+
+
+def test_load_nat_mapping_invalid_ip(tmp_path: Path):
+    """Test that malformed IP address raises ValueError."""
+    import json
+    cfg_file = tmp_path / "invalid_ip.json"
+    cfg_file.write_text(json.dumps({
+        "mappings": [
+            {"published_ip": "999.999.999.999", "observed_ip": "10.0.0.1"}
+        ]
+    }), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Invalid published IP"):
+        load_nat_mapping(cfg_file)
+
+
+def test_load_nat_mapping_duplicate_pair(tmp_path: Path):
+    """Test that duplicate mapping pair raises ValueError."""
+    import json
+    cfg_file = tmp_path / "dup.json"
+    cfg_file.write_text(json.dumps({
+        "mappings": [
+            {"published_ip": "198.51.100.1", "observed_ip": "10.0.0.1"},
+            {"published_ip": "198.51.100.1", "observed_ip": "10.0.0.1"}
+        ]
+    }), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Duplicate NAT mapping"):
+        load_nat_mapping(cfg_file)
+
+
+def test_check_events_custom_nat_map(tmp_path: Path):
+    """Test check_events_in_pcap with a custom NAT mapping path and verify notes reporting."""
+    import json
+    events_file = tmp_path / "events.csv"
+    pcap_file = tmp_path / "traffic.pcap"
+    out_file = tmp_path / "check.csv"
+    nat_file = tmp_path / "custom_nat.json"
+
+    nat_file.write_text(json.dumps({
+        "mappings": [
+            {"published_ip": "203.0.113.5", "observed_ip": "192.168.1.99"}
+        ]
+    }), encoding="utf-8")
+
+    base_time = datetime(2026, 11, 7, 10, 0, 0, tzinfo=timezone.utc)
+    base_epoch = base_time.timestamp()
+
+    _write_sample_events(events_file, [
+        {
+            "campaign_id": "custom_nat_camp",
+            "attacker_ip": "203.0.113.5",
+            "victim_ip": "192.168.1.10",
+            "dst_port": "8080",
+            "start_ts": "2026-11-07T10:00:00Z",
+            "end_ts": "2026-11-07T10:30:00Z",
+            "attack_family": "dos",
+            "attack_variant": "http_flood",
+            "mitre_tactic": "TA0040",
+            "mitre_technique": "T1499",
+            "label_source": "synthetic",
+            "label_confidence": "exact",
+            "original_label": "DoS",
+            "citation": "test_suite",
+        }
+    ])
+
+    # Traffic in capture uses observed IP 192.168.1.99
+    pkt = Ether() / IP(src="192.168.1.99", dst="192.168.1.10") / TCP(sport=50000, dport=8080)
+    pkt.time = base_epoch + 15.0
+    wrpcap(str(pcap_file), [pkt])
+
+    results = check_events_in_pcap(
+        events_csv_path=events_file,
+        pcap_path=pcap_file,
+        out_csv_path=out_file,
+        window_hours=1.0,
+        prefer_scapy=True,
+        nat_map_path=nat_file,
+    )
+
+    assert len(results) == 1
+    res = results[0]
+    assert res["found"] == "yes"
+    assert res["observed_attacker_ip"] == "192.168.1.99"
+    assert "NAT mapping applied: published attacker 203.0.113.5 -> observed 192.168.1.99" in res["notes"]
+
 
 

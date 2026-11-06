@@ -1,0 +1,10 @@
+{
+  "description": "Legacy verified NAT alias mappings for CIC-IDS-2017 firewall (P-02)",
+  "mappings": [
+    {
+      "published_ip": "205.174.165.73",
+      "observed_ip": "172.16.0.1",
+      "description": "Kali Linux attacker external IP to internal firewall NAT gateway address"
+    }
+  ]
+}
