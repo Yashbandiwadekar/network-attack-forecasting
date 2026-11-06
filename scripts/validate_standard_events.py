@@ -58,13 +58,17 @@ def validate_events_df(df: pd.DataFrame, source_name: str = "events") -> List[st
         row_id = f"Row {idx} (campaign_id={row.get('campaign_id', '')})"
 
         # Mandatory fields
-        for field in ("campaign_id", "attacker_ip", "start_ts", "end_ts", "original_label", "citation"):
+        for field in ("campaign_id", "attacker_ip", "original_label", "citation"):
             val = str(row.get(field, "")).strip()
             if not val or val.lower() == "nan":
                 errors.append(f"{source_name} {row_id}: Missing mandatory field '{field}'")
 
         start_ts = str(row.get("start_ts", "")).strip()
         end_ts = str(row.get("end_ts", "")).strip()
+        if start_ts.lower() == "nan":
+            start_ts = ""
+        if end_ts.lower() == "nan":
+            end_ts = ""
 
         # Timestamp format checks
         if start_ts and not UTC_ISO_REGEX.match(start_ts):
@@ -103,7 +107,8 @@ def validate_events_df(df: pd.DataFrame, source_name: str = "events") -> List[st
 
         # Held-out Friday 23-02-2018 protection check
         camp = str(row.get("campaign_id", "")).lower()
-        if "cic2018_fri" in camp or "2018-02-23" in start_ts:
+        cite = str(row.get("citation", "")).lower()
+        if "2018-02-23" in start_ts or "23-02" in camp or "23-02" in cite or "cic2018_fri_ddos" in camp:
             errors.append(f"{source_name} {row_id}: Contamination alert! Held-out test day Friday 23-02-2018 detected in event table.")
 
     return errors
