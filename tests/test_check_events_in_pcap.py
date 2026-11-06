@@ -166,3 +166,4 @@ def test_check_events_nat_resolution(tmp_path: Path):
     assert results[0]["found"] == "yes"
     assert results[0]["observed_attacker_ip"] == "172.16.0.1"
     assert float(results[0]["offset_from_published_start"]) == 120.0
+

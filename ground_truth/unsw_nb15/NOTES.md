@@ -58,3 +58,4 @@ The following 6 categories exist in `NUSW-NB15_GT.csv` but have no pre-approved 
 * By default, encountering any unmapped category halts generation with a clear diagnostic message and exit code.
 * No mappings have been guessed or fabricated independently (Rule 6).
 * Once Yash approves the official MITRE tactic/technique and family mappings for these 6 categories, they will be registered in `pipeline/label_standard.py`.
+

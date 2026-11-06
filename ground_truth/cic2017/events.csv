@@ -17,3 +17,4 @@ cic2017_fri_bot_01,205.174.165.73,192.168.10.14,,2017-07-07T10:02:00Z,2017-07-07
 cic2017_fri_bot_01,205.174.165.73,192.168.10.15,,2017-07-07T10:02:00Z,2017-07-07T12:59:00Z,botnet_c2,ares_botnet,TA0011,T1071,ground_truth_schedule,window,Bot,https://www.unb.ca/cic/datasets/ids-2017.html Table 4 (Friday 07/07/2017)
 cic2017_fri_portscan_01,205.174.165.73,192.168.10.50,,2017-07-07T13:00:00Z,2017-07-07T15:23:00Z,portscan,nmap_scan,TA0043,T1595,ground_truth_schedule,window,PortScan,https://www.unb.ca/cic/datasets/ids-2017.html Table 4 (Friday 07/07/2017)
 cic2017_fri_ddos_01,205.174.165.73,192.168.10.50,80,2017-07-07T15:56:00Z,2017-07-07T16:16:00Z,ddos,loic_http,TA0040,T1498,ground_truth_schedule,window,DDoS,https://www.unb.ca/cic/datasets/ids-2017.html Table 4 (Friday 07/07/2017)
+

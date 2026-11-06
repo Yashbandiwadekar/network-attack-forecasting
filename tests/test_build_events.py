@@ -226,3 +226,4 @@ def test_build_events_allow_unmapped_flag(tmp_path: Path):
     assert df_out.iloc[0]["attack_family"] == ""
     assert df_out.iloc[0]["mitre_tactic"] == ""
     assert df_out.iloc[0]["mitre_technique"] == ""
+

@@ -186,3 +186,4 @@ def test_capinfos_integration_with_scapy(tmp_path: Path):
         assert r["first_ts_utc"].endswith("Z")
         assert r["last_ts_utc"].endswith("Z")
         assert len(r["sha256"]) == 64
+
